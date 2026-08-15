@@ -1,0 +1,502 @@
+Paper: 2025北京西城高二（下）期末英语
+Response Length: 20156 characters
+================================================================================
+RAW RESPONSE (BEFORE PROCESSING):
+================================================================================
+{
+  "paper": {
+    "totalScore": 140,
+    "duration": 120
+  },
+  "sections": [
+    {
+      "type": "完形填空",
+      "title": "消防员用牛奶和啤酒救火",
+      "tags": [],
+      "questionStart": 1,
+      "questionEnd": 10,
+      "score": 15,
+      "article": "Firefighters should be quick thinkers. In an emergency, they should figure out the speediest and safest way to act, sometimes including improvising (临时拼凑) with the things <ClozeBlank></ClozeBlank>. Fire chief Fennessy knows this well. He is now making headlines for <ClozeBlank></ClozeBlank> two homes with milk and beer during a fire in Altadena, California.\n\n![菁师帮（北京题库）](images/image1.png)Although Altadena was not in his charge, Fennessy grew up there and still had family and friends there. Hearing the news of the fire, he tried to contact his brother. When he couldn't <ClozeBlank></ClozeBlank> his brother, Fennessy decided to drive over to Altadena. On his way, he learned his brother's family had been taken to safety, but since he had already made the <ClozeBlank></ClozeBlank>, Fennessy figured he might as well take a look.\n\nWhen reaching the spot, Fennessy couldn't believe his eyes at the sight of the ruins. \"I haven't seen anything like this where you drive for miles, and there's massive <ClozeBlank></ClozeBlank>,\" Fennessy said. When he reached his brother's street, his home and a neighbor's house were still standing, but he <ClozeBlank></ClozeBlank> the flames were getting too close, as other nearby homes were already burning down.\n\nEven more worrisome, a gas meter on the neighbor's house was melting (熔化), surrounded by fire. Thinking he had to <ClozeBlank></ClozeBlank> the gas meter, he looked for a hose (水龙带), but there was no water.\n\nExploring his options, Fennessy <ClozeBlank></ClozeBlank> his entry through the front door of one of the homes and went into the kitchen looking for whatever he could use. \"I ended up finding some milk and beer,\" he explained. \"To do nothing means the home's going to be <ClozeBlank></ClozeBlank>, and in this case, a little milk and beer really saved the day.\"\n\nThe two homes he saved are now the only two houses standing on the block. But Fennessy said he only did what he could as a trained firefighter and was getting a lot of <ClozeBlank></ClozeBlank> for what was luck in terms of timing and resources. \"We're fixers. We're going to put our lives on the line,\" Fennessy said.",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "A",
+          "analysis": "根据语境，消防员需要利用手边的东西临时拼凑，at hand 意为\"在手边\"，符合句意。",
+          "score": 1.5
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "C",
+          "analysis": "根据下文，他用牛奶和啤酒救了两个房子，所以是 saving。",
+          "score": 1.5
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "B",
+          "analysis": "他试图联系哥哥，但联系不上，reach 意为\"联系上\"。",
+          "score": 1.5
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "B",
+          "analysis": "他已经开车去了，所以是 made the trip。",
+          "score": 1.5
+        },
+        {
+          "id": 5,
+          "content": "",
+          "answer": "D",
+          "analysis": "他看到的是大面积的破坏，destruction 符合语境。",
+          "score": 1.5
+        },
+        {
+          "id": 6,
+          "content": "",
+          "answer": "C",
+          "analysis": "他担心火焰越来越近，feared 符合语境。",
+          "score": 1.5
+        },
+        {
+          "id": 7,
+          "content": "",
+          "answer": "A",
+          "analysis": "他需要冷却煤气表，cool 意为\"冷却\"。",
+          "score": 1.5
+        },
+        {
+          "id": 8,
+          "content": "",
+          "answer": "D",
+          "analysis": "他强行进入前门，forced 符合语境。",
+          "score": 1.5
+        },
+        {
+          "id": 9,
+          "content": "",
+          "answer": "A",
+          "analysis": "如果不采取行动，房子就会被烧毁，lost 意为\"失去\"。",
+          "score": 1.5
+        },
+        {
+          "id": 10,
+          "content": "",
+          "answer": "C",
+          "analysis": "他得到了很多赞誉，credit 意为\"赞扬\"。",
+          "score": 1.5
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "Odyssey of the Mind 创意竞赛",
+      "tags": ["A篇"],
+      "questionStart": 11,
+      "questionEnd": 13,
+      "score": 6,
+      "start": "Odyssey of the Mind (OM) promotes creativity",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "A",
+          "analysis": "根据第一段\"Independent study, original ideas, and critical thinking skills are rewarded\"可知，OM最看重创新解决方案。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "B",
+          "analysis": "根据\"They will be scored for how well they meet the requirements of the problem (Long-Term score) and for their creativity in categories specific to that problem (Style score)\"可知，从两个方面评分。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "C",
+          "analysis": "根据\"Odyssey of the Mind Spirit Award: It recognizes an individual involved in the program who demonstrates the encouragement and development of cooperation, self-respect, and the appreciation and understanding of others.\"可知，团队合作精神最可能获得此奖。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "冒险人生与意外转折",
+      "tags": ["B篇"],
+      "questionStart": 14,
+      "questionEnd": 17,
+      "score": 8,
+      "start": "I've always been a daring risk taker.",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "D",
+          "analysis": "根据\"From then on, I committed my life to adventure\"可知，赢得比赛给了她冒险的决心。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "D",
+          "analysis": "根据\"I laughed at the idea\"可知，她起初持怀疑态度。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "B",
+          "analysis": "根据最后一段\"the company never received it\"可知，申请信没有送达。",
+          "score": 2
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "B",
+          "analysis": "文章讲述了作者因申请信未送达而走上飞行之路，说明最好的旅程不是规划好的。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "雨林中的隐藏空地",
+      "tags": ["C篇"],
+      "questionStart": 18,
+      "questionEnd": 21,
+      "score": 8,
+      "start": "Elephants and gorillas in the Republic of the Congo's rainforests",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "C",
+          "analysis": "根据第一段\"to search for vital nutrition and maintain their complex social networks\"可知，bais是获取食物和社交的地方。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "B",
+          "analysis": "根据\"The researchers' map of bais, the first of its kind\"可知，这是首次绘制bais网络地图。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "A",
+          "analysis": "根据上下文，elusive意为\"难以找到的\"。",
+          "score": 2
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "B",
+          "analysis": "文章主要介绍了通过无人机和AI发现雨林中隐藏的bais，因此标题应为\"Hidden Playgrounds Revealed in Rainforests\"。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "科学与人文的融合",
+      "tags": ["D篇"],
+      "questionStart": 22,
+      "questionEnd": 24,
+      "score": 6,
+      "start": "Monday was the first day of Dartmouth's spring term.",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "C",
+          "analysis": "根据\"mixing the sciences and the humanities\"可知，这门课打破了科学与人文的界限。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "D",
+          "analysis": "作者认为科学家应该与人文学者合作，因此David与哲学学生合作会得到作者赞同。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "C",
+          "analysis": "根据最后一段\"it is wanting to know that makes us matter\"可知，作者强调求知欲的重要性。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "七选五",
+      "title": "宽恕的艺术",
+      "tags": [],
+      "questionStart": 25,
+      "questionEnd": 29,
+      "score": 10,
+      "article": "Forgiveness is something that many of us strive for, but it can often feel difficult to achieve. Over the years, we've heard countless people express the intention to forgive, only to struggle with the emotional roadblocks that prevent them from truly letting go.\n\nFirst, let's define forgiveness. <Blank></Blank> It's not about forgetting what happened or excusing harmful behavior. In fact, our minds tell us that if we stay angry, bitter, or distant, we'll be safe from further hurt. <Blank></Blank> While holding onto memories and creating distance may offer temporary emotional safeguards, it often deepens our sadness, isolates us, and prevents us from healing. Forgiveness, on the other hand, is about choosing not to let that pain continue to define your thoughts, emotions, and behaviors.\n\nForgiveness is essential because we're all human, and we all make mistakes. If we want to cultivate meaningful relationships, there will unavoidably be times when we hurt one another. Forgiveness becomes crucial in maintaining those connections and our own peace of mind. <Blank></Blank> Forgiving yourself is especially important. Raising walls of bitterness or anger toward yourself is deeply damaging. When you hold on to shame or guilt, you create emotional barriers that prevent you from living fully and authentically.\n\nSo, how do we forgive? While the journey is deeply personal and can vary from person to person, there are key steps that can help guide us. Acknowledge the hurt and pain exactly as it is. <Blank></Blank> This perspective allows us to see others (and ourselves) as imperfect humans doing the best they can with what they have. Extend sympathy to yourself and others. Choose to release bitterness and move forward in line with your values.\n\n<Blank></Blank> It's an ongoing practice. But every time you choose forgiveness, you create space for love and healing to flow through your life.",
+      "options": [
+        {
+          "id": "A",
+          "label": "It is a continuous process."
+        },
+        {
+          "id": "B",
+          "label": "But we know that this isn't true."
+        },
+        {
+          "id": "C",
+          "label": "Recognize that everyone has faults."
+        },
+        {
+          "id": "D",
+          "label": "Remember that forgiveness isn't a one-time event."
+        },
+        {
+          "id": "E",
+          "label": "Forgiveness is the decision to release attachment to a painful past."
+        },
+        {
+          "id": "F",
+          "label": "You don't have to communicate with the person who wronged you."
+        },
+        {
+          "id": "G",
+          "label": "In fact, we may need to forgive not only others but ourselves as well."
+        }
+      ],
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "E",
+          "analysis": "前文提到定义宽恕，后文说不是忘记或原谅，因此E选项\"宽恕是决定释放对痛苦过去的依恋\"符合定义。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "B",
+          "analysis": "前文说我们的思维告诉我们保持愤怒可以安全，后文说这往往加深悲伤，因此B选项\"但我们知道这不是真的\"衔接自然。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "G",
+          "analysis": "后文提到原谅自己很重要，因此G选项\"事实上，我们可能不仅需要原谅别人，也需要原谅自己\"引出下文。",
+          "score": 2
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "C",
+          "analysis": "后文说这种视角让我们看到他人不完美，因此C选项\"认识到每个人都有缺点\"符合。",
+          "score": 2
+        },
+        {
+          "id": 5,
+          "content": "",
+          "answer": "D",
+          "analysis": "后文说这是一个持续的实践，因此D选项\"记住宽恕不是一次性事件\"符合。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "选词填空",
+      "title": "选词填空",
+      "tags": [],
+      "questionStart": 30,
+      "questionEnd": 34,
+      "score": 10,
+      "article": "benefit, treat, logic, impress, motivate",
+      "questions": [
+        {
+          "id": 1,
+          "content": "The <Input2></Input2> performance of the athlete left everyone amazed.",
+          "answer": "impressive",
+          "analysis": "根据句意，运动员的表现令人惊叹，用形容词impressive。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "He is a bright student, but he just lacks the <Input2></Input2> to learn new things.",
+          "answer": "motivation",
+          "analysis": "根据句意，他缺乏学习新事物的动力，用名词motivation。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "Many patients are not getting the medical <Input2></Input2> they need.",
+          "answer": "treatment##treatments",
+          "analysis": "根据句意，病人没有得到所需的医疗治疗，用名词treatment。",
+          "score": 2
+        },
+        {
+          "id": 4,
+          "content": "Cycling is highly <Input2></Input2> to health and the environment.",
+          "answer": "beneficial",
+          "analysis": "根据句意，骑自行车对健康和环境有益，用形容词beneficial。",
+          "score": 2
+        },
+        {
+          "id": 5,
+          "content": "Programming requires <Input2></Input2> thinking to gradually break big problems into smaller steps.",
+          "answer": "logical",
+          "analysis": "根据句意，编程需要逻辑思维，用形容词logical。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "语法填空",
+      "title": "语法填空",
+      "tags": [],
+      "questionStart": 35,
+      "questionEnd": 44,
+      "score": 15,
+      "article": "## A\n\nThe World Health Day, <Input></Input> (celebrate) every year on April 7, is a global initiative started by the World Health Organization (WHO). The aim of the day is <Input></Input> (spread) awareness around key health issues and run campaigns and discussions around it. This year's theme is \"Healthy Beginning, Hopeful Futures\". The health of mothers and babies is the foundation of healthy <Input></Input> (family) and communities, helping ensure hopeful futures for us all.\n\n## B\n\nA tortoise at the Philadelphia Zoo has become the oldest first-time mother of her species after <Input></Input> (have) her first babies at 100 years old. The tortoise, named Mommy, is a critically endangered species in their native home. There are <Input></Input> (few) than 50 kept in US zoos. Mommy arrived at the Zoo in 1932, meaning anyone that <Input></Input> (visit) the Zoo for the last 93 years has likely seen her. This is a significant milestone <Input></Input> the history of the Zoo.\n\n## C\n\nA Chinese automaker has created a battery <Input></Input> will enable electric vehicles (EVs) to charge almost as quickly as it takes to fill a regular car's gas tank. The new battery, named the e platform, <Input></Input> (develop) last year by BYD, a Chinese firm that is overtaking Tesla as the world's top seller of electric vehicles. BYD says it will install a network of 4,000 flash-charging stations across China. This technology is currently only available in China, and the company has yet to confirm <Input></Input> it will make it available internationally or not.",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "celebrated",
+          "analysis": "非谓语动词作定语，celebrate与World Health Day是被动关系，用过去分词。",
+          "score": 1.5
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "to spread",
+          "analysis": "不定式作表语，表示目的。",
+          "score": 1.5
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "families",
+          "analysis": "根据语境，此处用复数形式。",
+          "score": 1.5
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "having",
+          "analysis": "介词after后接动名词。",
+          "score": 1.5
+        },
+        {
+          "id": 5,
+          "content": "",
+          "answer": "fewer",
+          "analysis": "than提示用比较级，fewer than 50。",
+          "score": 1.5
+        },
+        {
+          "id": 6,
+          "content": "",
+          "answer": "has visited",
+          "analysis": "for the last 93 years提示用现在完成时，主语anyone是单数。",
+          "score": 1.5
+        },
+        {
+          "id": 7,
+          "content": "",
+          "answer": "in",
+          "analysis": "in the history of 固定搭配。",
+          "score": 1.5
+        },
+        {
+          "id": 8,
+          "content": "",
+          "answer": "which##that",
+          "analysis": "定语从句，先行词是battery，关系词在从句中作主语，用which或that。",
+          "score": 1.5
+        },
+        {
+          "id": 9,
+          "content": "",
+          "answer": "was developed",
+          "analysis": "根据last year用一般过去时，且develop与battery是被动关系。",
+          "score": 1.5
+        },
+        {
+          "id": 10,
+          "content": "",
+          "answer": "whether",
+          "analysis": "whether...or not 固定搭配。",
+          "score": 1.5
+        }
+      ]
+    },
+    {
+      "type": "阅读表达",
+      "title": "延迟满足",
+      "tags": [],
+      "questionStart": 45,
+      "questionEnd": 48,
+      "score": 12,
+      "start": "We live in a world filled with distractions.",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "Delayed gratification refers to the ability to wait for a long-term reward.",
+          "analysis": "根据第一段\"delayed gratification, which refers to the ability to wait for a long-term reward\"可知答案。",
+          "score": 2
+        },
+        {
+          "id": 2,
+          "content": "",
+          "answer": "Delayed gratification requires self-discipline and the ability to manage impulses, while instant gratification often involves giving in to immediate desires.",
+          "analysis": "根据第二段\"The former requires self-discipline and the ability to manage impulses, while the latter often involves giving in to immediate desires.\"可知答案。",
+          "score": 2
+        },
+        {
+          "id": 3,
+          "content": "",
+          "answer": "**_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development.**_\n\nAccording to the passage, delayed gratification has to do with one's natural ability and environment and what one is taught.",
+          "analysis": "根据第三段\"Delayed gratification has to do with one's natural ability and environment and what one is taught.\"可知，延迟满足不仅与环境有关，还与个人能力和教育有关。",
+          "score": 3
+        },
+        {
+          "id": 4,
+          "content": "",
+          "answer": "I have been longing for a new gaming console. Instead of buying it immediately, I save a fixed amount weekly to get it in a few months.",
+          "analysis": "根据文章内容，延迟满足需要抵制即时欲望，通过储蓄等方式实现长期目标。",
+          "score": 5
+        }
+      ]
+    },
+    {
+      "type": "作文",
+      "title": "智慧生活投稿建议",
+      "tags": [],
+      "questionStart": 49,
+      "questionEnd": 49,
+      "score": 20,
+      "start": "假设你是红星中学高二学生李华。",
+      "passageTitle": "",
+      "questions": [
+        {
+          "id": 1,
+          "content": "",
+          "answer": "Dear Jim,\n\nI'm thrilled to know you're going to introduce Beijing students' smart lifestyle! My suggestion is to focus on one key trend: AI-assisted learning.\n\nNowadays, AI tools are revolutionizing how high school students like me study. They provide instant homework help, generate practice questions, and even analyze our mistakes to create personalized study plans. Many classmates use voice assistants to practice English speaking, making learning more interactive. I believe your article will definitely be relevant if you highlight AI-assisted learning in Beijing and how it is transforming education here. Truly this is cutting-edge technology that is relatable to teens worldwide!\n\nI hope my advice is helpful.\n\nYours\n\nLi Hua",
+          "analysis": "",
+          "score": 20
+        }
+      ]
+    }
+  ]
+}

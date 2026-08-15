@@ -1,0 +1,711 @@
+Paper: 2025北京西城高二（下）期末英语
+================================================================================
+你是一位英语试卷解析专家。请分析以下英语试卷（MD格式），识别其结构、题型，并生成完整的解析结果。
+
+当前试卷名称：2025北京西城高二（下）期末英语
+
+重要原则：
+1. 只识别这7种题型：完形填空、语法填空、阅读、七选五、选词填空、阅读表达、作文
+2. 你读取的是MD格式的试卷，包含完整的文章内容、题目和参考答案
+3. 对于有填空的题型（完形填空、七选五、语法填空、选词填空），你需要输出完整的文章，把挖空位置用对应的标签替换
+4. 对于阅读、阅读表达、作文，输出 start 锚点即可，程序会自动提取文章
+5. 所有题目的答案和解析，你都要从MD的参考答案部分抄写下来
+6. 绝对不能返回类似"无法解析"这种占位文本；内容可见就必须给出真实结果
+7. 开头的paper信息从MD开头获取："本试卷共XX页，共XX分。考试时长XX分钟" → totalScore和duration
+8. 分数规则：从试卷头部或各题型小节标题中读取每道题的分值，必须认真读！
+   - 小节标题示例："第一节（共10小题；每小题1.5分，共15分）"、"第一节（共4小题；第60、61题各2分，第62题3分，第63题5分，共12分）"
+   - 每道题的 score 字段必须填写，不能为 0
+   - 每个 section 的 score 字段填写该题型的总分，可以从题干里读取
+   - 阅读表达题型常见分值：第40、41题各2分，第42题3分，第43题5分，请仔细读小节标题！
+9. **保留MD格式**：输出 article 时，原文中的图片、加粗、斜体、下划线、表格等MD格式元素必须原样保留，不要删除或修改
+
+## 填空替换规则（极其重要！）
+
+对于完形填空、七选五、语法填空、选词填空，你需要输出替换好空位的完整文章。MD中挖空位置会显示为 `___1___`、`___2___` 等格式。
+
+替换规则：
+- 完形填空：用 `<ClozeBlank></ClozeBlank>` 替换每个空
+- 语法填空：用 `<Input></Input>` 替换每个空，保留空后面的括号提示词（如 `(celebrate)`）
+- 七选五：用 `<Blank></Blank>` 替换每个空
+- 选词填空：用 `<Input2></Input2>` 替换每个空
+
+**空格规则（极其重要！）**：
+- 如果空的左右两边都是文章内容（单词/字母），标签前后各加一个空格：`were <ClozeBlank></ClozeBlank> throughout`
+- 如果空后面是标点符号（`.` `,` `;` `!` `?`），标签后不加空格：`XXX <ClozeBlank></ClozeBlank>.`
+- 如果空前面是标点符号，标签前加空格：`"XXX. <ClozeBlank></ClozeBlank> XXX`
+
+示例：
+MD原文：`I had a good ___1___ on people. I wanted to do well, which brought much ___2___.`
+输出：`I had a good <ClozeBlank></ClozeBlank> on people. I wanted to do well, which brought much <ClozeBlank></ClozeBlank>.`
+
+MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
+输出：`The World Health Day, <Input></Input> (celebrate) every year on April 7`
+
+**关键要求：**
+- 输出完整的文章，不要省略任何内容
+- 文章中的所有挖空位置都要替换，不能遗漏
+- 保留文章原有的格式（换行、标点等）
+- **保留所有MD格式元素**：图片（`![...](...)`）、加粗（`**...**`）、斜体（`*...*`）、表格、列表等，原样输出，不要删改
+- 如果文章有标题（如 "Features of Modern-Day Heroes: Beyond Superpowers and Capes"），在 article 开头加上 "## 标题
+
+" 格式
+
+## 答案和解析规则（极其重要！）
+
+你必须从MD的"参考答案"部分抄写每个题目的答案和解析。
+
+### 答案格式处理：
+- 选择题答案：`21. A` → answer = "A"
+- 语法填空答案：`11. between` → answer = "between"
+- 阅读表达答案：如果答案跨多行，完整抄写，保留换行
+- 如果答案有备选（如 `42. which##that`），完整保留：answer = "which##that"
+- 如果答案格式是 `1.【答案】 to improve`，只取 "to improve"
+- 作文答案：answer = ""（如果答案里有范文的话，抄写；否则不写）
+
+### 解析格式处理：
+- **优先抄写**：如果MD参考答案中有解析（如 `【X题详解】`、`【解析】`、`【详解】` 块），原封不动抄写到对应题目的 analysis 字段，保留换行和MD格式
+- **没有解析时自己生成**：如果MD参考答案中只有答案没有解析，则根据文章内容和答案，自己生成一段简洁的解析（中文，1-3句话），说明为什么选这个答案
+- 作文的解析：如果MD有解析，抄写；否则不写解析
+
+### 题目映射：
+- 每个 section 必须输出 questions 数组，每题都要有 score 字段
+- id 用相对序号（1, 2, 3...），不要用原始题号
+
+## start 锚点规则（仅用于阅读/阅读表达/作文）
+
+对于阅读、阅读表达、作文，你不需要输出完整文章，只需输出一个 start 锚点。
+
+- **start 越短越好！只需输出文章开头前 5~10 个词即可**
+- **start 绝对不能包含题号**
+- 必须是MD中真实存在的连续字符串
+- **必须在全文具有唯一性！**
+- 长度 50 字符以内
+- 如果文章有独立标题行，填写 passageTitle 字段，start 从标题下面的正文第一个词开始
+- 阅读的 A/B/C/D 篇目标识不算标题
+
+## 标题规则：
+- 完形填空 / 阅读 / 七选五 / 阅读表达：根据文章内容起一个简洁中文标题，15字以内
+- 作文：直接写主题，如"智慧生活投稿建议"。严禁出现"给Jim的..."等格式
+- 选词填空：固定填 "选词填空"
+- 语法填空：填 "语法填空"（如果有多组A/B/C，合并为一个section，文章用 `## A
+
+...
+
+## B
+
+...` 格式分隔）
+
+## tags 规则：
+- **只有阅读需要加 tags**，如 `["A篇"]`、`["B篇"]`、`["C篇"]`、`["D篇"]`
+- 其他题型不需要 tags
+
+## JSON输出格式：
+
+{  "paper": {
+    "totalScore": 总分,
+    "duration": 时长（分钟）
+  },
+  "sections": [
+    {
+      "type": "完形填空|语法填空|阅读|七选五|选词填空|阅读表达|作文",
+      "title": "标题",
+      "tags": ["A篇"],
+      "questionStart": 开始题号,
+      "questionEnd": 结束题号,
+      "score": 该题型总分,
+      "article": "完整文章（完形填空/七选五/语法填空/选词填空用，空位已替换好）",
+      "options": "七选五的选项列表（仅七选五需要）",
+      "start": "文章开头锚点（仅阅读/阅读表达/作文用）",
+      "passageTitle": "文章标题（可选）",
+      "questions": [
+        {
+          "id": 1,
+          "content": "该句子的内容，空位已替换（仅选词填空需要）",
+          "answer": "答案",
+          "analysis": "解析",
+          "score": 2
+        }
+      ]
+    }
+  ]
+}
+
+## 各题型详细要求：
+
+### 完形填空
+- 输出完整 article（空位替换为 `<ClozeBlank></ClozeBlank>`）
+- 输出每个题目的答案和解析（从MD抄写）
+- 不输出 start、不输出 blanks
+
+### 语法填空
+- 如果有多组A/B/C，合并为一个section
+- 输出完整 article，用 `## A
+
+...
+
+## B
+
+...` 格式分隔各组
+- 空位替换为 `<Input></Input>`，保留后面的括号提示词
+- 输出每个题目的答案和解析（从MD抄写）
+- 不输出 start、不输出 blanks
+
+### 阅读理解
+- 每篇文章一个section
+- 输出 start 锚点（程序自动提取文章）
+- 输出每个题目的答案和解析（从MD抄写）
+- **必须填写 tags 字段**
+- 不输出 article、不输出 blanks
+
+### 七选五
+- 输出完整 article（空位替换为 `<Blank></Blank>`）
+- 输出 options 数组，格式为 `[{"id": "A", "label": "选项内容"}, ...]`
+- 输出每个题目的答案和解析（从MD抄写）
+- 不输出 start、不输出 blanks
+
+### 选词填空
+- article 只写词表，格式：`"benefit, treat, logic, impress, motivate"`（用逗号+空格分隔）
+- 每个题目的 content 写该句子，空位替换为 `<Input2></Input2>`，如：`"The <Input2></Input2> performance of the athlete left everyone amazed."`
+- 输出每个题目的答案和解析（从MD抄写）
+- 不输出 start、不输出 blanks
+
+### 阅读表达
+- 输出 start 锚点（程序自动提取文章）
+- 输出每个题目的答案和解析（从MD抄写）
+- **答案必须原封不动保留MD格式元素**：加粗（`**...**`）、斜体（`*...*`）、下划线（`<u>...</u>`）等全部保留
+- 不输出 article、不输出 blanks
+
+### 作文
+- 输出 start 锚点（程序自动提取题目）
+- 如果MD参考答案中有范文（范文/例文），将范文完整抄写到 answer 字段，保留所有MD格式
+- 如果MD参考答案中有评分标准/解析，抄写到 analysis 字段
+- 如果没有范文：answer=""，analysis 从MD抄写解析内容
+- 不输出 article、不输出 blanks
+
+必须返回有效的JSON，无需其他说明。
+
+---
+
+以下是试卷内容（MD格式）：
+
+2025北京西城高二（下）期末
+
+英 语
+
+**2025.7**
+
+**本试卷共14页，共140分。考试时长120分钟。考生务必将答案写在答题卡上，在试卷上作答无效。**
+
+**第Ⅰ卷（共83分）**
+
+**Ⅰ.听力理解（共三节，30分）**
+
+**第一节：（共4小题；每小题2分，共8分）**
+
+**听下面四段对话，每段对话后有一道小题，从每题所给的A、B、C三个选项中选出最佳选项。每段对话你将听一遍。**
+
+1\. What will the man wear to the event?
+
+A. A suit. B. A jacket. C. A T-shirt.
+
+2\. How will the woman go to the shopping center today?
+
+A. By car. B. On foot. C. By bus.
+
+3\. What is the man looking for?
+
+A. His locker. B. His book. C. His bag.
+
+4\. What is the woman's favorite class now?
+
+A. Art. B. Math. C. Science.
+
+**第二节：（共6小题；每小题2分，共12分）**
+
+**听下面三段对话或独白，每段对话或独白后有两道小题，从每题所给的A、B、C三个选项中选出最佳选项。每段对话或独白你将听两遍。**
+
+**听下面一段对话，回答第5至第6小题。**
+
+5\. What is the man?
+
+A. A cleaner. B. A secretary. C. A manager.
+
+6\. What will the woman probably do next?
+
+A. Go to work. B. Answer calls. C. Buy some coffee.
+
+**听下面一段对话，回答第7至第8小题。**
+
+7\. How does Tom help Mary with her garden?
+
+A. He cuts the grass. B. He shapes the bushes. C. He plants new flowers.
+
+8\. What is the most probable relationship between the two speakers?
+
+A. Husband and wife. B. Classmates. C. Neighbors.
+
+**听下面一段独白，回答第9至第10小题。**
+
+9\. What will Jamie Cook's lecture focus on?
+
+A. The features of science.
+
+B. The social impacts of AI.
+
+C. The possibility of life on other planets.
+
+10\. What is the speaker's purpose in giving the talk?
+
+A. To welcome new students.
+
+B. To present various discoveries.
+
+C. To introduce upcoming events.
+
+**第三节：（共5小题；每小题2分，共10分）**
+
+听下面一段独白，根据题目要求在相应的横线上写下第11题至第15题的关键信息。每小题仅填写一个词。这段独白你将听两遍。
+
+| **How to Survive in the Wild** | |
+| --- | | --- |
+| **Find water** | · 11 a body of water.<br><br>·Dig for water if you can't find it around. |
+| **12 a shelter** | ·Find a fallen tree or a big rock.<br><br>·Search for 13 branches and lay them against the tree or rock. |
+| **14 yourself from the elements** | ·Eat late.<br><br>·Cover yourself with dirt and 15 when you go to sleep. |
+
+**Ⅱ.完形填空（共10小题；每小题1.5分，共15分）**
+
+**阅读下面短文，掌握其大意，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该选项涂黑。**
+
+Firefighters should be quick thinkers. In an emergency, they should figure out the speediest and safest way to act, sometimes including improvising (临时拼凑) with the things \_**\_1_\_**. Fire chief Fennessy knows this well. He is now making headlines for \_**\_2_\_** two homes with milk and beer during a fire in Altadena, California.
+
+![菁师帮（北京题库）](images/image1.png)Although Altadena was not in his charge, Fennessy grew up there and still had family and friends there. Hearing the news of the fire, he tried to contact his brother. When he couldn't \_**\_3_\_** his brother, Fennessy decided to drive over to Altadena. On his way, he learned his brother's family had been taken to safety, but since he had already made the \_**\_4_\_**, Fennessy figured he might as well take a look.
+
+When reaching the spot, Fennessy couldn't believe his eyes at the sight of the ruins. "I haven't seen anything like this where you drive for miles, and there's massive \_**\_5_\_**," Fennessy said. When he reached his brother's street, his home and a neighbor's house were still standing, but he \_**\_6_\_** the flames were getting too close, as other nearby homes were already burning down.
+
+Even more worrisome, a gas meter on the neighbor's house was melting (熔化), surrounded by fire. Thinking he had to \_**\_7_\_** the gas meter, he looked for a hose (水龙带), but there was no water.
+
+Exploring his options, Fennessy \_**\_8_\_** his entry through the front door of one of the homes and went into the kitchen looking for whatever he could use. "I ended up finding some milk and beer," he explained. "To do nothing means the home's going to be \_**\_9_\_**, and in this case, a little milk and beer really saved the day."
+
+The two homes he saved are now the only two houses standing on the block. But Fennessy said he only did what he could as a trained firefighter and was getting a lot of \_**\___10_\_**\__ for what was luck in terms of timing and resources. "We're fixers. We're going to put our lives on the line," Fennessy said.
+
+1\. A. at hand B. on time C. in order D. in mind
+
+2\. A. cleaning B. providing C. saving D. filling
+
+3\. A. persuade B. reach C. meet D. remind
+
+4\. A. day B. trip C. change D. appointment
+
+5\. A. access B. progress C. disturbance D. destruction
+
+6\. A. forgot B. wondered C. feared D. ignored
+
+7\. A. cool B. break C. operate D. remove
+
+8\. A. missed B. declared C. delayed D. forced
+
+9\. A. lost B. emptied C. moved D. restored
+
+10\. A. wisdom B. pride C. credit D. confidence
+
+**Ⅲ.阅读理解（共两节，38分）**
+
+**第一节（共14小题；每小题2分，共28分）**
+
+**阅读下面短文，从每题所给的 A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。**
+
+**A**
+
+Odyssey of the Mind (OM) promotes creativity, problem solving, teamwork, and more. It is a creative problem-solving competition that gives kids the confidence to think for themselves and to create solutions to any challenge. Independent study, original ideas, and critical thinking skills are rewarded over getting the "one right answer" thanks to our unique open-ended problems that are backed by educators and experts in STE(A)M fields. Performance, art & cultural studies are also incorporated, creating a well-rounded program that has impacted lives for over 40 years. OM benefits all types of students as they learn to think outside the box.
+
+**Participation**
+
+● Students work in teams of up to seven members and spend weeks or months working together and creating solutions to long-term problems. Every year, there are six long-term problems designed for them to choose from.
+
+● Teams are formed by division and compete against teams in the same division and problem. Grade level determines the division for teams.
+
+● In the competition, teams have eight minutes to present their long-term problem solution. They will be scored for how well they meet the requirements of the problem (Long-Term score) and for their creativity in categories specific to that problem (Style score).
+
+**Cost**
+
+Yearly memberships are required to participate in OM. Each membership supports one team per problem per division.
+
+**● Standard Membership \$290:** Individual schools/ Multiple schools sharing a principal.
+
+**● Additional Membership \$190:** Only for schools who enter two teams in the same problem and division in competition.
+
+**Awards**
+
+**● Ranatra Fusca Creativity Award:** It represents the essence of OM. It is presented to teams or individuals who exhibit exceptional creativity, either through some aspect of their problem solution, or an extraordinary idea beyond the problem solution.
+
+**● OMER's Award:** It recognizes individuals or teams who demonstrate outstanding sportsmanship, excellent behavior, or exceptional talent.
+
+**● Odyssey of the Mind Creativity Award:** It recognizes an individual and/ or organization for extraordinary creative achievement or exceptional effort.
+
+**● Odyssey of the Mind Spirit Award:** It recognizes an individual involved in the program who demonstrates the encouragement and development of cooperation, self-respect, and the appreciation and understanding of others.
+
+11\. What does Odyssey of the Mind value most?
+
+A. Having innovative solutions. B. Getting the right answer.
+
+C. Impacting others' daily lives. D. Facing more challenges.
+
+12\. In Odyssey of the Mind, students will \_**\_**\__.
+
+A. work in groups of at least seven
+
+B. be scored from two different aspects
+
+C. address six problems at the same time
+
+D. prepare their solutions within eight minutes
+
+13\. The participant with the strongest sense of teamwork is most likely to be awarded \_**\_**\__.
+
+A. OMER's Award
+
+B. Ranatra Fusca Creativity Award
+
+C. Odyssey of the Mind Spirit Award
+
+D. Odyssey of the Mind Creativity Award
+
+**B**
+
+I've always been a daring risk taker. But when I was 15, my luck ran out. A horseback riding accident resulted in severe injuries, the death of my beloved horse Spooks, and the horrible news that I'd never ride again. I was set on proving the doctors wrong. Just a few months later, with my mother's support, I rode sidesaddle and won my first jumping competition. The excitement was incredible.
+
+![菁师帮（北京题库）](images/image2.png)From then on, I committed my life to adventure, remembering my mother's lesson: never say, "I can't". At 22, I read about an opening to be a motorcycle trick rider - I'd learned to ride a few years earlier. Still, it was 1976 and I knew they were unlikely to hire a woman. I thought about that as I signed my trick rider application, leaving off the honorific - Ms., hoping to hide the fact that I was a woman. But they never got back to me.
+
+I was heartbroken. Maybe the position had already been filled; maybe they'd discovered I was a woman. My friend Steve then proposed an idea that at first seemed crazy: learning to fly aeroplanes. "Flying is for men," I laughed at the idea. But gradually, I realized the suggestion had stuck with me.
+
+Years ago, trial flights - brief introductory sessions with an instructor - cost just £5 for 15 minutes in the air. Steve and I both signed up, and after my first session, I couldn't stop talking about flying. I got my license and headed for the US to work as a pilot. It wasn't easy. Initially, people were doubtful about a woman working in the role, but I ended up outperforming my male colleagues. Twenty years later, I returned to England and started my own flying company.
+
+Now, I live a quieter life. I've settled in a village in Lincolnshire, spending much of my time volunteering in care homes. Last October, after nearly fifty years and countless adventures, I received a letter from a post office in Staines. It was my trick rider application. The post office apologized for the delay and explained it had been found stuck behind a drawer in the office - the company never received it.
+
+Looking back, I realized that even though I didn't get that job, it led me to a series of adventures that shaped my life in unexpected and fulfilling ways.
+
+14\. What did winning the jumping competition bring to the writer?
+
+A. The faith in friendship.
+
+B. The acquisition of a new skill.
+
+C. The recognition of mother's love.
+
+D. The determination to go adventuring.
+
+15\. How did the writer feel at first when Steve suggested learning to fly?
+
+A. Curious. B. Inspired. C. Desperate. D. Doubtful.
+
+16\. Why did the writer fail to receive any reply about the trick ride position?
+
+A. Because she forgot to sign the application.
+
+B. Because her application was not delivered.
+
+C. Because women were unfit for the position.
+
+D. Because the position had already been filled.
+
+17\. What can we learn from this passage?
+
+A. Smart plans make big dreams.
+
+B. The best journeys are not mapped.
+
+C. Doubt kills more goals than failure.
+
+D. Strong women create strong societies.
+
+**C**
+
+Elephants and gorillas in the Republic of the Congo's rainforests spend a lot of time hiding in the shadows - or so we thought. Using drone (无人机) surveys and AI processing, scientists have discovered an extensive network of mysterious open clearings among the trees. Animals like elephants, gorillas visit these muddy areas, called _bais_, in the languages of the Indigenous Ba'Aka, to search for vital nutrition and maintain their complex social networks. The numerous playgrounds are visible in satellite images, and AI analysis is helping researchers find them more effectively.
+
+The discovery began in 2021 when Sylvain Ngouma and Evan Hockridge came upon a massive clearing during fieldwork in Odzala-Kokoua National Park and found a trail (踪迹) of wet, pot-sized footprints leading through the woods to the open roundabout. Hockridge, who had thought _bais_ were abnormal, says, "I had it backward. It kind of hit me when I was there. You can't understand animal interactions without first understanding _bais_."
+
+For the next three summers, the team investigated the clearings. They analyzed camera-trap images, confirming what local people had told them - that these natural clearings are crucial gathering grounds for some of the world's most endangered mammals. The _bais_, they realized, are big melting pots, big playgrounds, for a collection of forest animals.
+
+During the initial surveys, the team followed elephant trails to move through the rainforest from _bai_ to _bai_. This process led Hockridge to wonder about a network. Although previous studies documented animal behavior in selected _bais_, no one had counted them or had the means to map their distribution. The team partnered with African Parks, using drones to scan known sites. They trained an AI algorithm (算法) to identify _bais_ in satellite imagery, revealing 2,176 clearings in one park - 10 times more than previously recorded.
+
+_Bais_ are always near rivers or streams. Most are smaller than a city block, but few, at more than 100 acres, are bigger than some college campuses. "_Bais_ are ultimately islands of resources, and animals produce these networks of trails to essentially navigate to and from a network of _bais_," Hockridge says. The researchers' map of _bais_, the first of its kind, is also a map of conservation priorities. "We find that a huge portion of the animal community depends on this unique ecosystem. These species don't have alternative habitats other than _bais_," Hockridge says.
+
+The study is also a step toward solving the ultimate mystery: How did _bais_ form? Many ecologists have argued that a combination of hydrology (水文学) and animal landscaping is at play. But definitive proof remains elusive. Now, with a map in hand and camera traps still in place, the research team is tracking long-term changes, which have implications for the maintenance of these crucial animal habitats.
+
+"We have hypotheses (假说)," Andrew Davies, an ecologist in Harvard, says, "but the short answer is: we don't know."
+
+18\. For rainforest animals, _bais_ are places for \_**\_**\__.
+
+A. fun and safety B. water and shelter
+
+C. food and connection D. shade and entertainment
+
+19\. What can we learn about Ngouma and Hockridge's research?
+
+A. It discovered how _bais_ formed.
+
+B. It was the first to map the network of _bais_.
+
+C. It analyzed images of _bais_ provided by local people.
+
+D. It concluded _bais_ were spots intended for endangered species.
+
+20\. What does the underlined word "elusive" in Paragraph 6 probably mean?
+
+A. Difficult to find. B. Simple to clarify.
+
+C. Possible to overestimate. D. Unlikely to question.
+
+21\. Which would be the best title for this passage?
+
+A. Conservation Priorities in Rainforests
+
+B. Hidden Playgrounds Revealed in Rainforests
+
+C. Secrets of Rainforest Animals' Social Networks
+
+D. Modern Tools Adopted for Rainforest Exploration
+
+**D**
+
+Monday was the first day of Dartmouth's spring term. So, as I often do at this time, I started teaching my course for non-science majors called "Understanding the Universe: From Atoms to the Big Bang".
+
+This is what students like to call a "physics for poets" class - a class that explores the history of how humanity has faced some of the deepest questions we can ask about the material world and our place in it, without the math. It is a class that tries to capture the true spirit of the liberal-arts education, mixing the sciences and the humanities as different and complementary ways of knowing the world and why we matter. In fancier words, as an intellectual history of physics and astronomy (天文学), the class requires that scientific thinking be contextualized culturally, so that students can situate the ways in which some of the most revolutionary ideas in the past 2,000 years emerged when they did.
+
+Scientists, by training, have little exposure to the humanities. Given that a major in the sciences requires a lot of technical work, we spend precious little time dealing with what happened culturally and historically around the science we are trying to understand. This, I believe, is the reason why so many scientists in the public media condemn (谴责) the humanities as useless. As a consequence, many scientific ideas are presented as having addressed some of the deepest questions we have been asking, when they haven't.
+
+Humanities students, on the other hand, are typically those who avoid the sciences or, at least, math. Their training is also technical, involving lots of reading and critical writing. You can often tell, when you teach this kind of class, who the scientists and the humanists are. All you have to do is write an equation (方程) on the blackboard and look at the class. Humanists will quickly look bored. The scientists will become lively. As you read from Aristotle's _Metaphysics_, the opposite will happen. To bridge this gap is the challenge.
+
+The classroom is the ideal place for this conversation between the sciences and the humanities to unfold. By exposing students to the two sides of the cultural divide, we stand a chance of creating something that will actually close the gap. Scientists should recognize that some research topics - AI, biotechnology, climate change, life extension, nature, and many others - need to be investigated together with humanists as a joint effort.
+
+I finished the first class by reminding the students that not even the best teacher in the world can teach someone who doesn't want to learn. After all, as Tom Stoppard reminded us in his brilliant play _Arcadia_, it is wanting to know that makes us matter - scientists and humanists alike.
+
+22\. What's special about the author's class?
+
+A. It guides students to explain revolutionary ideas.
+
+B. It appeals to arts students to switch to scientific thinking.
+
+C. It breaks the boundary between the sciences and the humanities.
+
+D. It挖s into the secrets of human's position in the material world.
+
+23\. Which of the following would the author applaud?
+
+A. Mary, a history major, quit computer engineering for lack of interest.
+
+B. Mia, an art student, drew pictures of famous scientists for a science fair.
+
+C. Ben, teaching chemistry, guided his students to focus on technology work.
+
+D. David, studying physics, worked with a philosophy student for his project.
+
+24\. What message does the author intend to deliver to his students?
+
+A. University courses present challenges.
+
+B. The cultural divide deserves approval.
+
+C. The eagerness to learn is of significance.
+
+D. Prejudice towards the humanities is history.
+
+**第二节（共5小题；每小题2分，共10分）**
+
+**根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中共有两项为多余选项。**
+
+Forgiveness is something that many of us strive for, but it can often feel difficult to achieve. Over the years, we've heard countless people express the intention to forgive, only to struggle with the emotional roadblocks that prevent them from truly letting go.
+
+First, let's define forgiveness. \_**\_25\_\_** It's not about forgetting what happened or excusing harmful behavior. In fact, our minds tell us that if we stay angry, bitter, or distant, we'll be safe from further hurt. \_**\_26\_\_** While holding onto memories and creating distance may offer temporary emotional safeguards, it often deepens our sadness, isolates us, and prevents us from healing. Forgiveness, on the other hand, is about choosing not to let that pain continue to define your thoughts, emotions, and behaviors.
+
+Forgiveness is essential because we're all human, and we all make mistakes. If we want to cultivate meaningful relationships, there will unavoidably be times when we hurt one another. Forgiveness becomes crucial in maintaining those connections and our own peace of mind. \_**\_27\_\_** Forgiving yourself is especially important. Raising walls of bitterness or anger toward yourself is deeply damaging. When you hold on to shame or guilt, you create emotional barriers that prevent you from living fully and authentically.
+
+So, how do we forgive? While the journey is deeply personal and can vary from person to person, there are key steps that can help guide us. Acknowledge the hurt and pain exactly as it is. \_**\_28\_\_** This perspective allows us to see others (and ourselves) as imperfect humans doing the best they can with what they have. Extend sympathy to yourself and others. Choose to release bitterness and move forward in line with your values.
+
+\_**\_29\_\_** It's an ongoing practice. But every time you choose forgiveness, you create space for love and healing to flow through your life.
+
+A. It is a continuous process.
+
+B. But we know that this isn't true.
+
+C. Recognize that everyone has faults.
+
+D. Remember that forgiveness isn't a one-time event.
+
+E. Forgiveness is the decision to release attachment to a painful past.
+
+F. You don't have to communicate with the person who wronged you.
+
+G. In fact, we may need to forgive not only others but ourselves as well.
+
+**第Ⅱ卷（共57分）**
+
+**Ⅰ.选词填空（共5小题；每小题2分，共10分）**
+
+用方框中单词的适当形式完成下列句子，每个单词只能用一次。
+
+benefit, treat, logic, impress, motivate
+
+30\. The \_**\_**\__ performance of the athlete left everyone amazed.
+
+31\. He is a bright student, but he just lacks the \_**\_**\__ to learn new things.
+
+32\. Many patients are not getting the medical \_**\_**\__ they need.
+
+33\. Cycling is highly \_**\_**\__ to health and the environment.
+
+34\. Programming requires \_**\_**\__ thinking to gradually break big problems into smaller steps.
+
+**Ⅱ.语法填空（共10小题；每小题1.5分，共15分）**
+
+**A**
+
+阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+
+The World Health Day, \_**\_35\_\_** (celebrate) every year on April 7, is a global initiative started by the World Health Organization (WHO). The aim of the day is \_**\_36\_\_** (spread) awareness around key health issues and run campaigns and discussions around it. This year's theme is "Healthy Beginning, Hopeful Futures". The health of mothers and babies is the foundation of healthy \_**\_37\_\_** (family) and communities, helping ensure hopeful futures for us all.
+
+**B**
+
+阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+
+A tortoise at the Philadelphia Zoo has become the oldest first-time mother of her species after \_**\_38\_\_** (have) her first babies at 100 years old. The tortoise, named Mommy, is a critically endangered species in their native home. There are \_**\_39\_\_** (few) than 50 kept in US zoos. Mommy arrived at the Zoo in 1932, meaning anyone that \_**\_40\_\_** (visit) the Zoo for the last 93 years has likely seen her. This is a significant milestone \_**\_41\_\_** the history of the Zoo.
+
+**C**
+
+阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+
+A Chinese automaker has created a battery \_**\_42\_\_** will enable electric vehicles (EVs) to charge almost as quickly as it takes to fill a regular car's gas tank. The new battery, named the e platform, \_**\_43\_\_** (develop) last year by BYD, a Chinese firm that is overtaking Tesla as the world's top seller of electric vehicles. BYD says it will install a network of 4,000 flash-charging stations across China. This technology is currently only available in China, and the company has yet to confirm \_**\_44\_\_** it will make it available internationally or not.
+
+**Ⅲ.书面表达（共两节，32分）**
+
+**第一节（共4小题；第60、61题各2分，第62题3分，第63题5分，共12分）**
+
+阅读下面的短文，根据题目要求用英文回答问题。
+
+We live in a world filled with distractions. Everywhere we look, we can find instant pleasures available for next-day delivery right to our homes. In a culture surrounded by messages saying that we can lose the discomfort right now, delayed gratification, which refers to the ability to wait for a long-term reward, is less attractive. But research shows it makes all the difference in achieving a more important and satisfying goal.
+
+Delayed gratification and instant gratification involve the timing and approach to achieving satisfaction or rewards. The former requires self-discipline and the ability to manage impulses, while the latter often involves giving in to immediate desires. An example of this could be when a young man chooses to resist the urge to splurge (挥霍) on luxury items and instead save money regularly and patiently to buy a house. The delayed gratification is the goal and satisfaction he would achieve from owning a dream home, rather than the instant delight of impulsive shopping.
+
+Delayed gratification has to do with one's natural ability and environment and what one is taught. Learning to delay the impulse for immediate pleasure in favor of long-term satisfaction is a skill required for progressive and long-term growth. We can start by making small changes every day and staying consistent with those changes. Over time, these habits can accumulate and lead to big changes and results. Consistent reminders of why we want to reach our goals can also help.
+
+If we were all masters at delayed gratification, our environment would not be filled with "quick" solutions to everything under the sun. Our culture demands that successful humans rise above the constant distraction to self-motivate and delay personal gratification in favor of distant goals. However, a balance between our thirst for instant rewards and our desire to create longevity in our career, relationships, and health is difficult to achieve. Our entire lives require that we weigh the choices of "okay right now" vs. "bigger better later". It takes a joint effort to override the environment to create our successful personal worlds.
+
+45\. What is delayed gratification?
+
+\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+
+46\. What is the difference between delayed gratification and instant gratification?
+
+\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+
+47\. Please decide which part is false in the following statement, then underline it and explain why.
+
+**_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development._**
+
+\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+
+48\. Please use an example to show how you would practice delayed gratification in your daily life. (**_In about 40 words_**)
+
+\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+
+**第二节（20分）**
+
+49\. 假设你是红星中学高二学生李华。你的外国好友Jim要给校报"AI and Teen Life"专栏投稿，他想重点介绍北京中学生的"智慧生活"，发来邮件询问你的建议。请你用英文给他回复，内容包括：
+
+1.建议内容；
+
+2.说明理由。
+
+注意：1.词数100左右；
+
+2.开头和结尾已给出，不计入总词数。
+
+_Dear Jim,_
+
+_\_**\_**\_**\_****\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\____
+
+_Yours,_
+
+_Li Hua_
+
+参考答案
+
+**第Ⅰ卷（共83分）**
+
+**Ⅱ.完形填空（共10小题；每小题1.5分，共15分）**
+
+**阅读下面短文，掌握其大意，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该选项涂黑。**
+
+1\. A 2. C 3. B 4. B 5. D 6. C 7. A 8. D 9. A 10. C
+
+**Ⅲ.阅读理解（共两节，38分）**
+
+**第一节（共14小题；每小题2分，共28分）**
+
+**阅读下面短文，从每题所给的 A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。**
+
+11\. A 12. B 13. C
+
+14\. D 15. D 16. B 17. B
+
+18\. C 19. B 20. A 21. B
+
+22\. C 23. D 24. C
+
+**第二节（共5小题；每小题2分，共10分）**
+
+**根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中共有两项为多余选项。**
+
+25\. E 26. B 27. G 28. C 29. D
+
+**第Ⅱ卷（共57分）**
+
+**Ⅰ.选词填空（共5小题；每小题2分，共10分）**
+
+30\. impressive
+
+31\. motivation
+
+32\. treatment##treatments
+
+33\. beneficial
+
+34\. logical
+
+**Ⅱ.语法填空（共10小题；每小题1.5分，共15分）**
+
+35\. celebrated 36. to spread 37. families
+
+38\. having 39. fewer 40. has visited 41. in
+
+42\. which## that 43. was developed 44. whether
+
+**Ⅲ.书面表达（共两节，32分）**
+
+**第一节（共4小题；第60、61题各2分，第62题3分，第63题5分，共12分）**
+
+45\. Delayed gratification refers to the ability to wait for a long-term reward.
+
+46\. Delayed gratification requires self-discipline and the ability to manage impulses, while instant gratification often involves giving in to immediate desires.
+
+47\. **_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development._**
+
+According to the passage, delayed gratification has to do with one's natural ability and environment and what one is taught.
+
+48\. I have been longing for a new gaming console. Instead of buying it immediately, I save a fixed amount weekly to get it in a few months.
+
+**第二节（20分）**
+
+Dear Jim,
+
+I'm thrilled to know you're going to introduce Beijing students' smart lifestyle! My suggestion is to focus on one key trend: AI-assisted learning.
+
+Nowadays, AI tools are revolutionizing how high school students like me study. They provide instant homework help, generate practice questions, and even analyze our mistakes to create personalized study plans. Many classmates use voice assistants to practice English speaking, making learning more interactive. I believe your article will definitely be relevant if you highlight AI-assisted learning in Beijing and how it is transforming education here. Truly this is cutting-edge technology that is relatable to teens worldwide!
+
+I hope my advice is helpful.
+
+Yours
+
+Li Hua
+
+请分析上述试卷，输出结构化的JSON（仅JSON，无markdown fence，无其他文字）：
