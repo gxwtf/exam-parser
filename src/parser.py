@@ -204,6 +204,10 @@ class ExamParser:
             # Ensure questions have answers and analysis from AI
             self._ensure_questions(section_copy, section_type)
             
+            # Clean spacing around blank tags in article
+            if section_copy.get("article"):
+                section_copy["article"] = self._clean_article_spacing(section_copy["article"])
+            
             processed.append(section_copy)
         
         logger.debug("AI result processed")
@@ -264,8 +268,8 @@ class ExamParser:
         elif "高一" in filename:
             grade = "高一"
         
-        # Build title/source: remove "英语" suffix
-        title = filename.replace("英语", "").strip()
+        # Build title/source: remove "英语" and "（教师版）" suffixes
+        title = filename.replace("英语", "").replace("（教师版）", "").replace("(教师版)", "").strip()
         
         paper = ai_result.get("paper", {})
         paper["title"] = title
@@ -279,6 +283,29 @@ class ExamParser:
         
         logger.debug(f"  title={title}, subject={subject}, year={year}, grade={grade}")
     
+    @staticmethod
+    def _clean_article_spacing(article: str) -> str:
+        """清理文章里空标签周围的空格
+
+        修复 AI 输出的常见空格错误：
+        - <ClozeBlank></ClozeBlank> .  →  <ClozeBlank></ClozeBlank>.
+        - .I <ClozeBlank></ClozeBlank>  →  . I <ClozeBlank></ClozeBlank>
+        """
+        blank_tags = ["ClozeBlank", "Input", "Input2", "Blank"]
+
+        # 1. 删除空标签与标点之间的空格: </ClozeBlank> .  →  </ClozeBlank>.
+        for tag in blank_tags:
+            article = re.sub(
+                rf'</{tag}>\s+([.,;!?])',
+                rf'</{tag}>\1',
+                article,
+            )
+
+        # 2. 标点后紧跟字母时补空格: .I  →  . I
+        article = re.sub(r'([.,;!?])([A-Za-z])', r'\1 \2', article)
+
+        return article
+
     @staticmethod
     def _cn_type_to_qt(type_cn: str) -> str:
         """Derive questionType from Chinese type name."""

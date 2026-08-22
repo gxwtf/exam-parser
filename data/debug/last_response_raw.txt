@@ -1,360 +1,82 @@
-Paper: 2025北京西城高二（下）期末英语
-Response Length: 20156 characters
+Paper: 2023北京朝阳高三二模英语
+Response Length: 18316 characters
 ================================================================================
 RAW RESPONSE (BEFORE PROCESSING):
 ================================================================================
 {
   "paper": {
-    "totalScore": 140,
-    "duration": 120
+    "totalScore": 100,
+    "duration": 90
   },
   "sections": [
     {
       "type": "完形填空",
-      "title": "消防员用牛奶和啤酒救火",
+      "title": "新生儿重症监护室的希望",
       "tags": [],
       "questionStart": 1,
       "questionEnd": 10,
       "score": 15,
-      "article": "Firefighters should be quick thinkers. In an emergency, they should figure out the speediest and safest way to act, sometimes including improvising (临时拼凑) with the things <ClozeBlank></ClozeBlank>. Fire chief Fennessy knows this well. He is now making headlines for <ClozeBlank></ClozeBlank> two homes with milk and beer during a fire in Altadena, California.\n\n![菁师帮（北京题库）](images/image1.png)Although Altadena was not in his charge, Fennessy grew up there and still had family and friends there. Hearing the news of the fire, he tried to contact his brother. When he couldn't <ClozeBlank></ClozeBlank> his brother, Fennessy decided to drive over to Altadena. On his way, he learned his brother's family had been taken to safety, but since he had already made the <ClozeBlank></ClozeBlank>, Fennessy figured he might as well take a look.\n\nWhen reaching the spot, Fennessy couldn't believe his eyes at the sight of the ruins. \"I haven't seen anything like this where you drive for miles, and there's massive <ClozeBlank></ClozeBlank>,\" Fennessy said. When he reached his brother's street, his home and a neighbor's house were still standing, but he <ClozeBlank></ClozeBlank> the flames were getting too close, as other nearby homes were already burning down.\n\nEven more worrisome, a gas meter on the neighbor's house was melting (熔化), surrounded by fire. Thinking he had to <ClozeBlank></ClozeBlank> the gas meter, he looked for a hose (水龙带), but there was no water.\n\nExploring his options, Fennessy <ClozeBlank></ClozeBlank> his entry through the front door of one of the homes and went into the kitchen looking for whatever he could use. \"I ended up finding some milk and beer,\" he explained. \"To do nothing means the home's going to be <ClozeBlank></ClozeBlank>, and in this case, a little milk and beer really saved the day.\"\n\nThe two homes he saved are now the only two houses standing on the block. But Fennessy said he only did what he could as a trained firefighter and was getting a lot of <ClozeBlank></ClozeBlank> for what was luck in terms of timing and resources. \"We're fixers. We're going to put our lives on the line,\" Fennessy said.",
+      "article": "My son was born with breathing difficulties, so he had to stay in NICU, the hospital unit for newborns needing intensive care. There he could only be fed through a tube. I hated the tube. The lovely dreams I had of nursing my baby were entirely <ClozeBlank></ClozeBlank> .\n\nOn the fifth day, I <ClozeBlank></ClozeBlank> about the tube, saying that I wanted to feed him with a bottle. The doctors agreed to let me try. My son's feedings would be closely recorded to see if he was able to get <ClozeBlank></ClozeBlank> milk intake without the tube. After eighteen hours, it was determined he could not do that and the tube was back. This meant he wasn't getting stronger. The <ClozeBlank></ClozeBlank> felt so dark.\n\nSeated outside the NICU, I started crying. Just then, a young nurse came and sat beside me. When I had <ClozeBlank></ClozeBlank> my sorrow a little, she handed me a tissue and asked if I wanted to talk. I asked again if we could remove the tube. The nurse replied, \"Not today. But remember, tomorrow is a new day.\"\n\nShe seemed much younger than me, but her words were <ClozeBlank></ClozeBlank> and hope-filled, and I held on to them. I remembered her advice and repeated it to myself multiple times a day. The nurse changed my perspective away from current <ClozeBlank></ClozeBlank> to see the hope of tomorrow. Gradually, things started to <ClozeBlank></ClozeBlank> . On day eight, my son drank half of his milk without the tube. On day ten, the doctors approved taking off the tube <ClozeBlank></ClozeBlank> . \"Tomorrow\" came. It just came a few days later than expected. On day fifteen, we were released from the hospital, and my son \"graduated\" from the NICU.\n\nWhat I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with <ClozeBlank></ClozeBlank> . After all, tomorrow is a new day.",
       "questions": [
         {
           "id": 1,
-          "content": "",
-          "answer": "A",
-          "analysis": "根据语境，消防员需要利用手边的东西临时拼凑，at hand 意为\"在手边\"，符合句意。",
+          "answer": "B",
+          "analysis": "根据语境，作者原本的哺乳梦想因孩子需要插管而完全破灭，故选destroyed。",
           "score": 1.5
         },
         {
           "id": 2,
-          "content": "",
-          "answer": "C",
-          "analysis": "根据下文，他用牛奶和啤酒救了两个房子，所以是 saving。",
+          "answer": "A",
+          "analysis": "作者对插管表示抗议，想要用奶瓶喂养，故选protested。",
           "score": 1.5
         },
         {
           "id": 3,
-          "content": "",
-          "answer": "B",
-          "analysis": "他试图联系哥哥，但联系不上，reach 意为\"联系上\"。",
+          "answer": "C",
+          "analysis": "医生记录喂养情况，看孩子能否在没有管子的情况下获得足够的奶量，sufficient意为\"足够的\"。",
           "score": 1.5
         },
         {
           "id": 4,
-          "content": "",
-          "answer": "B",
-          "analysis": "他已经开车去了，所以是 made the trip。",
+          "answer": "D",
+          "analysis": "此处指作者面临的处境非常黑暗，situation意为\"处境\"。",
           "score": 1.5
         },
         {
           "id": 5,
-          "content": "",
-          "answer": "D",
-          "analysis": "他看到的是大面积的破坏，destruction 符合语境。",
+          "answer": "B",
+          "analysis": "作者控制住悲伤后，护士递纸巾，contained意为\"控制，抑制\"。",
           "score": 1.5
         },
         {
           "id": 6,
-          "content": "",
-          "answer": "C",
-          "analysis": "他担心火焰越来越近，feared 符合语境。",
+          "answer": "A",
+          "analysis": "护士的话充满智慧，故选wise。",
           "score": 1.5
         },
         {
           "id": 7,
-          "content": "",
-          "answer": "A",
-          "analysis": "他需要冷却煤气表，cool 意为\"冷却\"。",
+          "answer": "C",
+          "analysis": "护士改变了作者对当前挑战的看法，challenges意为\"挑战\"。",
           "score": 1.5
         },
         {
           "id": 8,
-          "content": "",
-          "answer": "D",
-          "analysis": "他强行进入前门，forced 符合语境。",
+          "answer": "B",
+          "analysis": "事情逐渐好转，look up意为\"好转\"。",
           "score": 1.5
         },
         {
           "id": 9,
-          "content": "",
-          "answer": "A",
-          "analysis": "如果不采取行动，房子就会被烧毁，lost 意为\"失去\"。",
+          "answer": "C",
+          "analysis": "医生批准完全取下管子，completely意为\"完全地\"。",
           "score": 1.5
         },
         {
           "id": 10,
-          "content": "",
-          "answer": "C",
-          "analysis": "他得到了很多赞誉，credit 意为\"赞扬\"。",
+          "answer": "D",
+          "analysis": "作者学会带着信心期待明天，faith意为\"信心\"。",
           "score": 1.5
-        }
-      ]
-    },
-    {
-      "type": "阅读",
-      "title": "Odyssey of the Mind 创意竞赛",
-      "tags": ["A篇"],
-      "questionStart": 11,
-      "questionEnd": 13,
-      "score": 6,
-      "start": "Odyssey of the Mind (OM) promotes creativity",
-      "passageTitle": "",
-      "questions": [
-        {
-          "id": 1,
-          "content": "",
-          "answer": "A",
-          "analysis": "根据第一段\"Independent study, original ideas, and critical thinking skills are rewarded\"可知，OM最看重创新解决方案。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "",
-          "answer": "B",
-          "analysis": "根据\"They will be scored for how well they meet the requirements of the problem (Long-Term score) and for their creativity in categories specific to that problem (Style score)\"可知，从两个方面评分。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "",
-          "answer": "C",
-          "analysis": "根据\"Odyssey of the Mind Spirit Award: It recognizes an individual involved in the program who demonstrates the encouragement and development of cooperation, self-respect, and the appreciation and understanding of others.\"可知，团队合作精神最可能获得此奖。",
-          "score": 2
-        }
-      ]
-    },
-    {
-      "type": "阅读",
-      "title": "冒险人生与意外转折",
-      "tags": ["B篇"],
-      "questionStart": 14,
-      "questionEnd": 17,
-      "score": 8,
-      "start": "I've always been a daring risk taker.",
-      "passageTitle": "",
-      "questions": [
-        {
-          "id": 1,
-          "content": "",
-          "answer": "D",
-          "analysis": "根据\"From then on, I committed my life to adventure\"可知，赢得比赛给了她冒险的决心。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "",
-          "answer": "D",
-          "analysis": "根据\"I laughed at the idea\"可知，她起初持怀疑态度。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "",
-          "answer": "B",
-          "analysis": "根据最后一段\"the company never received it\"可知，申请信没有送达。",
-          "score": 2
-        },
-        {
-          "id": 4,
-          "content": "",
-          "answer": "B",
-          "analysis": "文章讲述了作者因申请信未送达而走上飞行之路，说明最好的旅程不是规划好的。",
-          "score": 2
-        }
-      ]
-    },
-    {
-      "type": "阅读",
-      "title": "雨林中的隐藏空地",
-      "tags": ["C篇"],
-      "questionStart": 18,
-      "questionEnd": 21,
-      "score": 8,
-      "start": "Elephants and gorillas in the Republic of the Congo's rainforests",
-      "passageTitle": "",
-      "questions": [
-        {
-          "id": 1,
-          "content": "",
-          "answer": "C",
-          "analysis": "根据第一段\"to search for vital nutrition and maintain their complex social networks\"可知，bais是获取食物和社交的地方。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "",
-          "answer": "B",
-          "analysis": "根据\"The researchers' map of bais, the first of its kind\"可知，这是首次绘制bais网络地图。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "",
-          "answer": "A",
-          "analysis": "根据上下文，elusive意为\"难以找到的\"。",
-          "score": 2
-        },
-        {
-          "id": 4,
-          "content": "",
-          "answer": "B",
-          "analysis": "文章主要介绍了通过无人机和AI发现雨林中隐藏的bais，因此标题应为\"Hidden Playgrounds Revealed in Rainforests\"。",
-          "score": 2
-        }
-      ]
-    },
-    {
-      "type": "阅读",
-      "title": "科学与人文的融合",
-      "tags": ["D篇"],
-      "questionStart": 22,
-      "questionEnd": 24,
-      "score": 6,
-      "start": "Monday was the first day of Dartmouth's spring term.",
-      "passageTitle": "",
-      "questions": [
-        {
-          "id": 1,
-          "content": "",
-          "answer": "C",
-          "analysis": "根据\"mixing the sciences and the humanities\"可知，这门课打破了科学与人文的界限。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "",
-          "answer": "D",
-          "analysis": "作者认为科学家应该与人文学者合作，因此David与哲学学生合作会得到作者赞同。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "",
-          "answer": "C",
-          "analysis": "根据最后一段\"it is wanting to know that makes us matter\"可知，作者强调求知欲的重要性。",
-          "score": 2
-        }
-      ]
-    },
-    {
-      "type": "七选五",
-      "title": "宽恕的艺术",
-      "tags": [],
-      "questionStart": 25,
-      "questionEnd": 29,
-      "score": 10,
-      "article": "Forgiveness is something that many of us strive for, but it can often feel difficult to achieve. Over the years, we've heard countless people express the intention to forgive, only to struggle with the emotional roadblocks that prevent them from truly letting go.\n\nFirst, let's define forgiveness. <Blank></Blank> It's not about forgetting what happened or excusing harmful behavior. In fact, our minds tell us that if we stay angry, bitter, or distant, we'll be safe from further hurt. <Blank></Blank> While holding onto memories and creating distance may offer temporary emotional safeguards, it often deepens our sadness, isolates us, and prevents us from healing. Forgiveness, on the other hand, is about choosing not to let that pain continue to define your thoughts, emotions, and behaviors.\n\nForgiveness is essential because we're all human, and we all make mistakes. If we want to cultivate meaningful relationships, there will unavoidably be times when we hurt one another. Forgiveness becomes crucial in maintaining those connections and our own peace of mind. <Blank></Blank> Forgiving yourself is especially important. Raising walls of bitterness or anger toward yourself is deeply damaging. When you hold on to shame or guilt, you create emotional barriers that prevent you from living fully and authentically.\n\nSo, how do we forgive? While the journey is deeply personal and can vary from person to person, there are key steps that can help guide us. Acknowledge the hurt and pain exactly as it is. <Blank></Blank> This perspective allows us to see others (and ourselves) as imperfect humans doing the best they can with what they have. Extend sympathy to yourself and others. Choose to release bitterness and move forward in line with your values.\n\n<Blank></Blank> It's an ongoing practice. But every time you choose forgiveness, you create space for love and healing to flow through your life.",
-      "options": [
-        {
-          "id": "A",
-          "label": "It is a continuous process."
-        },
-        {
-          "id": "B",
-          "label": "But we know that this isn't true."
-        },
-        {
-          "id": "C",
-          "label": "Recognize that everyone has faults."
-        },
-        {
-          "id": "D",
-          "label": "Remember that forgiveness isn't a one-time event."
-        },
-        {
-          "id": "E",
-          "label": "Forgiveness is the decision to release attachment to a painful past."
-        },
-        {
-          "id": "F",
-          "label": "You don't have to communicate with the person who wronged you."
-        },
-        {
-          "id": "G",
-          "label": "In fact, we may need to forgive not only others but ourselves as well."
-        }
-      ],
-      "questions": [
-        {
-          "id": 1,
-          "content": "",
-          "answer": "E",
-          "analysis": "前文提到定义宽恕，后文说不是忘记或原谅，因此E选项\"宽恕是决定释放对痛苦过去的依恋\"符合定义。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "",
-          "answer": "B",
-          "analysis": "前文说我们的思维告诉我们保持愤怒可以安全，后文说这往往加深悲伤，因此B选项\"但我们知道这不是真的\"衔接自然。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "",
-          "answer": "G",
-          "analysis": "后文提到原谅自己很重要，因此G选项\"事实上，我们可能不仅需要原谅别人，也需要原谅自己\"引出下文。",
-          "score": 2
-        },
-        {
-          "id": 4,
-          "content": "",
-          "answer": "C",
-          "analysis": "后文说这种视角让我们看到他人不完美，因此C选项\"认识到每个人都有缺点\"符合。",
-          "score": 2
-        },
-        {
-          "id": 5,
-          "content": "",
-          "answer": "D",
-          "analysis": "后文说这是一个持续的实践，因此D选项\"记住宽恕不是一次性事件\"符合。",
-          "score": 2
-        }
-      ]
-    },
-    {
-      "type": "选词填空",
-      "title": "选词填空",
-      "tags": [],
-      "questionStart": 30,
-      "questionEnd": 34,
-      "score": 10,
-      "article": "benefit, treat, logic, impress, motivate",
-      "questions": [
-        {
-          "id": 1,
-          "content": "The <Input2></Input2> performance of the athlete left everyone amazed.",
-          "answer": "impressive",
-          "analysis": "根据句意，运动员的表现令人惊叹，用形容词impressive。",
-          "score": 2
-        },
-        {
-          "id": 2,
-          "content": "He is a bright student, but he just lacks the <Input2></Input2> to learn new things.",
-          "answer": "motivation",
-          "analysis": "根据句意，他缺乏学习新事物的动力，用名词motivation。",
-          "score": 2
-        },
-        {
-          "id": 3,
-          "content": "Many patients are not getting the medical <Input2></Input2> they need.",
-          "answer": "treatment##treatments",
-          "analysis": "根据句意，病人没有得到所需的医疗治疗，用名词treatment。",
-          "score": 2
-        },
-        {
-          "id": 4,
-          "content": "Cycling is highly <Input2></Input2> to health and the environment.",
-          "answer": "beneficial",
-          "analysis": "根据句意，骑自行车对健康和环境有益，用形容词beneficial。",
-          "score": 2
-        },
-        {
-          "id": 5,
-          "content": "Programming requires <Input2></Input2> thinking to gradually break big problems into smaller steps.",
-          "answer": "logical",
-          "analysis": "根据句意，编程需要逻辑思维，用形容词logical。",
-          "score": 2
         }
       ]
     },
@@ -362,137 +84,325 @@ RAW RESPONSE (BEFORE PROCESSING):
       "type": "语法填空",
       "title": "语法填空",
       "tags": [],
-      "questionStart": 35,
-      "questionEnd": 44,
+      "questionStart": 11,
+      "questionEnd": 20,
       "score": 15,
-      "article": "## A\n\nThe World Health Day, <Input></Input> (celebrate) every year on April 7, is a global initiative started by the World Health Organization (WHO). The aim of the day is <Input></Input> (spread) awareness around key health issues and run campaigns and discussions around it. This year's theme is \"Healthy Beginning, Hopeful Futures\". The health of mothers and babies is the foundation of healthy <Input></Input> (family) and communities, helping ensure hopeful futures for us all.\n\n## B\n\nA tortoise at the Philadelphia Zoo has become the oldest first-time mother of her species after <Input></Input> (have) her first babies at 100 years old. The tortoise, named Mommy, is a critically endangered species in their native home. There are <Input></Input> (few) than 50 kept in US zoos. Mommy arrived at the Zoo in 1932, meaning anyone that <Input></Input> (visit) the Zoo for the last 93 years has likely seen her. This is a significant milestone <Input></Input> the history of the Zoo.\n\n## C\n\nA Chinese automaker has created a battery <Input></Input> will enable electric vehicles (EVs) to charge almost as quickly as it takes to fill a regular car's gas tank. The new battery, named the e platform, <Input></Input> (develop) last year by BYD, a Chinese firm that is overtaking Tesla as the world's top seller of electric vehicles. BYD says it will install a network of 4,000 flash-charging stations across China. This technology is currently only available in China, and the company has yet to confirm <Input></Input> it will make it available internationally or not.",
+      "article": "## A\n\nAs a variant of American football, flag football is a type of sport in which a player must remove a flag belt from the ball carrier to end a down. The first rule of the game is that contact <Input></Input> players is not permitted. Recently, it <Input></Input> (gain) great popularity in China among young people. It's engaging and ridiculously fun. That's why the percentage of people <Input></Input> (join) a flag football club through online channels has risen to a new high level.\n\n## B\n\nOld Connections, a telecommunications museum in Seattle, with a working exchange from the 1940s, <Input></Input> (show) how telephones brought us together, but also tore us apart. Perhaps it should not be <Input></Input> (surprise) that the Internet has brought with it a new wave of horrific destructiveness. History itself is a kind of radio programme, broadcast to us in frequencies that become harder to receive as we forget the old ways. But as long as we keep the ancient exchanges running, we have a way to remember and understand <Input></Input> we come from.\n\n## C\n\nWang Dakang, aged 88, is a model of lifelong learning. In the 1980s, he was the first person <Input></Input> (accomplish) a round trip of China using only a bicycle. To edit this experience into his book, Wang decided to go to college. At the age of 61, he <Input></Input> (admit) into college, majoring in journalism. By 2012, he had completed three majors in college. At present, Wang lives in Leshan, where he spends his days following carefully <Input></Input> (plan) routines. His study starts at 6 am every morning, during <Input></Input> he reads and takes notes from newspapers. Wang said, \"There is so much to learn and I will continue learning until the very end.\"",
       "questions": [
         {
-          "id": 1,
-          "content": "",
-          "answer": "celebrated",
-          "analysis": "非谓语动词作定语，celebrate与World Health Day是被动关系，用过去分词。",
+          "id": 11,
+          "answer": "between",
+          "analysis": "contact between players 意为\"球员之间的接触\"，between表示两者之间。",
           "score": 1.5
         },
         {
-          "id": 2,
-          "content": "",
-          "answer": "to spread",
-          "analysis": "不定式作表语，表示目的。",
+          "id": 12,
+          "answer": "has gained",
+          "analysis": "根据Recently可知用现在完成时，主语it为单数，故填has gained。",
           "score": 1.5
         },
         {
-          "id": 3,
-          "content": "",
-          "answer": "families",
-          "analysis": "根据语境，此处用复数形式。",
+          "id": 13,
+          "answer": "joining",
+          "analysis": "people与join是主动关系，且此处为后置定语，故用现在分词joining。",
           "score": 1.5
         },
         {
-          "id": 4,
-          "content": "",
-          "answer": "having",
-          "analysis": "介词after后接动名词。",
+          "id": 14,
+          "answer": "shows",
+          "analysis": "主语Old Connections是单数，且描述客观事实，用一般现在时，故填shows。",
           "score": 1.5
         },
         {
-          "id": 5,
-          "content": "",
-          "answer": "fewer",
-          "analysis": "than提示用比较级，fewer than 50。",
+          "id": 15,
+          "answer": "surprising",
+          "analysis": "此处作表语，表示\"令人惊讶的\"，用形容词surprising。",
           "score": 1.5
         },
         {
-          "id": 6,
-          "content": "",
-          "answer": "has visited",
-          "analysis": "for the last 93 years提示用现在完成时，主语anyone是单数。",
+          "id": 16,
+          "answer": "where",
+          "analysis": "此处引导宾语从句，从句中缺少地点状语，故用where。",
           "score": 1.5
         },
         {
-          "id": 7,
-          "content": "",
-          "answer": "in",
-          "analysis": "in the history of 固定搭配。",
+          "id": 17,
+          "answer": "to accomplish",
+          "analysis": "the first person后常接不定式作定语，故填to accomplish。",
           "score": 1.5
         },
         {
-          "id": 8,
-          "content": "",
-          "answer": "which##that",
-          "analysis": "定语从句，先行词是battery，关系词在从句中作主语，用which或that。",
+          "id": 18,
+          "answer": "was admitted",
+          "analysis": "he与admit是被动关系，且根据At the age of 61可知用一般过去时的被动语态，故填was admitted。",
           "score": 1.5
         },
         {
-          "id": 9,
-          "content": "",
-          "answer": "was developed",
-          "analysis": "根据last year用一般过去时，且develop与battery是被动关系。",
+          "id": 19,
+          "answer": "planned",
+          "analysis": "routines与plan是被动关系，用过去分词作定语，故填planned。",
           "score": 1.5
         },
         {
-          "id": 10,
-          "content": "",
-          "answer": "whether",
-          "analysis": "whether...or not 固定搭配。",
+          "id": 20,
+          "answer": "which",
+          "analysis": "此处为\"介词+关系代词\"引导的非限制性定语从句，先行词为6 am every morning，故填which。",
           "score": 1.5
         }
       ]
     },
     {
-      "type": "阅读表达",
-      "title": "延迟满足",
-      "tags": [],
-      "questionStart": 45,
-      "questionEnd": 48,
-      "score": 12,
-      "start": "We live in a world filled with distractions.",
-      "passageTitle": "",
+      "type": "阅读",
+      "title": "哥伦比亚大学SHAPE项目",
+      "tags": ["A篇"],
+      "questionStart": 21,
+      "questionEnd": 23,
+      "score": 6,
+      "start": "Columbia Engineering's Summer High School Academic Program for Engineers (SHAPE) is a selective pre-college program",
+      "passageTitle": "Columbia Engineering's Summer High School Academic Program for Engineers (SHAPE)",
       "questions": [
         {
-          "id": 1,
-          "content": "",
-          "answer": "Delayed gratification refers to the ability to wait for a long-term reward.",
-          "analysis": "根据第一段\"delayed gratification, which refers to the ability to wait for a long-term reward\"可知答案。",
+          "id": 21,
+          "answer": "A",
+          "analysis": "根据第一段\"SHAPE is tailored for students with a gift for STEM\"可知，该项目适合在STEM方面有天赋的学生，故选A。",
           "score": 2
         },
         {
-          "id": 2,
-          "content": "",
-          "answer": "Delayed gratification requires self-discipline and the ability to manage impulses, while instant gratification often involves giving in to immediate desires.",
-          "analysis": "根据第二段\"The former requires self-discipline and the ability to manage impulses, while the latter often involves giving in to immediate desires.\"可知答案。",
+          "id": 22,
+          "answer": "D",
+          "analysis": "根据\"its professional development components help students develop the skills they need to get there\"可知，学生能获得工程所需的技能，故选D。",
           "score": 2
         },
         {
-          "id": 3,
-          "content": "",
-          "answer": "**_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development.**_\n\nAccording to the passage, delayed gratification has to do with one's natural ability and environment and what one is taught.",
-          "analysis": "根据第三段\"Delayed gratification has to do with one's natural ability and environment and what one is taught.\"可知，延迟满足不仅与环境有关，还与个人能力和教育有关。",
+          "id": 23,
+          "answer": "D",
+          "analysis": "根据申请标准第一条\"Strong academic record\"可知，学生需要证明自己的学习能力，故选D。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "失去一条腿后的微笑",
+      "tags": ["B篇"],
+      "questionStart": 24,
+      "questionEnd": 26,
+      "score": 6,
+      "start": "I lost my leg to cancer at 30.",
+      "passageTitle": "I Am Choosing to Smile",
+      "questions": [
+        {
+          "id": 24,
+          "answer": "B",
+          "analysis": "根据第二段小男孩大喊\"She only has one leg! Doesn't that look funny?\"可知，让作者震惊的是男孩喊出的话，故选B。",
+          "score": 2
+        },
+        {
+          "id": 25,
+          "answer": "A",
+          "analysis": "根据后文作者开始去学校演讲、成为励志演说家可知，这次经历让她找到了人生的目标，故选A。",
+          "score": 2
+        },
+        {
+          "id": 26,
+          "answer": "B",
+          "analysis": "作者勇敢面对自己的残疾，并教育孩子尊重差异，体现了勇敢的品质，故选B。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "植物抗病新策略",
+      "tags": ["C篇"],
+      "questionStart": 27,
+      "questionEnd": 30,
+      "score": 8,
+      "start": "Researchers from a U.K. plant research institute have found a way to provide plants with an antibody-based defense",
+      "passageTitle": "Plant Defense Strategy",
+      "questions": [
+        {
+          "id": 27,
+          "answer": "C",
+          "analysis": "根据第一段\"inoculate a protein from the plant pathogen to be targeted to a camel\"可知，是将病原体蛋白引入骆驼体内，故选C。",
+          "score": 2
+        },
+        {
+          "id": 28,
+          "answer": "D",
+          "analysis": "第二段主要说明植物病原体不断进化，逃避植物免疫受体的识别，解释了植物为何难以应对不断更新的病害，故选D。",
+          "score": 2
+        },
+        {
+          "id": 29,
+          "answer": "B",
+          "analysis": "根据最后一段\"we have the potential of made-to-order resistance genes and keeping up with a pathogen\"可知，纳米抗体能帮助植物跟上病原体的变化，故选B。",
+          "score": 2
+        },
+        {
+          "id": 30,
+          "answer": "A",
+          "analysis": "根据最后一段科学家们的评论可知，他们希望将这一成果应用于现实世界，故选A。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读",
+      "title": "AI的心智理论",
+      "tags": ["D篇"],
+      "questionStart": 31,
+      "questionEnd": 34,
+      "score": 8,
+      "start": "Superhuman artificial intelligence is already among us.",
+      "passageTitle": "AI with Its Own Theory of Mind Is Expected",
+      "questions": [
+        {
+          "id": 31,
+          "answer": "C",
+          "analysis": "根据第三段\"if someone asks whether you are going for a run and you reply 'it's raining', they can quickly conclude that the answer is no\"可知，AI能理解基于常识的推理，C项中妈妈告诉孩子食物健康，孩子就吃，符合常识推理，故选C。",
+          "score": 2
+        },
+        {
+          "id": 32,
+          "answer": "B",
+          "analysis": "根据第四段\"Building prior knowledge into AI makes it reliant on our imperfect understanding of theory of mind\"可知，人类对心智理论的理解不完美，限制了AI的发展，故选B。",
+          "score": 2
+        },
+        {
+          "id": 33,
+          "answer": "C",
+          "analysis": "根据最后一段\"It is also a stepping stone on the path towards a deeper goal for AI and robotics research: building truly self-aware machines\"可知，作者最看重推理能力，故选C。",
+          "score": 2
+        },
+        {
+          "id": 34,
+          "answer": "A",
+          "analysis": "文章主要讨论AI拥有心智理论的可能性，故选A。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "七选五",
+      "title": "机会成本",
+      "tags": [],
+      "questionStart": 35,
+      "questionEnd": 39,
+      "score": 10,
+      "article": "In our modern world, there are endless alternatives. Have you ever found yourself wondering whether you should quit or stay in your job, accept an offer or give it up for another? There is a simple and practical method that solves this problem. <Blank></Blank> When you understand the concept, you have the power to measure every alternative with precision and make the right decision.\n\nIn the field of economics, opportunity cost is the value that you have to give up when you choose an option over another good option. <Blank></Blank> Every time you choose something, you give up other alternatives together with their financial benefits. It is not all the other options, but the most valued one that is defined as the opportunity cost.\n\n<Blank></Blank> Take the simple example of trying to decide whether to take public transportation for 80 minutes or to drive for 40 minutes. You might save on the cost of gas while riding the bus but double the trip length and miss out on other things you could have done during that time. <Blank></Blank> This is how you create priorities in your daily life.\n\nThough useful in decision making, the biggest drawback of opportunity cost is that it's often related to what's hard to quantify. <Blank></Blank> After all, putting a number to your peaceful mind or happiness can be difficult.\n\nOpportunity cost isn't cut and dried. It varies from person to person. At the end of the day, you are in charge of what you own and what you want to gain.",
+      "options": [
+        {
+          "id": "A",
+          "label": "It is about finding out the opportunity cost."
+        },
+        {
+          "id": "B",
+          "label": "Weigh the losses and gains, and make your decision."
+        },
+        {
+          "id": "C",
+          "label": "Opportunity cost matters not only in economics but also in real life."
+        },
+        {
+          "id": "D",
+          "label": "This is especially true when the opportunity cost is of non-financial benefit."
+        },
+        {
+          "id": "E",
+          "label": "The key principle underlying the idea is that there is no such thing as free lunch."
+        },
+        {
+          "id": "F",
+          "label": "Most people overlook opportunity cost because the benefits are usually hidden from view."
+        },
+        {
+          "id": "G",
+          "label": "It is the development of important skills that would help you move forward in your daily life."
+        }
+      ],
+      "questions": [
+        {
+          "id": 35,
+          "answer": "A",
+          "analysis": "前文提到有简单实用的方法解决问题，后文说理解这个概念，可知此处引出\"机会成本\"，故选A。",
+          "score": 2
+        },
+        {
+          "id": 36,
+          "answer": "E",
+          "analysis": "前文解释机会成本的定义，后文说每次选择都放弃其他选择，此处强调没有免费午餐的原则，故选E。",
+          "score": 2
+        },
+        {
+          "id": 37,
+          "answer": "C",
+          "analysis": "后文举例说明机会成本在生活中的应用，此处应承上启下，说明机会成本不仅在经济领域重要，在现实生活中也重要，故选C。",
+          "score": 2
+        },
+        {
+          "id": 38,
+          "answer": "B",
+          "analysis": "前文举例说明权衡利弊，后文说这就是你如何建立优先事项，此处应总结权衡得失后做决定，故选B。",
+          "score": 2
+        },
+        {
+          "id": 39,
+          "answer": "D",
+          "analysis": "前文说机会成本的缺点是难以量化，后文说给平静的心态或幸福定价很难，此处应说明当机会成本是非财务利益时尤其如此，故选D。",
+          "score": 2
+        }
+      ]
+    },
+    {
+      "type": "阅读表达",
+      "title": "怀旧的力量",
+      "tags": [],
+      "questionStart": 40,
+      "questionEnd": 43,
+      "score": 12,
+      "start": "The term \"nostalgia\" was first coined in 1688 and was defined as a mental illness of soldiers continually thinking about their homeland and longing for return.",
+      "passageTitle": "The Power of Nostalgia",
+      "questions": [
+        {
+          "id": 40,
+          "answer": "A mental illness of soldiers continually thinking about their homeland and longing for return.",
+          "analysis": "根据第一段\"was defined as a mental illness of soldiers continually thinking about their homeland and longing for return\"可知答案。",
+          "score": 2
+        },
+        {
+          "id": 41,
+          "answer": "They have found that time travel to the past and into the future both bring benefits to us.",
+          "analysis": "根据第二段\"researchers have found that subjects are much more likely to report positive feelings from a given piece of music if they've heard it before\"和\"time travel into the future can bring a whole new set of rewards\"可知，时间旅行到过去和未来都有好处。",
+          "score": 2
+        },
+        {
+          "id": 42,
+          "answer": "We should use a positive end result to drive us into action when procrastinating.",
+          "analysis": "根据第四段\"When you're procrastinating, visualize an end result. Flash forward to see the floor swept or the essay finished, and use that positive image to drive you into action.\"可知，应该想象积极的结果，而不是消极的结果。",
           "score": 3
         },
         {
-          "id": 4,
-          "content": "",
-          "answer": "I have been longing for a new gaming console. Instead of buying it immediately, I save a fixed amount weekly to get it in a few months.",
-          "analysis": "根据文章内容，延迟满足需要抵制即时欲望，通过储蓄等方式实现长期目标。",
+          "id": 43,
+          "answer": "(1) I often imagine myself attending my ideal university in September 2023 to cheer myself up. Picturing myself wandering on the campus and enjoying the harvest in the golden autumn can give me the motivation to overcome nervousness and stress at present with an optimistic attitude and in full gear.\n\n(2) I recall the time of winning the first prize in a speech contest two years ago. Standing on the stage reaching out for the prize, I was filled with pride. This experience serves as a constant source of encouragement and confidence for me to keep working hard to improve myself.",
+          "analysis": "根据文章内容，描述自己的一次有益的时间旅行经历，答案不唯一，合理即可。",
           "score": 5
         }
       ]
     },
     {
       "type": "作文",
-      "title": "智慧生活投稿建议",
+      "title": "感谢外教推荐英文书并交流阅读计划",
       "tags": [],
-      "questionStart": 49,
-      "questionEnd": 49,
+      "questionStart": null,
+      "questionEnd": null,
       "score": 20,
-      "start": "假设你是红星中学高二学生李华。",
+      "start": "假设你是红星中学高三学生李华。你最近读完了外教 Jim 推荐的一本英文书，请你用英文给Jim 写一封邮件",
       "passageTitle": "",
       "questions": [
         {
           "id": 1,
-          "content": "",
-          "answer": "Dear Jim,\n\nI'm thrilled to know you're going to introduce Beijing students' smart lifestyle! My suggestion is to focus on one key trend: AI-assisted learning.\n\nNowadays, AI tools are revolutionizing how high school students like me study. They provide instant homework help, generate practice questions, and even analyze our mistakes to create personalized study plans. Many classmates use voice assistants to practice English speaking, making learning more interactive. I believe your article will definitely be relevant if you highlight AI-assisted learning in Beijing and how it is transforming education here. Truly this is cutting-edge technology that is relatable to teens worldwide!\n\nI hope my advice is helpful.\n\nYours\n\nLi Hua",
+          "answer": "Dear Jim,\n\nThank you for your recommendation of the English novel _The Old Man and the Sea._\n\nHaving finished reading_,_ I've harvested a lot. The tough man who fights against the big fish and sharks alone in the sea inspires me to brave frustrations in my life. And I have learned that we should stick to our dreams no matter what hardships we may encounter.\n\nThe book unfolds a new world to me. Thus, I make a plan for further reading. English novels enlightening my mind will be included in my reading list. I intend to read one book a month. While reading, I will take down my understanding in time to gain more beyond the lines.\n\nI would appreciate it if you could give me more recommendations.\n\nYours,\n\nLi Hua",
           "analysis": "",
           "score": 20
         }

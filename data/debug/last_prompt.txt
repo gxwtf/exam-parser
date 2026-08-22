@@ -1,8 +1,8 @@
-Paper: 2025北京西城高二（下）期末英语
+Paper: 2023北京朝阳高三二模英语
 ================================================================================
 你是一位英语试卷解析专家。请分析以下英语试卷（MD格式），识别其结构、题型，并生成完整的解析结果。
 
-当前试卷名称：2025北京西城高二（下）期末英语
+当前试卷名称：2023北京朝阳高三二模英语
 
 重要原则：
 1. 只识别这7种题型：完形填空、语法填空、阅读、七选五、选词填空、阅读表达、作文
@@ -64,7 +64,11 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 解析格式处理：
 - **优先抄写**：如果MD参考答案中有解析（如 `【X题详解】`、`【解析】`、`【详解】` 块），原封不动抄写到对应题目的 analysis 字段，保留换行和MD格式
-- **没有解析时自己生成**：如果MD参考答案中只有答案没有解析，则根据文章内容和答案，自己生成一段简洁的解析（中文，1-3句话），说明为什么选这个答案
+- **没有解析时自己生成**：如果MD参考答案中只有答案没有解析，则根据文章内容和答案，自己生成一段简洁的解析（中文），具体要求：
+  - 完型填空：依据文章说明选这个选项的原因，如果其他干扰项有一些词或词组比较难，也可以介绍一下
+  - 阅读题：依据文章说明为什么选这个答案，阅读题ABCD选项要说明每个选项选或不选的原因
+  - 七选五：依据文章说明为什么选这个选项
+  - 选词填空、语法填空、阅读表达：依据题目说明解析答案
 - 作文的解析：如果MD有解析，抄写；否则不写解析
 
 ### 题目映射：
@@ -188,524 +192,400 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 以下是试卷内容（MD格式）：
 
-2025北京西城高二（下）期末
+2023北京朝阳高三二模
 
 英 语
 
-**2025.7**
+2023\. 5
 
-**本试卷共14页，共140分。考试时长120分钟。考生务必将答案写在答题卡上，在试卷上作答无效。**
+(考试时间90分钟 满分100分)
 
-**第Ⅰ卷（共83分）**
+本试卷共10 页。考生务必在答题卡指定区域作答，在试卷上作答无效。
 
-**Ⅰ.听力理解（共三节，30分）**
+第一部分 知识运用（共两节，30 分）
 
-**第一节：（共4小题；每小题2分，共8分）**
+第一节（共10 小题；每小题1.5 分，共15 分）
 
-**听下面四段对话，每段对话后有一道小题，从每题所给的A、B、C三个选项中选出最佳选项。每段对话你将听一遍。**
+阅读下面短文，掌握其大意，从每题所给的 A、B、C、D 四个选项中，选出最佳选项， 并在答题卡上将该项涂黑。
 
-1\. What will the man wear to the event?
+My son was born with breathing difficulties, so he had to stay in NICU, the hospital unit for newborns needing intensive care. There he could only be fed through a tube. I hated the tube. The lovely dreams I had of nursing my baby were entirely 1 .
 
-A. A suit. B. A jacket. C. A T-shirt.
+On the fifth day, I 2 about the tube, saying that I wanted to feed him with a bottle. The doctors agreed to let me try. My son’s feedings would be closely recorded to see if he was able to get 3 milk intake without the tube. After eighteen hours, it was determined he could not do that and the tube was back. This meant he wasn’t getting stronger. The 4 felt so dark.
 
-2\. How will the woman go to the shopping center today?
+Seated outside the NICU, I started crying. Just then, a young nurse came and sat beside me. When I had 5 my sorrow a little, she handed me a tissue and asked if I wanted to talk. I asked again if we could remove the tube. The nurse replied, “Not today. But remember, tomorrow is a new day.”
 
-A. By car. B. On foot. C. By bus.
+She seemed much younger than me, but her words were 6 and hope-filled, and I held on to them. I remembered her advice and repeated it to myself multiple times a day. The nurse changed my perspective away from current 7 to see the hope of tomorrow. Gradually, things started to 8 . On day eight, my son drank half of his milk without the tube. On day ten, the doctors approved taking off the tube 9 . “Tomorrow” came. It just came a few days later than expected. On day fifteen, we were released from the hospital, and my son “graduated” from the NICU.
 
-3\. What is the man looking for?
+What I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with 10 . After all, tomorrow is a new day.
 
-A. His locker. B. His book. C. His bag.
+1\. A. controlled B. destroyed C. questioned D. recalled
 
-4\. What is the woman's favorite class now?
+2\. A. protested B. wondered C. forgot D. warned
 
-A. Art. B. Math. C. Science.
+3\. A. maximum B. restricted C. sufficient D. additional
 
-**第二节：（共6小题；每小题2分，共12分）**
+4\. A. plot B. spot C. atmosphere D. situation
 
-**听下面三段对话或独白，每段对话或独白后有两道小题，从每题所给的A、B、C三个选项中选出最佳选项。每段对话或独白你将听两遍。**
+5\. A. spared B. contained C. shared D. exhibited
 
-**听下面一段对话，回答第5至第6小题。**
+6\. A. wise B. plain C. familiar D. sharp
 
-5\. What is the man?
+7\. A. mistakes B. dreams C. challenges D. doubts
 
-A. A cleaner. B. A secretary. C. A manager.
+8\. A. go away B. look up C. make sense D. fall apart
 
-6\. What will the woman probably do next?
+9\. A. frequently B. slightly C. completely D. occasionally
 
-A. Go to work. B. Answer calls. C. Buy some coffee.
+10\. A. intention B. imagination C. urge D. faith
 
-**听下面一段对话，回答第7至第8小题。**
+第二节（共10 小题；每小题1.5 分, 共15 分）
 
-7\. How does Tom help Mary with her garden?
-
-A. He cuts the grass. B. He shapes the bushes. C. He plants new flowers.
-
-8\. What is the most probable relationship between the two speakers?
-
-A. Husband and wife. B. Classmates. C. Neighbors.
-
-**听下面一段独白，回答第9至第10小题。**
-
-9\. What will Jamie Cook's lecture focus on?
-
-A. The features of science.
-
-B. The social impacts of AI.
-
-C. The possibility of life on other planets.
-
-10\. What is the speaker's purpose in giving the talk?
-
-A. To welcome new students.
-
-B. To present various discoveries.
-
-C. To introduce upcoming events.
-
-**第三节：（共5小题；每小题2分，共10分）**
-
-听下面一段独白，根据题目要求在相应的横线上写下第11题至第15题的关键信息。每小题仅填写一个词。这段独白你将听两遍。
-
-| **How to Survive in the Wild** | |
-| --- | | --- |
-| **Find water** | · 11 a body of water.<br><br>·Dig for water if you can't find it around. |
-| **12 a shelter** | ·Find a fallen tree or a big rock.<br><br>·Search for 13 branches and lay them against the tree or rock. |
-| **14 yourself from the elements** | ·Eat late.<br><br>·Cover yourself with dirt and 15 when you go to sleep. |
-
-**Ⅱ.完形填空（共10小题；每小题1.5分，共15分）**
-
-**阅读下面短文，掌握其大意，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该选项涂黑。**
-
-Firefighters should be quick thinkers. In an emergency, they should figure out the speediest and safest way to act, sometimes including improvising (临时拼凑) with the things \_**\_1_\_**. Fire chief Fennessy knows this well. He is now making headlines for \_**\_2_\_** two homes with milk and beer during a fire in Altadena, California.
-
-![菁师帮（北京题库）](images/image1.png)Although Altadena was not in his charge, Fennessy grew up there and still had family and friends there. Hearing the news of the fire, he tried to contact his brother. When he couldn't \_**\_3_\_** his brother, Fennessy decided to drive over to Altadena. On his way, he learned his brother's family had been taken to safety, but since he had already made the \_**\_4_\_**, Fennessy figured he might as well take a look.
-
-When reaching the spot, Fennessy couldn't believe his eyes at the sight of the ruins. "I haven't seen anything like this where you drive for miles, and there's massive \_**\_5_\_**," Fennessy said. When he reached his brother's street, his home and a neighbor's house were still standing, but he \_**\_6_\_** the flames were getting too close, as other nearby homes were already burning down.
-
-Even more worrisome, a gas meter on the neighbor's house was melting (熔化), surrounded by fire. Thinking he had to \_**\_7_\_** the gas meter, he looked for a hose (水龙带), but there was no water.
-
-Exploring his options, Fennessy \_**\_8_\_** his entry through the front door of one of the homes and went into the kitchen looking for whatever he could use. "I ended up finding some milk and beer," he explained. "To do nothing means the home's going to be \_**\_9_\_**, and in this case, a little milk and beer really saved the day."
-
-The two homes he saved are now the only two houses standing on the block. But Fennessy said he only did what he could as a trained firefighter and was getting a lot of \_**\___10_\_**\__ for what was luck in terms of timing and resources. "We're fixers. We're going to put our lives on the line," Fennessy said.
-
-1\. A. at hand B. on time C. in order D. in mind
-
-2\. A. cleaning B. providing C. saving D. filling
-
-3\. A. persuade B. reach C. meet D. remind
-
-4\. A. day B. trip C. change D. appointment
-
-5\. A. access B. progress C. disturbance D. destruction
-
-6\. A. forgot B. wondered C. feared D. ignored
-
-7\. A. cool B. break C. operate D. remove
-
-8\. A. missed B. declared C. delayed D. forced
-
-9\. A. lost B. emptied C. moved D. restored
-
-10\. A. wisdom B. pride C. credit D. confidence
-
-**Ⅲ.阅读理解（共两节，38分）**
-
-**第一节（共14小题；每小题2分，共28分）**
-
-**阅读下面短文，从每题所给的 A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。**
+阅读下列短文，根据短文内容填空。在未给提示词的空白处仅填写 1 个适当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。请在答题卡指定区域作答。
 
 **A**
 
-Odyssey of the Mind (OM) promotes creativity, problem solving, teamwork, and more. It is a creative problem-solving competition that gives kids the confidence to think for themselves and to create solutions to any challenge. Independent study, original ideas, and critical thinking skills are rewarded over getting the "one right answer" thanks to our unique open-ended problems that are backed by educators and experts in STE(A)M fields. Performance, art & cultural studies are also incorporated, creating a well-rounded program that has impacted lives for over 40 years. OM benefits all types of students as they learn to think outside the box.
-
-**Participation**
-
-● Students work in teams of up to seven members and spend weeks or months working together and creating solutions to long-term problems. Every year, there are six long-term problems designed for them to choose from.
-
-● Teams are formed by division and compete against teams in the same division and problem. Grade level determines the division for teams.
-
-● In the competition, teams have eight minutes to present their long-term problem solution. They will be scored for how well they meet the requirements of the problem (Long-Term score) and for their creativity in categories specific to that problem (Style score).
-
-**Cost**
-
-Yearly memberships are required to participate in OM. Each membership supports one team per problem per division.
-
-**● Standard Membership \$290:** Individual schools/ Multiple schools sharing a principal.
-
-**● Additional Membership \$190:** Only for schools who enter two teams in the same problem and division in competition.
-
-**Awards**
-
-**● Ranatra Fusca Creativity Award:** It represents the essence of OM. It is presented to teams or individuals who exhibit exceptional creativity, either through some aspect of their problem solution, or an extraordinary idea beyond the problem solution.
-
-**● OMER's Award:** It recognizes individuals or teams who demonstrate outstanding sportsmanship, excellent behavior, or exceptional talent.
-
-**● Odyssey of the Mind Creativity Award:** It recognizes an individual and/ or organization for extraordinary creative achievement or exceptional effort.
-
-**● Odyssey of the Mind Spirit Award:** It recognizes an individual involved in the program who demonstrates the encouragement and development of cooperation, self-respect, and the appreciation and understanding of others.
-
-11\. What does Odyssey of the Mind value most?
-
-A. Having innovative solutions. B. Getting the right answer.
-
-C. Impacting others' daily lives. D. Facing more challenges.
-
-12\. In Odyssey of the Mind, students will \_**\_**\__.
-
-A. work in groups of at least seven
-
-B. be scored from two different aspects
-
-C. address six problems at the same time
-
-D. prepare their solutions within eight minutes
-
-13\. The participant with the strongest sense of teamwork is most likely to be awarded \_**\_**\__.
-
-A. OMER's Award
-
-B. Ranatra Fusca Creativity Award
-
-C. Odyssey of the Mind Spirit Award
-
-D. Odyssey of the Mind Creativity Award
+As a variant of American football, flag football is a type of sport in which a player must remove a flag belt from the ball carrier to end a down. The first rule of the game is that contact 11 players is not permitted. Recently, it 12 (gain) great popularity in China among young people. It’s engaging and ridiculously fun. That’s why the percentage of people 13 (join) a flag football club through online channels has risen to a new high level.
 
 **B**
 
-I've always been a daring risk taker. But when I was 15, my luck ran out. A horseback riding accident resulted in severe injuries, the death of my beloved horse Spooks, and the horrible news that I'd never ride again. I was set on proving the doctors wrong. Just a few months later, with my mother's support, I rode sidesaddle and won my first jumping competition. The excitement was incredible.
-
-![菁师帮（北京题库）](images/image2.png)From then on, I committed my life to adventure, remembering my mother's lesson: never say, "I can't". At 22, I read about an opening to be a motorcycle trick rider - I'd learned to ride a few years earlier. Still, it was 1976 and I knew they were unlikely to hire a woman. I thought about that as I signed my trick rider application, leaving off the honorific - Ms., hoping to hide the fact that I was a woman. But they never got back to me.
-
-I was heartbroken. Maybe the position had already been filled; maybe they'd discovered I was a woman. My friend Steve then proposed an idea that at first seemed crazy: learning to fly aeroplanes. "Flying is for men," I laughed at the idea. But gradually, I realized the suggestion had stuck with me.
-
-Years ago, trial flights - brief introductory sessions with an instructor - cost just £5 for 15 minutes in the air. Steve and I both signed up, and after my first session, I couldn't stop talking about flying. I got my license and headed for the US to work as a pilot. It wasn't easy. Initially, people were doubtful about a woman working in the role, but I ended up outperforming my male colleagues. Twenty years later, I returned to England and started my own flying company.
-
-Now, I live a quieter life. I've settled in a village in Lincolnshire, spending much of my time volunteering in care homes. Last October, after nearly fifty years and countless adventures, I received a letter from a post office in Staines. It was my trick rider application. The post office apologized for the delay and explained it had been found stuck behind a drawer in the office - the company never received it.
-
-Looking back, I realized that even though I didn't get that job, it led me to a series of adventures that shaped my life in unexpected and fulfilling ways.
-
-14\. What did winning the jumping competition bring to the writer?
-
-A. The faith in friendship.
-
-B. The acquisition of a new skill.
-
-C. The recognition of mother's love.
-
-D. The determination to go adventuring.
-
-15\. How did the writer feel at first when Steve suggested learning to fly?
-
-A. Curious. B. Inspired. C. Desperate. D. Doubtful.
-
-16\. Why did the writer fail to receive any reply about the trick ride position?
-
-A. Because she forgot to sign the application.
-
-B. Because her application was not delivered.
-
-C. Because women were unfit for the position.
-
-D. Because the position had already been filled.
-
-17\. What can we learn from this passage?
-
-A. Smart plans make big dreams.
-
-B. The best journeys are not mapped.
-
-C. Doubt kills more goals than failure.
-
-D. Strong women create strong societies.
+Old Connections, a telecommunications museum in Seattle, with a working exchange from the 1940s, 14 (show) how telephones brought us together, but also tore us apart. Perhaps it should not be 15 (surprise) that the Internet has brought with it a new wave of horrific destructiveness. History itself is a kind of radio programme, broadcast to us in frequencies that become harder to receive as we forget the old ways. But as long as we keep the ancient exchanges running, we have a way to remember and understand 16 we come from.
 
 **C**
 
-Elephants and gorillas in the Republic of the Congo's rainforests spend a lot of time hiding in the shadows - or so we thought. Using drone (无人机) surveys and AI processing, scientists have discovered an extensive network of mysterious open clearings among the trees. Animals like elephants, gorillas visit these muddy areas, called _bais_, in the languages of the Indigenous Ba'Aka, to search for vital nutrition and maintain their complex social networks. The numerous playgrounds are visible in satellite images, and AI analysis is helping researchers find them more effectively.
+Wang Dakang, aged 88, is a model of lifelong learning. In the 1980s, he was the first person 17 (accomplish) a round trip of China using only a bicycle. To edit this experience into his book, Wang decided to go to college. At the age of 61, he 18 (admit) into college, majoring in journalism. By 2012, he had completed three majors in college. At present, Wang lives in Leshan, where he spends his days following carefully 19 (plan) routines. His study starts at 6 am every morning, during 20 he reads and takes notes from newspapers. Wang said, “There is so much to learn and I will continue learning until the very end.”
 
-The discovery began in 2021 when Sylvain Ngouma and Evan Hockridge came upon a massive clearing during fieldwork in Odzala-Kokoua National Park and found a trail (踪迹) of wet, pot-sized footprints leading through the woods to the open roundabout. Hockridge, who had thought _bais_ were abnormal, says, "I had it backward. It kind of hit me when I was there. You can't understand animal interactions without first understanding _bais_."
+第二部分 阅读理解（共两节，38 分）
 
-For the next three summers, the team investigated the clearings. They analyzed camera-trap images, confirming what local people had told them - that these natural clearings are crucial gathering grounds for some of the world's most endangered mammals. The _bais_, they realized, are big melting pots, big playgrounds, for a collection of forest animals.
+第一节（共14 小题；每小题2 分，共28 分）
 
-During the initial surveys, the team followed elephant trails to move through the rainforest from _bai_ to _bai_. This process led Hockridge to wonder about a network. Although previous studies documented animal behavior in selected _bais_, no one had counted them or had the means to map their distribution. The team partnered with African Parks, using drones to scan known sites. They trained an AI algorithm (算法) to identify _bais_ in satellite imagery, revealing 2,176 clearings in one park - 10 times more than previously recorded.
+阅读下列短文，从每题所给的 A、B、C、D 四个选项中，选出最佳选项，并在答题卡 上将该项涂黑。
 
-_Bais_ are always near rivers or streams. Most are smaller than a city block, but few, at more than 100 acres, are bigger than some college campuses. "_Bais_ are ultimately islands of resources, and animals produce these networks of trails to essentially navigate to and from a network of _bais_," Hockridge says. The researchers' map of _bais_, the first of its kind, is also a map of conservation priorities. "We find that a huge portion of the animal community depends on this unique ecosystem. These species don't have alternative habitats other than _bais_," Hockridge says.
+**A**
 
-The study is also a step toward solving the ultimate mystery: How did _bais_ form? Many ecologists have argued that a combination of hydrology (水文学) and animal landscaping is at play. But definitive proof remains elusive. Now, with a map in hand and camera traps still in place, the research team is tracking long-term changes, which have implications for the maintenance of these crucial animal habitats.
+Columbia Engineering’s Summer High School Academic Program for Engineers (SHAPE) is a selective pre-college program for high school students and recent graduates. SHAPE is tailored for students with a gift for STEM: science, technology, engineering, and mathematics. Each 3-week session offers college-level, project-based courses in engineering taught by celebrated professors at the university.
 
-"We have hypotheses (假说)," Andrew Davies, an ecologist in Harvard, says, "but the short answer is: we don't know."
+SHAPE gives students a more realistic picture of what it means to be an engineer, and its professional development components help students develop the skills they need to get there.
 
-18\. For rainforest animals, _bais_ are places for \_**\_**\__.
+**Courses**
 
-A. fun and safety B. water and shelter
+SHAPE features creative problem-solving courses and exposes students to innovative engineering techniques and knowledge presented by professors. Please note that SHAPE does not provide college credit.
 
-C. food and connection D. shade and entertainment
+Students gain access to the famous MakerSpace and state-of-the-art research laboratories after completing the safety training and will only do so under close guidance.
 
-19\. What can we learn about Ngouma and Hockridge's research?
+SHAPE also provides students with workshops to explore career fields, professional development, and guidance on sharpening one’s college application from admissions officers. Students in the program will be visiting companies and organizations that show the classroom content in practice.
 
-A. It discovered how _bais_ formed.
+**Application**
 
-B. It was the first to map the network of _bais_.
+Students are selected based on the following criteria:
 
-C. It analyzed images of _bais_ provided by local people.
+1\. Strong academic record
 
-D. It concluded _bais_ were spots intended for endangered species.
+2\. Personal statement to demonstrate excitement and interest in STEM through engagement in challenging courses, activities, projects, etc.
 
-20\. What does the underlined word "elusive" in Paragraph 6 probably mean?
+3\. Enthusiastic letter of recommendation submitted by a math or science teacher
 
-A. Difficult to find. B. Simple to clarify.
+4\. Creative responses to two required questions and one of the three optional questions
 
-C. Possible to overestimate. D. Unlikely to question.
+We encourage all students to apply by the priority deadline of June 15, 2023, so there is no application fee. After the priority deadline, a $50 application fee is required.
 
-21\. Which would be the best title for this passage?
+SHAPE is dedicated to supporting students and their families in need of financial assistance. We offer a limited number of need-based scholarships, which cover the full cost of SHAPE. To be considered for a need-based scholarship, families will need to provide a recent pay receipt and complete a Family Income and Expense Worksheet.
 
-A. Conservation Priorities in Rainforests
+Email: shape@columbia.edu for more information.
 
-B. Hidden Playgrounds Revealed in Rainforests
+21\. What can we learn about SHAPE?
 
-C. Secrets of Rainforest Animals' Social Networks
+A. It suits students talented in STEM.
 
-D. Modern Tools Adopted for Rainforest Exploration
+B. It shows the procedure of learning STEM.
+
+C. It serves as the start of students’ college life.
+
+D. It gives students chances to work with engineers.
+
+22\. In SHAPE, students can \___\___\___\_.
+
+A. be free to explore the MakerSpace
+
+B. earn college credit for future study
+
+C. put school knowledge into practice
+
+D. be equipped with skills for engineering
+
+23\. To secure a place in SHAPE, students need to \___\___\___\_.
+
+A. show their family financial state B. answer all the given questions
+
+C. pay application fees before deadline D. prove their learning capability
+
+**B**
+
+I lost my leg to cancer at 30. My first trip out of the house as a one-legged woman would be to see a sick friend in hospital with my mom.
+
+As I made my way through the hospital, I was prepared for looks of curiosity, sympathy, and even shock. But one thing shook me to a depth I had never experienced before. Two kids were playing in the hallway. As I passed by on my crutches (拐杖), they looked up at me, and suddenly, the little boy pointed at me. “Look at that lady!” It seemed that he was shouting loud enough for the entire hospital to hear. “She only has one leg! Doesn’t that look funny?”
+
+Both of the kids burst into laughter. Heads turned, and I felt the blood rush to my face. I put my head down and rushed out as fast as I dared on my crutches. I held my tears back until the car door closed. As I fell into the seats, I cried, “How could they think this is funny?”
+
+My mom tried her best to comfort me, “Honey, they are just kids. They don’t know any better.” They were just kids, but that did not excuse their rude behavior. I felt a wave of belief flood through me. I knew what I had to do. “Well, someone has to teach them!” I said. And I knew that someone would be me.
+
+When I was well enough, I started to visit elementary schools and talk to children about being different. I was teaching children to be respectful of people who are different, and teaching them people come in all shapes, colors and sizes and we are each special and unique.
+
+Speaking to children was just the beginning for me. I became an inspirational speaker and author and learned that being grateful for all the remaining parts of me was the only way to start and end my day. I shared my story in my book called _I Am Choosing to Smile_. I do, indeed, choose to smile. Waking up every morning, I look down at my one foot and say with all sincerity, “Good morning, five toes. I’m very glad to see you!”
+
+24\. What shocked the author in the hospital?
+
+A. The curious look a boy had. B. The words a boy shouted out.
+
+C. The game the boys were playing. D. The sympathy the boys expressed.
+
+25\. How did the experience in the hospital change the author?
+
+A. She found the purpose of her life. B. She began to realize her difference.
+
+C. She understood kids’ characteristics. D. She learned the importance of respect.
+
+26\. Which of the following words can best describe the author?
+
+A. Patient. B. Brave. C. Intelligent. D. Caring.
+
+**C**
+
+Researchers from a U.K. plant research institute have found a way to provide plants with an antibody-based defense for a specific threat, potentially speeding the creation of crops resistant to any kind of emerging virus, or bacterium (细菌). The strategy is to inoculate a protein from the plant pathogen (病原体) to be targeted to a camel or other camel relatives, purify the unusually small antibodies the camels produce, and engineer the corresponding gene section for them into a plant’s own immune gene.
+
+Farmers lose many billions of dollars to plant diseases each year, and emerging pathogens pose new threats to food security in the developing world. Plants have evolved their own immune system, kick-started by cell receptors that recognize general pathogen features, such as a bacterial cell wall, as well as intracellular receptors for molecules (分子) produced by specific pathogens. If a plant cell detects these molecules, it may trigger its own death to save the rest of the plant. But plant pathogens often evolve and escape from those receptors.
+
+A long-standing dream in plant biotechnology is to create designer disease resistance genes that could be produced as fast as pathogens emerge. One approach is to edit the gene for a plant immune receptor, changing the protein’s shape to recognize a particular pathogenic molecule.
+
+Instead, Sophien Kamoun, a molecular biologist at the Sainsbury Laboratory, and his colleagues used an animal immune system to help make the receptor adjustments. During an infection with a new pathogen, animals produce billions of slightly different antibodies, ultimately selecting and mass-producing those that best target the virus.
+
+Camelids, which include camels, are workhorses for antibody design because their immune systems create unusually small versions, called nano-bodies. As a proof of principle of the new plant defense strategy, Kamoun’s group turned to two standard camelid nano-bodies that recognize two different molecules, including one called green fluorescent protein (GFP), to detect test viruses, in this case a potato virus, engineered to make the fluorescent proteins. They investigated how well plants with the nano-body-enhanced receptors detected the changed potato viruses. It was found that the plants increased an active immune response and experienced almost no viral reproduction.
+
+“The exciting part about this technology is that we have the potential of made-to-order resistance genes and keeping up with a pathogen,” Kamoun says. “This technology is a potential game changer,” says Jeff Dangl, a plant researcher at the University of North Carolina. Ksenia Krasileva, a scientist at the University of California, Berkeley, says the mixture of nano-bodies with plant immune receptors opens up a vast body of biomedical knowledge for plant scientists. “We can now dig into all of that research and translate it to save crops.”
+
+27\. What does the underlined word “inoculate” in Paragraph 1 probably mean?
+
+A. Compare. B. Restore. C. Introduce. D. Label.
+
+28\. What is the main purpose of Paragraph 2?
+
+A. To illustrate the function of cells in saving the plant.
+
+B. To explain how to strengthen plant receptors effectively.
+
+C. To demonstrate the solutions to farmers’ annual heavy losses.
+
+D. To reveal why plants fail to handle constantly-updated diseases.
+
+29\. What can we learn from the passage?
+
+A. Editing plant receptors is to match the shape of pathogens.
+
+B. Nano-bodies can help plants catch up with pathogen changes.
+
+C. Plants select the best antibodies from animals to fight viruses.
+
+D. Plants with nano-bodies respond actively in massive virus copying.
+
+30\. According to the passage, scientists will \___\___\___\_.
+
+A. apply the outcome in the real world
+
+B. prove the findings of resistance genes
+
+C. identify similar means to fight diseases
+
+D. seek more support for the new strategy
 
 **D**
 
-Monday was the first day of Dartmouth's spring term. So, as I often do at this time, I started teaching my course for non-science majors called "Understanding the Universe: From Atoms to the Big Bang".
+Superhuman artificial intelligence is already among us. Well, sort of. When it comes to playing games like chess and Go, or solving difficult scientific challenges like predicting protein structures, computers are well ahead of us. But we have one superpower they aren’t close to mastering: mind reading.
 
-This is what students like to call a "physics for poets" class - a class that explores the history of how humanity has faced some of the deepest questions we can ask about the material world and our place in it, without the math. It is a class that tries to capture the true spirit of the liberal-arts education, mixing the sciences and the humanities as different and complementary ways of knowing the world and why we matter. In fancier words, as an intellectual history of physics and astronomy (天文学), the class requires that scientific thinking be contextualized culturally, so that students can situate the ways in which some of the most revolutionary ideas in the past 2,000 years emerged when they did.
+Humans have a mysterious ability to reason the goals, desires and beliefs of others, a crucial skill that means we can anticipate other people’s actions and the consequences of our own. Reading minds comes so easily to us, though, that we often don’t think to spell out what we want. If AIs are to become truly useful in everyday life—to cooperate effectively with us or to understand that a child might run into the road after a bouncing ball—we have to give them this gift that evolution has given us to read other people’s minds.
 
-Scientists, by training, have little exposure to the humanities. Given that a major in the sciences requires a lot of technical work, we spend precious little time dealing with what happened culturally and historically around the science we are trying to understand. This, I believe, is the reason why so many scientists in the public media condemn (谴责) the humanities as useless. As a consequence, many scientific ideas are presented as having addressed some of the deepest questions we have been asking, when they haven't.
+Psychologists refer to the ability to infer another’s mental state as theory of mind. In humans, this capacity starts to develop at a very young age. How to reproduce the capability in machines is far from clear, though. One of the main challenges is context. For instance, if someone asks whether you are going for a run and you reply “it’s raining”, they can quickly conclude that the answer is no. But this requires huge amounts of background knowledge about running, weather and human preferences.
 
-Humanities students, on the other hand, are typically those who avoid the sciences or, at least, math. Their training is also technical, involving lots of reading and critical writing. You can often tell, when you teach this kind of class, who the scientists and the humanists are. All you have to do is write an equation (方程) on the blackboard and look at the class. Humanists will quickly look bored. The scientists will become lively. As you read from Aristotle's _Metaphysics_, the opposite will happen. To bridge this gap is the challenge.
+Moreover, whether humans or AI, the theory of mind is supposed to emerge naturally from one’s own learning process. Building prior knowledge into AI makes it reliant on our imperfect understanding of theory of mind. In addition, AI may be capable of developing approaches we could never imagine. There can be many forms of theory of mind that we don’t know about simply because we live in a human body that has certain types of senses and a certain ability to think.
 
-The classroom is the ideal place for this conversation between the sciences and the humanities to unfold. By exposing students to the two sides of the cultural divide, we stand a chance of creating something that will actually close the gap. Scientists should recognize that some research topics - AI, biotechnology, climate change, life extension, nature, and many others - need to be investigated together with humanists as a joint effort.
+Yet we might still want AI to have a more human-like form of theory of mind. Humans can clearly explain their goals and desires to each other using common language and ideas. While letting AI form the theory of mind in their learning process is likely to lead to developing more powerful AI, plainly building in shared ways to represent knowledge may be crucial for humans to trust and communicate with AI.
 
-I finished the first class by reminding the students that not even the best teacher in the world can teach someone who doesn't want to learn. After all, as Tom Stoppard reminded us in his brilliant play _Arcadia_, it is wanting to know that makes us matter - scientists and humanists alike.
+It is important to remember, though, that the pursuit of machines with theory of mind is about more than just building more useful robots. It is also a stepping stone on the path towards a deeper goal for AI and robotics research: building truly self-aware machines. Whether we will ever get there remains to be seen. But along the way thinking about other people and other agents, we are on the path to learning to think about ourselves.
 
-22\. What's special about the author's class?
+31\. According to the passage, which of the following contexts can AI understand well?
 
-A. It guides students to explain revolutionary ideas.
+A. When you are asked to eat spicy food for dinner and you reply “a sore throat”.
 
-B. It appeals to arts students to switch to scientific thinking.
+B. When a teacher asks for a boy’s homework and he answers “my dog ate it”.
 
-C. It breaks the boundary between the sciences and the humanities.
+C. When a mom tells her kid some food is good for health and the kid eats it.
 
-D. It挖s into the secrets of human's position in the material world.
+D. When kids see their mom after hurting themselves and they cry louder.
 
-23\. Which of the following would the author applaud?
+32\. The author believes that \___\___\___\_.
 
-A. Mary, a history major, quit computer engineering for lack of interest.
+A. humans’ theory of mind is far from perfect
 
-B. Mia, an art student, drew pictures of famous scientists for a science fair.
+B. humans limit AI’s theory of mind to an extent
 
-C. Ben, teaching chemistry, guided his students to focus on technology work.
+C. we should reject human-like forms of abilities for AI
 
-D. David, studying physics, worked with a philosophy student for his project.
+D. shared forms of theory of mind result in more powerful AI
 
-24\. What message does the author intend to deliver to his students?
+33\. As for AIs, what does the author value most?
 
-A. University courses present challenges.
+A. Reliability. B. Practicability.
 
-B. The cultural divide deserves approval.
+C. Reasoning capability. D. Communication ability.
 
-C. The eagerness to learn is of significance.
+34\. Which would be the best title for the passage?
 
-D. Prejudice towards the humanities is history.
+A. AI with Its Own Theory of Mind Is Expected
 
-**第二节（共5小题；每小题2分，共10分）**
+B. AI with Theory of Mind Will Reshape Our Future
 
-**根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中共有两项为多余选项。**
+C. AI’s Theory of Mind Is a Blessing or Suffering to Humans
 
-Forgiveness is something that many of us strive for, but it can often feel difficult to achieve. Over the years, we've heard countless people express the intention to forgive, only to struggle with the emotional roadblocks that prevent them from truly letting go.
+D. Theory of Mind Bridges the Gap Between Humans and AI
 
-First, let's define forgiveness. \_**\_25\_\_** It's not about forgetting what happened or excusing harmful behavior. In fact, our minds tell us that if we stay angry, bitter, or distant, we'll be safe from further hurt. \_**\_26\_\_** While holding onto memories and creating distance may offer temporary emotional safeguards, it often deepens our sadness, isolates us, and prevents us from healing. Forgiveness, on the other hand, is about choosing not to let that pain continue to define your thoughts, emotions, and behaviors.
+第二节（共5 小题；每小题2 分，共10 分）
 
-Forgiveness is essential because we're all human, and we all make mistakes. If we want to cultivate meaningful relationships, there will unavoidably be times when we hurt one another. Forgiveness becomes crucial in maintaining those connections and our own peace of mind. \_**\_27\_\_** Forgiving yourself is especially important. Raising walls of bitterness or anger toward yourself is deeply damaging. When you hold on to shame or guilt, you create emotional barriers that prevent you from living fully and authentically.
+根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中有两项为多余选项。
 
-So, how do we forgive? While the journey is deeply personal and can vary from person to person, there are key steps that can help guide us. Acknowledge the hurt and pain exactly as it is. \_**\_28\_\_** This perspective allows us to see others (and ourselves) as imperfect humans doing the best they can with what they have. Extend sympathy to yourself and others. Choose to release bitterness and move forward in line with your values.
+In our modern world, there are endless alternatives. Have you ever found yourself wondering whether you should quit or stay in your job, accept an offer or give it up for another? There is a simple and practical method that solves this problem. 35 When you understand the concept, you have the power to measure every alternative with precision and make the right decision.
 
-\_**\_29\_\_** It's an ongoing practice. But every time you choose forgiveness, you create space for love and healing to flow through your life.
+In the field of economics, opportunity cost is the value that you have to give up when you choose an option over another good option. 36 Every time you choose something, you give up other alternatives together with their financial benefits. It is not all the other options, but the most valued one that is defined as the opportunity cost.
 
-A. It is a continuous process.
+37 Take the simple example of trying to decide whether to take public transportation for 80 minutes or to drive for 40 minutes. You might save on the cost of gas while riding the bus but double the trip length and miss out on other things you could have done during that time. 38 This is how you create priorities in your daily life.
 
-B. But we know that this isn't true.
+Though useful in decision making, the biggest drawback of opportunity cost is that it’s often related to what’s hard to quantify. 39 After all, putting a number to your peaceful mind or happiness can be difficult.
 
-C. Recognize that everyone has faults.
+Opportunity cost isn’t cut and dried. It varies from person to person. At the end of the day, you are in charge of what you own and what you want to gain.
 
-D. Remember that forgiveness isn't a one-time event.
+A. It is about finding out the opportunity cost.
 
-E. Forgiveness is the decision to release attachment to a painful past.
+B. Weigh the losses and gains, and make your decision.
 
-F. You don't have to communicate with the person who wronged you.
+C. Opportunity cost matters not only in economics but also in real life.
 
-G. In fact, we may need to forgive not only others but ourselves as well.
+D. This is especially true when the opportunity cost is of non-financial benefit.
 
-**第Ⅱ卷（共57分）**
+E. The key principle underlying the idea is that there is no such thing as free lunch.
 
-**Ⅰ.选词填空（共5小题；每小题2分，共10分）**
+F. Most people overlook opportunity cost because the benefits are usually hidden from view.
 
-用方框中单词的适当形式完成下列句子，每个单词只能用一次。
+G. It is the development of important skills that would help you move forward in your daily life.
 
-benefit, treat, logic, impress, motivate
+第三部分 书面表达（共两节，32 分）
 
-30\. The \_**\_**\__ performance of the athlete left everyone amazed.
+第一节 （共4 小题；第40、41 题各2 分，第42 题3 分，第43 题5 分，共12 分）
 
-31\. He is a bright student, but he just lacks the \_**\_**\__ to learn new things.
+阅读下面短文，根据题目要求用英文回答问题。请在答题卡指定区域作答。
 
-32\. Many patients are not getting the medical \_**\_**\__ they need.
+The term “nostalgia” was first coined in 1688 and was defined as a mental illness of soldiers continually thinking about their homeland and longing for return. However, today we have a much more positive attitude to nostalgia. It’s a great example of the benefits of a strong memory.
 
-33\. Cycling is highly \_**\_**\__ to health and the environment.
+In numerous scientific experiments, researchers have found that subjects are much more likely to report positive feelings from a given piece of music if they’ve heard it before. But there’s also a growing body of research into time travel “the other way”, because memory skills can take people into the future, too. Decades of studies have shown that time travel into the future can bring a whole new set of rewards. For example, athletes who practice by mentally visualizing and imagining successful performances in the future do perform better.
 
-34\. Programming requires \_**\_**\__ thinking to gradually break big problems into smaller steps.
+All these findings are inspiring and attractive. How could you become a confident time traveler to the past or into the future? Here are some tips for you:
 
-**Ⅱ.语法填空（共10小题；每小题1.5分，共15分）**
+To take pleasure in helpful memories, maybe to reawaken happy feelings, use all your senses—not just sight. Smell, taste, touch and sound will also help you to recreate the past in rich clarity.
 
-**A**
+If you find a memory that’s particularly helpful—for reassurance, say—keep using it! You’ll get faster at finding it, and add extra layers of detail each time.
 
-阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+When you’re procrastinating (拖延), visualize an end result. Flash forward to see the floor swept or the essay finished, and use that positive image to drive you into action.
 
-The World Health Day, \_**\_35\_\_** (celebrate) every year on April 7, is a global initiative started by the World Health Organization (WHO). The aim of the day is \_**\_36\_\_** (spread) awareness around key health issues and run campaigns and discussions around it. This year's theme is "Healthy Beginning, Hopeful Futures". The health of mothers and babies is the foundation of healthy \_**\_37\_\_** (family) and communities, helping ensure hopeful futures for us all.
+Ahead of major challenges, imagine the full impact of success. Don’t just picture yourself getting that great job: fill your mind with the really big ways it’s going to change your life.
 
-**B**
+There’ll still be times when old thoughts remind you of sadness, or you’re anxious about what’s next. But the more you learn to control your memory, the better you’ll be at mining your past, and shaping your future, to be your best self now.
 
-阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+40\. What did nostalgia originally mean?
 
-A tortoise at the Philadelphia Zoo has become the oldest first-time mother of her species after \_**\_38\_\_** (have) her first babies at 100 years old. The tortoise, named Mommy, is a critically endangered species in their native home. There are \_**\_39\_\_** (few) than 50 kept in US zoos. Mommy arrived at the Zoo in 1932, meaning anyone that \_**\_40\_\_** (visit) the Zoo for the last 93 years has likely seen her. This is a significant milestone \_**\_41\_\_** the history of the Zoo.
+41\. What have the researchers found about time travel?
 
-**C**
+42\. Please decide which part is false in the following statement, then underline it and explain why.
 
-阅读下面短文，根据短文内容填空。在未给提示词的空白处仅填写1个恰当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
+➢ **_Memory skills can bring us into the future, so we should imagine a negative end result to drive us into action when procrastinating._**
 
-A Chinese automaker has created a battery \_**\_42\_\_** will enable electric vehicles (EVs) to charge almost as quickly as it takes to fill a regular car's gas tank. The new battery, named the e platform, \_**\_43\_\_** (develop) last year by BYD, a Chinese firm that is overtaking Tesla as the world's top seller of electric vehicles. BYD says it will install a network of 4,000 flash-charging stations across China. This technology is currently only available in China, and the company has yet to confirm \_**\_44\_\_** it will make it available internationally or not.
+43\. Describe one of the helpful time-travel experiences in your life. (**_In about 40 words_**)
 
-**Ⅲ.书面表达（共两节，32分）**
+第二节（20 分）
 
-**第一节（共4小题；第60、61题各2分，第62题3分，第63题5分，共12分）**
+假设你是红星中学高三学生李华。你最近读完了外教 Jim 推荐的一本英文书，请你用英文给Jim 写一封邮件，内容包括：
 
-阅读下面的短文，根据题目要求用英文回答问题。
+1. 表达感谢并分享读书收获；
 
-We live in a world filled with distractions. Everywhere we look, we can find instant pleasures available for next-day delivery right to our homes. In a culture surrounded by messages saying that we can lose the discomfort right now, delayed gratification, which refers to the ability to wait for a long-term reward, is less attractive. But research shows it makes all the difference in achieving a more important and satisfying goal.
+2. 交流后续英文书阅读计划。
 
-Delayed gratification and instant gratification involve the timing and approach to achieving satisfaction or rewards. The former requires self-discipline and the ability to manage impulses, while the latter often involves giving in to immediate desires. An example of this could be when a young man chooses to resist the urge to splurge (挥霍) on luxury items and instead save money regularly and patiently to buy a house. The delayed gratification is the goal and satisfaction he would achieve from owning a dream home, rather than the instant delight of impulsive shopping.
+注意：1. 词数100 左右；
 
-Delayed gratification has to do with one's natural ability and environment and what one is taught. Learning to delay the impulse for immediate pleasure in favor of long-term satisfaction is a skill required for progressive and long-term growth. We can start by making small changes every day and staying consistent with those changes. Over time, these habits can accumulate and lead to big changes and results. Consistent reminders of why we want to reach our goals can also help.
+2. 开头和结尾已给出，不计入总词数。
 
-If we were all masters at delayed gratification, our environment would not be filled with "quick" solutions to everything under the sun. Our culture demands that successful humans rise above the constant distraction to self-motivate and delay personal gratification in favor of distant goals. However, a balance between our thirst for instant rewards and our desire to create longevity in our career, relationships, and health is difficult to achieve. Our entire lives require that we weigh the choices of "okay right now" vs. "bigger better later". It takes a joint effort to override the environment to create our successful personal worlds.
+_Dear Jim,_ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ _Yours,_
 
-45\. What is delayed gratification?
+_Li Hua_
 
-\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+（请务必将作文写在答题卡指定区域内）
 
-46\. What is the difference between delayed gratification and instant gratification?
+参考答案
 
-\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+第一部分 知识运用（共两节，30分）
 
-47\. Please decide which part is false in the following statement, then underline it and explain why.
+第一节（共10小题；每小题1.5分，共15分）
 
-**_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development._**
+1．B 2．A 3．C 4．D 5．B
 
-\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+6．A 7．C 8．B 9．C 10. D
 
-48\. Please use an example to show how you would practice delayed gratification in your daily life. (**_In about 40 words_**)
+第二节（共10小题；每小题1.5分，共15分）
 
-\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**_
+11\. between 12. has gained 13. joining 14. shows 15. surprising
 
-**第二节（20分）**
+16\. where 17. to accomplish 18. was admitted 19. planned 20. which
 
-49\. 假设你是红星中学高二学生李华。你的外国好友Jim要给校报"AI and Teen Life"专栏投稿，他想重点介绍北京中学生的"智慧生活"，发来邮件询问你的建议。请你用英文给他回复，内容包括：
+第二部分 阅读理解（共两节，38分）
 
-1.建议内容；
+第一节（共14小题；每小题2分，共28分）
 
-2.说明理由。
+21．A 22．D 23．D 24．B 25．A
 
-注意：1.词数100左右；
+26．B 27．C 28．D 29．B 30．A
 
-2.开头和结尾已给出，不计入总词数。
+31．C 32．B 33．C 34．A
+
+第二节（共5小题；每小题2分，共10分）
+
+35．A 36．E 37．C 38．B 39．D
+
+第三部分 书面表达（共两节，32分）
+
+第一节（共4小题；第40、41题各2分，第42题3分，第43题5分，共12分）
+
+40\. A mental illness of soldiers continually thinking about their homeland and longing for return.
+
+41\. They have found that time travel to the past and into the future both bring benefits to us.
+
+42\. ⮚ **_Memory skills can bring us into the future, so we should imagine a negative end result to drive us into action when procrastinating._**
+
+We should use a positive end result to drive us into action when procrastinating.
+
+43\. (1) I often imagine myself attending my ideal university in September 2023 to cheer myself up. Picturing myself wandering on the campus and enjoying the harvest in the golden autumn can give me the motivation to overcome nervousness and stress at present with an optimistic attitude and in full gear.
+
+(2) I recall the time of winning the first prize in a speech contest two years ago. Standing on the stage reaching out for the prize, I was filled with pride. This experience serves as a constant source of encouragement and confidence for me to keep working hard to improve myself.
+
+**（**请根据学生答题情况酌情给分**）**
+
+第二节（20分）
 
 _Dear Jim,_
 
-_\_**\_**\_**\_****\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\_**\____
+Thank you for your recommendation of the English novel _The Old Man and the Sea._
+
+Having finished reading_,_ I’ve harvested a lot. The tough man who fights against the big fish and sharks alone in the sea inspires me to brave frustrations in my life. And I have learned that we should stick to our dreams no matter what hardships we may encounter.
+
+The book unfolds a new world to me. Thus, I make a plan for further reading. English novels enlightening my mind will be included in my reading list. I intend to read one book a month. While reading, I will take down my understanding in time to gain more beyond the lines.
+
+I would appreciate it if you could give me more recommendations.
 
 _Yours,_
 
 _Li Hua_
-
-参考答案
-
-**第Ⅰ卷（共83分）**
-
-**Ⅱ.完形填空（共10小题；每小题1.5分，共15分）**
-
-**阅读下面短文，掌握其大意，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该选项涂黑。**
-
-1\. A 2. C 3. B 4. B 5. D 6. C 7. A 8. D 9. A 10. C
-
-**Ⅲ.阅读理解（共两节，38分）**
-
-**第一节（共14小题；每小题2分，共28分）**
-
-**阅读下面短文，从每题所给的 A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。**
-
-11\. A 12. B 13. C
-
-14\. D 15. D 16. B 17. B
-
-18\. C 19. B 20. A 21. B
-
-22\. C 23. D 24. C
-
-**第二节（共5小题；每小题2分，共10分）**
-
-**根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中共有两项为多余选项。**
-
-25\. E 26. B 27. G 28. C 29. D
-
-**第Ⅱ卷（共57分）**
-
-**Ⅰ.选词填空（共5小题；每小题2分，共10分）**
-
-30\. impressive
-
-31\. motivation
-
-32\. treatment##treatments
-
-33\. beneficial
-
-34\. logical
-
-**Ⅱ.语法填空（共10小题；每小题1.5分，共15分）**
-
-35\. celebrated 36. to spread 37. families
-
-38\. having 39. fewer 40. has visited 41. in
-
-42\. which## that 43. was developed 44. whether
-
-**Ⅲ.书面表达（共两节，32分）**
-
-**第一节（共4小题；第60、61题各2分，第62题3分，第63题5分，共12分）**
-
-45\. Delayed gratification refers to the ability to wait for a long-term reward.
-
-46\. Delayed gratification requires self-discipline and the ability to manage impulses, while instant gratification often involves giving in to immediate desires.
-
-47\. **_Delayed gratification is merely related to one's environment, and it can contribute to one's long-term development._**
-
-According to the passage, delayed gratification has to do with one's natural ability and environment and what one is taught.
-
-48\. I have been longing for a new gaming console. Instead of buying it immediately, I save a fixed amount weekly to get it in a few months.
-
-**第二节（20分）**
-
-Dear Jim,
-
-I'm thrilled to know you're going to introduce Beijing students' smart lifestyle! My suggestion is to focus on one key trend: AI-assisted learning.
-
-Nowadays, AI tools are revolutionizing how high school students like me study. They provide instant homework help, generate practice questions, and even analyze our mistakes to create personalized study plans. Many classmates use voice assistants to practice English speaking, making learning more interactive. I believe your article will definitely be relevant if you highlight AI-assisted learning in Beijing and how it is transforming education here. Truly this is cutting-edge technology that is relatable to teens worldwide!
-
-I hope my advice is helpful.
-
-Yours
-
-Li Hua
 
 请分析上述试卷，输出结构化的JSON（仅JSON，无markdown fence，无其他文字）：

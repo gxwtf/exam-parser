@@ -55,13 +55,15 @@ def get_papers_to_process(input_dir: Path, output_dir: Path, force: bool = False
 
     papers = set()
     for item in input_dir.rglob("*.md"):
-        papers.add(item.stem)
+        name = item.stem.replace("（教师版）", "").replace("(教师版)", "").strip()
+        papers.add(name)
 
     if not force:
         # Skip papers that already have output
         existing = set()
         for item in output_dir.rglob("*.json"):
-            existing.add(item.stem)
+            name = item.stem.replace("（教师版）", "").replace("(教师版)", "").strip()
+            existing.add(name)
         papers -= existing
 
     return sorted(papers)
