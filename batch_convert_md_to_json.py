@@ -277,57 +277,71 @@ def main():
     success_count = 0
     failed_list = []
     validation_issues = {}
+    interrupted = False
 
-    for i, (rel_path, abs_path) in enumerate(pending, 1):
-        stem = clean_stem(os.path.splitext(os.path.basename(rel_path))[0])
-        print(f"[{i}/{len(pending)}] {stem} ...", end=" ", flush=True)
+    try:
+        for i, (rel_path, abs_path) in enumerate(pending, 1):
+            stem = clean_stem(os.path.splitext(os.path.basename(rel_path))[0])
+            print(f"[{i}/{len(pending)}] {stem} ...", end=" ", flush=True)
 
-        rel_path_result, success, error, val_errors = convert_one(
-            rel_path, abs_path, output_dir, exam_parser, args.force
-        )
+            rel_path_result, success, error, val_errors = convert_one(
+                rel_path, abs_path, output_dir, exam_parser, args.force
+            )
 
-        if success:
-            if error:
-                print(f"跳过")
-            else:
-                if val_errors:
-                    error_count = sum(1 for e in val_errors if e.level == "error")
-                    warn_count = sum(1 for e in val_errors if e.level == "warning")
-                    print(f"OK ({error_count}E/{warn_count}W)")
-                    validation_issues[rel_path] = val_errors
+            if success:
+                if error:
+                    print(f"跳过")
                 else:
-                    print("OK")
-            success_count += 1
-        else:
-            print(f"失败: {error}")
-            failed_list.append((rel_path, error))
+                    if val_errors:
+                        error_count = sum(1 for e in val_errors if e.level == "error")
+                        warn_count = sum(1 for e in val_errors if e.level == "warning")
+                        print(f"OK ({error_count}E/{warn_count}W)")
+                        validation_issues[rel_path] = val_errors
+                    else:
+                        print("OK")
+                success_count += 1
+            else:
+                print(f"失败: {error}")
+                failed_list.append((rel_path, error))
 
-        time.sleep(0.5)
+            time.sleep(0.5)
 
-    print(f"\n完成! 成功: {success_count}, 失败: {len(failed_list)}")
+        print(f"\n完成! 成功: {success_count}, 失败: {len(failed_list)}")
+    except KeyboardInterrupt:
+        interrupted = True
+        print(f"\n\n用户中断，已处理 {success_count} 个，失败 {len(failed_list)} 个")
+    finally:
+        if failed_list:
+            failed_file = os.path.join(output_dir, "failed_conversions.txt")
+            with open(failed_file, "w", encoding="utf-8") as f:
+                f.write(f"转换失败记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})")
+                if interrupted:
+                    f.write(" [用户中断]")
+                f.write("\n")
+                f.write("=" * 60 + "\n\n")
+                for name, err in failed_list:
+                    f.write(f"文件: {name}\n原因: {err}\n")
+                    f.write("-" * 40 + "\n")
+            print(f"失败记录: {failed_file}")
 
-    if failed_list:
-        failed_file = os.path.join(output_dir, "failed_conversions.txt")
-        with open(failed_file, "w", encoding="utf-8") as f:
-            f.write(f"转换失败记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})\n")
-            f.write("=" * 60 + "\n\n")
-            for name, err in failed_list:
-                f.write(f"文件: {name}\n原因: {err}\n")
-                f.write("-" * 40 + "\n")
-        print(f"失败记录: {failed_file}")
+        if validation_issues:
+            issues_file = os.path.join(output_dir, "validation_issues.txt")
+            with open(issues_file, "w", encoding="utf-8") as f:
+                f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})")
+                if interrupted:
+                    f.write(" [用户中断]")
+                f.write("\n")
+                f.write("=" * 60 + "\n\n")
+                for name, errors in validation_issues.items():
+                    f.write(f"文件: {name}\n")
+                    for e in errors:
+                        tag = "ERROR" if e.level == "error" else "WARN"
+                        f.write(f"  [{tag}] {e.code}: {e.message}\n")
+                    f.write("-" * 40 + "\n")
+            print(f"校验问题: {issues_file}")
 
-    if validation_issues:
-        issues_file = os.path.join(output_dir, "validation_issues.txt")
-        with open(issues_file, "w", encoding="utf-8") as f:
-            f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})\n")
-            f.write("=" * 60 + "\n\n")
-            for name, errors in validation_issues.items():
-                f.write(f"文件: {name}\n")
-                for e in errors:
-                    tag = "ERROR" if e.level == "error" else "WARN"
-                    f.write(f"  [{tag}] {e.code}: {e.message}\n")
-                f.write("-" * 40 + "\n")
-        print(f"校验问题: {issues_file}")
+        if interrupted:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

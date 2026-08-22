@@ -193,48 +193,61 @@ def main():
     success_count = 0
     fail_count = 0
     validation_issues = {}
+    interrupted = False
 
-    for i, base_name in enumerate(papers, 1):
-        try:
-            logger.info(f"[{i}/{len(papers)}] 处理: {base_name}")
-            logger.info("-" * 80)
+    try:
+        for i, base_name in enumerate(papers, 1):
+            try:
+                logger.info(f"[{i}/{len(papers)}] 处理: {base_name}")
+                logger.info("-" * 80)
 
-            result = exam_parser.parse_from_file(base_name, input_dir)
+                result = exam_parser.parse_from_file(base_name, input_dir)
 
-            output_file = output_dir / f"{base_name}.json"
-            exam_parser.save_result(result, output_file)
+                output_file = output_dir / f"{base_name}.json"
+                exam_parser.save_result(result, output_file)
 
-            _print_validation_summary(result, base_name)
+                _print_validation_summary(result, base_name)
 
-            val_errors = exam_parser._last_validation_errors
-            if val_errors:
-                validation_issues[base_name] = val_errors
+                val_errors = exam_parser._last_validation_errors
+                if val_errors:
+                    validation_issues[base_name] = val_errors
 
-            success_count += 1
-            logger.info(f"✓ 完成: {base_name}\n")
+                success_count += 1
+                logger.info(f"✓ 完成: {base_name}\n")
 
-        except Exception as e:
-            fail_count += 1
-            logger.error(f"✗ 失败: {base_name} — {e}", exc_info=args.debug)
-            continue
+            except Exception as e:
+                fail_count += 1
+                logger.error(f"✗ 失败: {base_name} — {e}", exc_info=args.debug)
+                continue
 
-    # Summary
-    logger.info("=" * 80)
-    logger.info(f"处理完成! 成功: {success_count}, 失败: {fail_count}")
-    logger.info("=" * 80)
+        # Summary
+        logger.info("=" * 80)
+        logger.info(f"处理完成! 成功: {success_count}, 失败: {fail_count}")
+        logger.info("=" * 80)
+    except KeyboardInterrupt:
+        interrupted = True
+        logger.info("=" * 80)
+        logger.info(f"用户中断! 已处理: {success_count}, 失败: {fail_count}")
+        logger.info("=" * 80)
+    finally:
+        if validation_issues:
+            issues_file = output_dir / "validation_issues.txt"
+            with open(issues_file, "w", encoding="utf-8") as f:
+                f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})")
+                if interrupted:
+                    f.write(" [用户中断]")
+                f.write("\n")
+                f.write("=" * 60 + "\n\n")
+                for name, errors in validation_issues.items():
+                    f.write(f"文件: {name}\n")
+                    for e in errors:
+                        tag = "ERROR" if e.level == "error" else "WARN"
+                        f.write(f"  [{tag}] {e.code}: {e.message}\n")
+                    f.write("-" * 40 + "\n")
+            logger.info(f"校验问题已保存: {issues_file}")
 
-    if validation_issues:
-        issues_file = output_dir / "validation_issues.txt"
-        with open(issues_file, "w", encoding="utf-8") as f:
-            f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})\n")
-            f.write("=" * 60 + "\n\n")
-            for name, errors in validation_issues.items():
-                f.write(f"文件: {name}\n")
-                for e in errors:
-                    tag = "ERROR" if e.level == "error" else "WARN"
-                    f.write(f"  [{tag}] {e.code}: {e.message}\n")
-                f.write("-" * 40 + "\n")
-        logger.info(f"校验问题已保存: {issues_file}")
+        if interrupted:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
