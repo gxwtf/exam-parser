@@ -11,6 +11,7 @@
 import os
 import sys
 import json
+import time
 import argparse
 import logging
 from pathlib import Path
@@ -191,6 +192,7 @@ def main():
     # Process
     success_count = 0
     fail_count = 0
+    validation_issues = {}
 
     for i, base_name in enumerate(papers, 1):
         try:
@@ -204,6 +206,10 @@ def main():
 
             _print_validation_summary(result, base_name)
 
+            val_errors = exam_parser._last_validation_errors
+            if val_errors:
+                validation_issues[base_name] = val_errors
+
             success_count += 1
             logger.info(f"✓ 完成: {base_name}\n")
 
@@ -216,6 +222,19 @@ def main():
     logger.info("=" * 80)
     logger.info(f"处理完成! 成功: {success_count}, 失败: {fail_count}")
     logger.info("=" * 80)
+
+    if validation_issues:
+        issues_file = output_dir / "validation_issues.txt"
+        with open(issues_file, "w", encoding="utf-8") as f:
+            f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})\n")
+            f.write("=" * 60 + "\n\n")
+            for name, errors in validation_issues.items():
+                f.write(f"文件: {name}\n")
+                for e in errors:
+                    tag = "ERROR" if e.level == "error" else "WARN"
+                    f.write(f"  [{tag}] {e.code}: {e.message}\n")
+                f.write("-" * 40 + "\n")
+        logger.info(f"校验问题已保存: {issues_file}")
 
 
 if __name__ == "__main__":

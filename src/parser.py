@@ -32,6 +32,7 @@ class ExamParser:
         self.ai_client = AIClient(api_key, model, base_url)
         self.paper_loader = PaperLoader()
         self.json_builder = JSONBuilder()
+        self._last_validation_errors = []
     
     def parse_from_file(self, base_name: str, input_dir: Optional[Path] = None) -> Dict[str, Any]:
         """
@@ -336,7 +337,9 @@ class ExamParser:
         """Stage 6: Validate final JSON"""
         validator = FinalJSONValidator(md_content)
         is_valid, errors = validator.validate(final_json)
-        
+
+        self._last_validation_errors = errors
+
         error_count = 0
         warning_count = 0
         for error in errors:
@@ -345,7 +348,7 @@ class ExamParser:
                 error_count += 1
             else:
                 warning_count += 1
-        
+
         if error_count > 0:
             logger.warning(f"⚠ {error_count} errors, {warning_count} warnings")
         elif warning_count > 0:

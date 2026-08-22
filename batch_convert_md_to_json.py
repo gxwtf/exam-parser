@@ -87,7 +87,7 @@ def output_exists(rel_path, output_dir):
 
 
 def convert_one(rel_path, abs_path, output_dir, parser, force):
-    """转换单个 MD 文件为 JSON"""
+    """转换单个 MD 文件为 JSON，返回 (rel_path, success, error, validation_errors)"""
     raw_stem = os.path.splitext(os.path.basename(rel_path))[0]
     stem = clean_stem(raw_stem)
     parts = rel_path.replace("\\", "/").split("/")
@@ -99,7 +99,7 @@ def convert_one(rel_path, abs_path, output_dir, parser, force):
     json_file = os.path.join(output_dir, rel_dir, f"{stem}.json")
 
     if not force and os.path.isfile(json_file):
-        return (rel_path, True, "已存在，跳过")
+        return (rel_path, True, "已存在，跳过", [])
 
     os.makedirs(os.path.dirname(json_file), exist_ok=True)
 
@@ -110,9 +110,10 @@ def convert_one(rel_path, abs_path, output_dir, parser, force):
         with open(json_file, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
-        return (rel_path, True, None)
+        validation_errors = parser._last_validation_errors
+        return (rel_path, True, None, validation_errors)
     except Exception as e:
-        return (rel_path, False, str(e))
+        return (rel_path, False, str(e), [])
 
 
 def main():
@@ -275,12 +276,13 @@ def main():
 
     success_count = 0
     failed_list = []
+    validation_issues = {}
 
     for i, (rel_path, abs_path) in enumerate(pending, 1):
         stem = clean_stem(os.path.splitext(os.path.basename(rel_path))[0])
         print(f"[{i}/{len(pending)}] {stem} ...", end=" ", flush=True)
 
-        rel_path_result, success, error = convert_one(
+        rel_path_result, success, error, val_errors = convert_one(
             rel_path, abs_path, output_dir, exam_parser, args.force
         )
 
@@ -288,7 +290,13 @@ def main():
             if error:
                 print(f"跳过")
             else:
-                print("OK")
+                if val_errors:
+                    error_count = sum(1 for e in val_errors if e.level == "error")
+                    warn_count = sum(1 for e in val_errors if e.level == "warning")
+                    print(f"OK ({error_count}E/{warn_count}W)")
+                    validation_issues[rel_path] = val_errors
+                else:
+                    print("OK")
             success_count += 1
         else:
             print(f"失败: {error}")
@@ -307,6 +315,19 @@ def main():
                 f.write(f"文件: {name}\n原因: {err}\n")
                 f.write("-" * 40 + "\n")
         print(f"失败记录: {failed_file}")
+
+    if validation_issues:
+        issues_file = os.path.join(output_dir, "validation_issues.txt")
+        with open(issues_file, "w", encoding="utf-8") as f:
+            f.write(f"校验问题记录 ({time.strftime('%Y-%m-%d %H:%M:%S')})\n")
+            f.write("=" * 60 + "\n\n")
+            for name, errors in validation_issues.items():
+                f.write(f"文件: {name}\n")
+                for e in errors:
+                    tag = "ERROR" if e.level == "error" else "WARN"
+                    f.write(f"  [{tag}] {e.code}: {e.message}\n")
+                f.write("-" * 40 + "\n")
+        print(f"校验问题: {issues_file}")
 
 
 if __name__ == "__main__":
