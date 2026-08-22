@@ -16,7 +16,13 @@ MD 文件 → AI 分析 → 内容提取 → JSON 构建 → 验证 → 输出
 
 ## 快速开始
 
-### 1. 配置
+### 1. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 配置
 
 复制 `.env.example` 为 `.env`，填入 API Key：
 
@@ -26,7 +32,7 @@ OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
 ```
 
-### 2. 放入试卷
+### 3. 放入试卷
 
 将 MD 格式的英语试卷放入 `data/input/` 目录。支持两种目录结构：
 
@@ -34,7 +40,7 @@ OPENAI_MODEL=deepseek-v4-flash
 
 **批量模式**（`batch_convert_md_to_json.py`）：保持 `类型/学科/试卷名/试卷名.md` 的层级结构，对接 `batch_convert_docx_to_md.py` 的输出。
 
-### 3. 运行
+### 4. 运行
 
 ```bash
 # === 单文件模式（main.py）===
@@ -73,7 +79,7 @@ python3 batch_convert_md_to_json.py --force
 python3 batch_convert_md_to_json.py -p ./path/to/paper.md
 ```
 
-### 4. 查看结果
+### 5. 查看结果
 
 - `main.py`：解析结果保存在输出目录，文件名为 `{试卷名}.json`。
 - `batch_convert_md_to_json.py`：输出到 `output_json/类型/学科/试卷名.json`，默认为输入目录旁。
