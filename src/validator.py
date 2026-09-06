@@ -3,6 +3,7 @@ Validation module for exam parser results
 """
 
 import logging
+import re
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
@@ -186,6 +187,7 @@ class FinalJSONValidator:
         self._validate_sections(result.get("sections", []))
         self._validate_section_counts(result.get("sections", []))
         self._validate_blank_question_consistency(result.get("sections", []))
+        self._validate_writing_content(result.get("sections", []), result.get("paper", {}))
         
         return len([e for e in self.errors if e.level == "error"]) == 0, self.errors
     
@@ -344,6 +346,30 @@ class FinalJSONValidator:
                     f"{sec_type}: 文章中空白数({total}) ≠ 题目数({question_count})",
                     section_index=i
                 ))
+    
+    def _validate_writing_content(self, sections: List[Dict[str, Any]], paper: Dict[str, Any]):
+        """Validate that English writing section content does not start with English words"""
+        subject = paper.get("subject", "")
+        if subject != "英语":
+            return
+        
+        for i, section in enumerate(sections):
+            if section.get("type") != "作文":
+                continue
+            
+            for j, question in enumerate(section.get("questions", [])):
+                content = question.get("content", "")
+                if not content:
+                    continue
+                
+                stripped = content.strip()
+                if re.match(r'^[a-zA-Z]', stripped):
+                    self.errors.append(ValidationError(
+                        "warning", "WRITING_CONTENT_EN",
+                        f"作文第{j+1}题题干以英文开头，疑似未正确解析",
+                        section_index=i,
+                        question_number=j+1
+                    ))
     
     def _validate_paper_info(self, paper: Dict[str, Any]):
         """Validate paper metadata"""

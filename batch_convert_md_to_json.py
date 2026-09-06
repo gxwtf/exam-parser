@@ -151,6 +151,7 @@ def run_validator(files, output_dir):
 
     total_errors = 0
     total_warnings = 0
+    clean_count = 0
     validator = FinalJSONValidator("")
 
     for rel_path, json_path in existing:
@@ -169,6 +170,10 @@ def run_validator(files, output_dir):
         total_errors += error_count
         total_warnings += warning_count
 
+        if error_count == 0 and warning_count == 0:
+            clean_count += 1
+            continue
+
         status = "✓" if is_valid else "✗"
         print(f"{status} {rel_path}: 错误 {error_count}, 警告 {warning_count}")
 
@@ -179,7 +184,7 @@ def run_validator(files, output_dir):
         print()
 
     print(f"{'='*60}")
-    print(f"校验完成: {len(existing)} 文件, 错误 {total_errors}, 警告 {total_warnings}")
+    print(f"校验完成: {len(existing)} 文件, 错误 {total_errors}, 警告 {total_warnings}, 正常 {clean_count}")
     print(f"{'='*60}")
 
 
