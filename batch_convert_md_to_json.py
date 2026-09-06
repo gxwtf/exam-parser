@@ -11,6 +11,8 @@
     python3 batch_convert_md_to_json.py -T 上期末 -s 语文         # 上期末的语文试卷
     python3 batch_convert_md_to_json.py --force                  # 强制重新转换
     python3 batch_convert_md_to_json.py --dry-run                # 仅列出文件，不转换
+    python3 batch_convert_md_to_json.py --validator              # 校验已有 JSON，不调用 AI
+    python3 batch_convert_md_to_json.py --validator -s 英语 -T 上期末  # 校验指定集合的 JSON
 """
 
 import os
@@ -116,6 +118,71 @@ def convert_one(rel_path, abs_path, output_dir, parser, force):
         return (rel_path, False, str(e), [])
 
 
+def run_validator(files, output_dir):
+    """校验已有 JSON 文件合法性，不调用 AI"""
+    from src.validator import FinalJSONValidator
+
+    json_files = []
+    for rel_path, _ in files:
+        stem = clean_stem(os.path.splitext(os.path.basename(rel_path))[0])
+        parts = rel_path.replace("\\", "/").split("/")
+        if len(parts) >= 3:
+            rel_dir = os.path.join(parts[0], parts[1])
+        else:
+            rel_dir = os.path.dirname(rel_path)
+        json_path = os.path.join(output_dir, rel_dir, f"{stem}.json")
+        json_files.append((rel_path, json_path))
+
+    existing = [(rel, p) for rel, p in json_files if os.path.isfile(p)]
+    missing = [(rel, p) for rel, p in json_files if not os.path.isfile(p)]
+
+    if missing:
+        print(f"\n缺少 JSON 文件 ({len(missing)} 个):")
+        for rel, p in missing:
+            print(f"  ✗ {rel}")
+
+    if not existing:
+        print("\n没有可校验的 JSON 文件。")
+        return
+
+    print(f"\n{'='*60}")
+    print(f"校验模式 — 共 {len(existing)} 个文件")
+    print(f"{'='*60}\n")
+
+    total_errors = 0
+    total_warnings = 0
+    validator = FinalJSONValidator("")
+
+    for rel_path, json_path in existing:
+        try:
+            with open(json_path, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"✗ {rel_path}: JSON 解析失败 — {e}")
+            total_errors += 1
+            continue
+
+        is_valid, errors = validator.validate(data)
+
+        error_count = sum(1 for e in errors if e.level == "error")
+        warning_count = sum(1 for e in errors if e.level == "warning")
+        total_errors += error_count
+        total_warnings += warning_count
+
+        status = "✓" if is_valid else "✗"
+        print(f"{status} {rel_path}: 错误 {error_count}, 警告 {warning_count}")
+
+        for e in errors:
+            prefix = "✗" if e.level == "error" else "⚠"
+            print(f"   {prefix} [{e.code}] {e.message}")
+
+        print()
+
+    print(f"{'='*60}")
+    print(f"校验完成: {len(existing)} 文件, 错误 {total_errors}, 警告 {total_warnings}")
+    print(f"{'='*60}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="批量将 MD 试卷解析为结构化 JSON",
@@ -128,6 +195,8 @@ def main():
   python3 batch_convert_md_to_json.py -T 上期末 -s 语文          # 上期末的语文试卷
   python3 batch_convert_md_to_json.py --force                   # 强制重新转换
   python3 batch_convert_md_to_json.py --dry-run                 # 仅列出待转换文件
+  python3 batch_convert_md_to_json.py --validator               # 校验已有 JSON，不调用 AI
+  python3 batch_convert_md_to_json.py --validator -s 英语 -T 上期末  # 校验指定集合的 JSON
         """,
     )
     parser.add_argument("--dir", default=None, help="输入目录（默认上级目录下的 output_docx_to_md）")
@@ -142,6 +211,7 @@ def main():
                         help=f"要转换的类型（默认全部: {' '.join(TYPES.keys())}）")
     parser.add_argument("--force", action="store_true", help="强制重新转换已存在的文件")
     parser.add_argument("--dry-run", action="store_true", help="仅列出待转换文件，不实际转换")
+    parser.add_argument("--validator", action="store_true", help="校验模式：仅检查已有 JSON 文件合法性，不调用 AI")
     parser.add_argument("--debug", action="store_true", help="开启调试模式")
     args = parser.parse_args()
 
@@ -245,6 +315,10 @@ def main():
         print("\n待转换文件列表:")
         for rel_path, _ in files:
             print(f"  {rel_path}")
+        return
+
+    if args.validator:
+        run_validator(files, output_dir)
         return
 
     if not files:
