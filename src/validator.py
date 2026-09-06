@@ -298,14 +298,14 @@ class FinalJSONValidator:
                         "error", "WRITING_ZERO",
                         "作文题目数为0，解析失败"
                     ))
-                elif qc != 1:
+                elif qc not in [1, 2]:
                     self.errors.append(ValidationError(
                         "warning", "WRITING_COUNT",
-                        f"作文题目数为{qc}，通常为1题，请核实"
+                        f"作文题目数为{qc}，通常为1-2题，请核实"
                     ))
         
         # Check for missing expected section types
-        expected = ["完形填空", "语法填空", "阅读", "七选五", "阅读表达", "作文"]
+        expected = ["完形填空", "阅读", "七选五", "作文"]
         for exp_type in expected:
             if exp_type not in section_counts:
                 self.errors.append(ValidationError(

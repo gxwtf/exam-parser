@@ -125,6 +125,7 @@ def main():
   python3 main.py -i ./papers -o ./output      # 指定目录
   python3 main.py -m deepseek-v4-flash         # 指定模型
   python3 main.py --force --debug              # 强制重处理 + 调试
+  python3 main.py -p "2019北京朝阳高三二模英语" "2016北京东城高三二模英语"  # 指定试卷
         """
     )
     parser.add_argument("-i", "--input", default=str(INPUT_DIR),
@@ -139,6 +140,8 @@ def main():
                         help=f"API 地址（默认: {OPENAI_BASE_URL}）")
     parser.add_argument("--force", action="store_true",
                         help="强制重新处理已存在的文件")
+    parser.add_argument("-p", "--papers", nargs="*", default=None,
+                        help="指定要处理的试卷名（多个用空格分隔），指定后自动强制重处理")
     parser.add_argument("--debug", action="store_true",
                         help="开启调试模式")
     args = parser.parse_args()
@@ -159,13 +162,24 @@ def main():
         logger.error("OPENAI_API_KEY 未设置，请在 .env 中配置或用 -k 指定")
         sys.exit(1)
 
+    # Determine mode
+    if args.papers:
+        force = True
+        mode_info = f"指定试卷（共 {len(args.papers)} 份）"
+    elif args.force:
+        force = True
+        mode_info = "强制重处理"
+    else:
+        force = False
+        mode_info = None
+
     logger.info("=" * 80)
     logger.info("英语试卷解析器")
     logger.info(f"模型: {model}")
     logger.info(f"输入: {input_dir}")
     logger.info(f"输出: {output_dir}")
-    if args.force:
-        logger.info("模式: 强制重处理")
+    if mode_info:
+        logger.info(f"模式: {mode_info}")
     logger.info("=" * 80)
 
     # Initialize parser
@@ -178,13 +192,16 @@ def main():
         sys.exit(1)
 
     # Collect papers
-    papers = get_papers_to_process(input_dir, output_dir, force=args.force)
+    if args.papers:
+        papers = args.papers
+    else:
+        papers = get_papers_to_process(input_dir, output_dir, force=force)
 
     if not papers:
-        if args.force:
+        if force:
             logger.warning("输入目录中没有找到 MD 文件")
         else:
-            logger.warning("没有需要处理的文件（全部已处理，用 --force 强制重处理）")
+            logger.warning("没有需要处理的文件（全部已处理，用 --force 或 -p 强制重处理）")
         return
 
     logger.info(f"共 {len(papers)} 份试卷待处理\n")

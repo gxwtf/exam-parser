@@ -56,6 +56,9 @@ python3 main.py -m deepseek-v4-flash
 # 强制重新处理（覆盖已有输出）
 python3 main.py --force
 
+# 指定试卷重新生成（自动强制模式）
+python3 main.py -p "2019北京朝阳高三二模英语" "2016北京东城高三二模英语"
+
 # 开启调试模式（查看详细日志）
 python3 main.py --debug
 
@@ -96,6 +99,7 @@ python3 batch_convert_md_to_json.py -p ./path/to/paper.md
 | `-k`, `--api-key` | API Key | 从 `.env` 读取 |
 | `--base-url` | API 地址 | 从 `.env` 读取 |
 | `--force` | 强制重新处理已存在的文件 | 默认跳过已处理 |
+| `-p`, `--papers` | 指定试卷名（多个用空格分隔），自动强制重处理 | — |
 | `--debug` | 开启调试模式（打印详细日志） | 关闭 |
 
 ### batch_convert_md_to_json.py
@@ -140,15 +144,17 @@ exam-parser/
 
 ## 支持的题型
 
-| 题型 | AI 输出 | 内容提取 |
-|------|---------|----------|
-| 完形填空 | 完整文章 + `<ClozeBlank>` 标签 | — |
-| 语法填空 | 完整文章 + `<Input>` 标签 | — |
-| 七选五 | 完整文章 + `<Blank>` 标签 + options | — |
-| 选词填空 | 词表 + 句子 + `<Input2>` 标签 | — |
-| 阅读 | start 锚点 | 从 MD 提取文章 |
-| 阅读表达 | start 锚点 | 从 MD 提取文章 |
-| 作文 | start 锚点 | 从 MD 提取题目 |
+| 题型 | 必考 | AI 输出 | 内容提取 |
+|------|:--:|---------|----------|
+| 完形填空 | ✓ | 完整文章 + `<ClozeBlank>` 标签 | — |
+| 阅读 | ✓ | start 锚点 | 从 MD 提取文章 |
+| 七选五 | ✓ | 完整文章 + `<Blank>` 标签 + options | — |
+| 作文 | ✓ | start 锚点 | 从 MD 提取题目 |
+| 语法填空 | | 完整文章 + `<Input>` 标签 | — |
+| 选词填空 | | 词表 + 句子 + `<Input2>` 标签 | — |
+| 阅读表达 | | start 锚点 | 从 MD 提取文章 |
+
+> 作文可能有 1-2 个 section（如第一节+第二节）。
 
 ## 输出格式
 
