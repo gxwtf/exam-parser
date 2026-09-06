@@ -114,6 +114,61 @@ def _print_validation_summary(result: dict, base_name: str):
     print(f"{'─'*60}\n")
 
 
+def run_validation(json_files: list, output_dir: Path):
+    """Validate existing JSON files without calling AI"""
+    from src.validator import FinalJSONValidator
+
+    if not json_files:
+        logger.warning("没有找到 JSON 文件")
+        return
+
+    existing = [f for f in json_files if f.exists()]
+    missing = [f for f in json_files if not f.exists()]
+
+    if missing:
+        for f in missing:
+            logger.warning(f"文件不存在: {f.name}")
+
+    if not existing:
+        logger.warning("没有可校验的 JSON 文件")
+        return
+
+    logger.info("=" * 60)
+    logger.info(f"校验模式 — 共 {len(existing)} 个文件")
+    logger.info("=" * 60)
+
+    total_errors = 0
+    total_warnings = 0
+
+    for f in existing:
+        try:
+            with open(f, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"✗ {f.name}: JSON 解析失败 — {e}")
+            total_errors += 1
+            continue
+
+        validator = FinalJSONValidator("")
+        is_valid, errors = validator.validate(data)
+
+        error_count = sum(1 for e in errors if e.level == "error")
+        warning_count = sum(1 for e in errors if e.level == "warning")
+        total_errors += error_count
+        total_warnings += warning_count
+
+        status = "✓" if is_valid else "✗"
+        logger.info(f"{status} {f.name}: 错误 {error_count}, 警告 {warning_count}")
+
+        for e in errors:
+            prefix = "✗" if e.level == "error" else "⚠"
+            logger.info(f"   {prefix} [{e.code}] {e.message}")
+
+    logger.info("=" * 60)
+    logger.info(f"校验完成: {len(existing)} 文件, 错误 {total_errors}, 警告 {total_warnings}")
+    logger.info("=" * 60)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="英语试卷解析器 — 将 MD 格式试卷转为结构化 JSON",
@@ -125,6 +180,8 @@ def main():
   python3 main.py -m deepseek-v4-flash         # 指定模型
   python3 main.py --force --debug              # 强制重处理 + 调试
   python3 main.py -p "2019北京朝阳高三二模英语" "2016北京东城高三二模英语"  # 指定试卷
+  python3 main.py --validate                                          # 校验已有 JSON（空跑）
+  python3 main.py --validate -p "2019北京朝阳高三二模英语"              # 校验指定 JSON
         """
     )
     parser.add_argument("-i", "--input", default=str(INPUT_DIR),
@@ -141,6 +198,8 @@ def main():
                         help="强制重新处理已存在的文件")
     parser.add_argument("-p", "--papers", nargs="*", default=None,
                         help="指定要处理的试卷名（多个用空格分隔），指定后自动强制重处理")
+    parser.add_argument("--validate", action="store_true",
+                        help="校验模式：仅检查已有 JSON 文件合法性，不调用 AI")
     parser.add_argument("--debug", action="store_true",
                         help="开启调试模式")
     args = parser.parse_args()
@@ -152,6 +211,15 @@ def main():
     input_dir = Path(args.input)
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Validate mode: skip AI, just check existing JSON files
+    if args.validate:
+        if args.papers:
+            json_files = [output_dir / f"{normalize_paper_name(p)}.json" for p in args.papers]
+        else:
+            json_files = sorted(output_dir.rglob("*.json"))
+        run_validation(json_files, output_dir)
+        return
 
     api_key = args.api_key or os.getenv("OPENAI_API_KEY", OPENAI_API_KEY)
     base_url = args.base_url or os.getenv("OPENAI_BASE_URL", OPENAI_BASE_URL)

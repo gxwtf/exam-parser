@@ -59,6 +59,12 @@ python3 main.py --force
 # 指定试卷重新生成（自动强制模式）
 python3 main.py -p "2019北京朝阳高三二模英语" "2016北京东城高三二模英语"
 
+# 校验已有 JSON 文件（空跑，不调用 AI）
+python3 main.py --validate
+
+# 校验指定 JSON 文件
+python3 main.py --validate -p "2019北京朝阳高三二模英语"
+
 # 开启调试模式（查看详细日志）
 python3 main.py --debug
 
