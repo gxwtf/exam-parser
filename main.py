@@ -22,6 +22,7 @@ from config import (
     OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, LOG_LEVEL, LOG_FILE
 )
 from src.parser import ExamParser
+from src.loader import normalize_paper_name
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +57,13 @@ def get_papers_to_process(input_dir: Path, output_dir: Path, force: bool = False
 
     papers = set()
     for item in input_dir.rglob("*.md"):
-        name = item.stem.replace("（教师版）", "").replace("(教师版)", "").strip()
-        papers.add(name)
+        papers.add(normalize_paper_name(item.stem))
 
     if not force:
         # Skip papers that already have output
         existing = set()
         for item in output_dir.rglob("*.json"):
-            name = item.stem.replace("（教师版）", "").replace("(教师版)", "").strip()
-            existing.add(name)
+            existing.add(normalize_paper_name(item.stem))
         papers -= existing
 
     return sorted(papers)
@@ -193,7 +192,7 @@ def main():
 
     # Collect papers
     if args.papers:
-        papers = args.papers
+        papers = [normalize_paper_name(p) for p in args.papers]
     else:
         papers = get_papers_to_process(input_dir, output_dir, force=force)
 

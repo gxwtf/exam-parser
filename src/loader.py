@@ -2,12 +2,22 @@
 Module for loading paper data (MD files)
 """
 
+import re
 import logging
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_paper_name(name: str) -> str:
+    """Normalize paper filename: remove spaces between year and Chinese, remove '含答案' suffix"""
+    # Remove space between year digits and Chinese characters: 2014 西城 -> 2014西城
+    name = re.sub(r'(\d)\s+([\u4e00-\u9fff])', r'\1\2', name)
+    # Remove '含答案' suffix
+    name = re.sub(r'含答案$', '', name)
+    return name
 
 
 @dataclass
@@ -70,12 +80,14 @@ class PaperLoader:
         """
         Find file with given base name and extension
         
-        Searches the input directory for the file
+        Normalizes the base_name before searching
         """
         if not self.input_dir or not self.input_dir.exists():
             return None
         
-        for item in self.input_dir.rglob(f"*{base_name}*"):
+        normalized = normalize_paper_name(base_name)
+        
+        for item in self.input_dir.rglob(f"*{normalized}*"):
             if item.suffix.lower() == extension.lower():
                 return item
         
