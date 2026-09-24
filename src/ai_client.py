@@ -95,10 +95,28 @@ class AIClient:
                 temperature=0.1,
                 max_tokens=32000,
                 timeout=120,
-                extra_body={"thinking": {"type": "disabled"}}
+                extra_body={"reasoning_effort": "low"}
             )
 
-            result_text = response.choices[0].message.content.strip()
+            message = response.choices[0].message
+            finish_reason = response.choices[0].finish_reason
+
+            # Reasoning models may exhaust max_tokens on reasoning and leave content=None
+            if message.content is None:
+                rt = None
+                try:
+                    ctd = response.usage.completion_tokens_details
+                    rt = getattr(ctd, "reasoning_tokens", None) if ctd else None
+                except Exception:
+                    pass
+                raise ValueError(
+                    f"AI returned empty content (finish_reason={finish_reason}, "
+                    f"reasoning_tokens={rt}). The reasoning model used up all "
+                    f"max_tokens on reasoning. Try lowering reasoning_effort or "
+                    f"increasing max_tokens."
+                )
+
+            result_text = message.content.strip()
             
             # Normalize curly/smart quotes to straight quotes
             result_text = self._normalize_quotes(result_text)

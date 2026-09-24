@@ -62,7 +62,7 @@ def test_short_prompt():
     
     try:
         print("Sending short prompt to AI...")
-        result = client.analyze_paper(short_txt, short_md, paper_name="short_test")
+        result = client.analyze_paper(short_txt, short_md)
         
         print("✓ AI Response received successfully!")
         print(f"Response type: {type(result)}")
