@@ -93,7 +93,7 @@ class AIClient:
                     }
                 ],
                 temperature=0.1,
-                max_tokens=10000,
+                max_tokens=32000,
                 timeout=120,
                 extra_body={"thinking": {"type": "disabled"}}
             )

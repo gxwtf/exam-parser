@@ -1,8 +1,8 @@
-Paper: 2023北京朝阳高三二模英语（教师版）
+Paper: 2019北京西城高三二模英语（教师版）
 ================================================================================
 你是一位英语试卷解析专家。请分析以下英语试卷（MD格式），识别其结构、题型，并生成完整的解析结果。
 
-当前试卷名称：2023北京朝阳高三二模英语（教师版）
+当前试卷名称：2019北京西城高三二模英语（教师版）
 
 重要原则：
 1. 只识别这7种题型：完形填空、语法填空、阅读、七选五、选词填空、阅读表达、作文
@@ -141,8 +141,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 完形填空
 - 输出完整 article（空位替换为 `<ClozeBlank></ClozeBlank>`）
-- 输出每个题目的 content（题干，即MD中原题号后的句子，如"the 1 of the project"）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
-- 不输出 start、不输出 blanks
+- 输出每个题目的 options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
+- 不输出 content、不输出 start、不输出 blanks
 
 ### 语法填空
 - 如果有多组A/B/C，合并为一个section
@@ -196,400 +196,476 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 以下是试卷内容（MD格式）：
 
-2023北京朝阳高三二模
+2019北京西城高三二模
 
-英 语
+英 语 2019.5
 
-2023\. 5
+本试卷共10页，共120分。考试时长100分钟。考生务必将答案答在答题卡上，在试卷上作答无效。考试结束后，将本试卷和答题卡一并交回。
 
-(考试时间90分钟 满分100分)
+第一部分：知识运用（共两节，45分）
 
-本试卷共10 页。考生务必在答题卡指定区域作答，在试卷上作答无效。
+第一节 语法填空（共10小题；每小题1.5分，共15分）
 
-第一部分 知识运用（共两节，30 分）
+阅读下列短文，根据短文内容填空。在未给提示词的空白处仅填写 1个适当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。
 
-第一节（共10 小题；每小题1.5 分，共15 分）
+A
 
-阅读下面短文，掌握其大意，从每题所给的 A、B、C、D 四个选项中，选出最佳选项， 并在答题卡上将该项涂黑。
+When I was in high school our physics teacher gave us a challenge 1 involved making a paper airplane of any shape. The only objective was to get it to fly as far as possible. 2 (stand) at the starting line, one of my classmates took a piece of flat paper, crumpled (把…捏成一团) it up, and 3 (throw) it down the way. He beat the class with ease. Some of the students got mad and said that he cheated, but the physics teacher 4 (clear) explained it could be any shape and that a paper ball was indeed a shape.
 
-My son was born with breathing difficulties, so he had to stay in NICU, the hospital unit for newborns needing intensive care. There he could only be fed through a tube. I hated the tube. The lovely dreams I had of nursing my baby were entirely 1 .
+B
 
-On the fifth day, I 2 about the tube, saying that I wanted to feed him with a bottle. The doctors agreed to let me try. My son’s feedings would be closely recorded to see if he was able to get 3 milk intake without the tube. After eighteen hours, it was determined he could not do that and the tube was back. This meant he wasn’t getting stronger. The 4 felt so dark.
+Buildings around the world 5 (go) dark for 60 minutes this evening in a voluntary event known as Earth Hour. This grassroots effort started in 2007 in Sydney, Australia, and has since grown into 6 global movement to raise awareness of our energy consumption and the effects of climate change on our planet. Anyone can participate in this movement 7 switching off the lights at 8:30 PM local time. Last year close to 18,000 landmark buildings switched off their lights in 188 countries. Will you dim your lights tonight?
 
-Seated outside the NICU, I started crying. Just then, a young nurse came and sat beside me. When I had 5 my sorrow a little, she handed me a tissue and asked if I wanted to talk. I asked again if we could remove the tube. The nurse replied, “Not today. But remember, tomorrow is a new day.”
+C
 
-She seemed much younger than me, but her words were 6 and hope-filled, and I held on to them. I remembered her advice and repeated it to myself multiple times a day. The nurse changed my perspective away from current 7 to see the hope of tomorrow. Gradually, things started to 8 . On day eight, my son drank half of his milk without the tube. On day ten, the doctors approved taking off the tube 9 . “Tomorrow” came. It just came a few days later than expected. On day fifteen, we were released from the hospital, and my son “graduated” from the NICU.
+The story of Chinese fashion began in 2011 when Feiyue and Huili, both Chinese sneaker brands, suddenly gained international attention. Their products 8 (see) on models all over the world then. Last year, Chinese sportswear brand LI-NING was at the New York Fashion Week in September with new designs 9 (decorate) with Chinese characters. Now the Chinese brands are impressive and ambitious and can go head to head with foreign brands. And this ambition may be due to the fact that China's young people are now more confident about 10 (they) own culture.
 
-What I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with 10 . After all, tomorrow is a new day.
+第二节 完形填空（共20小题；每小题1.5分，共30分）
 
-1\. A. controlled B. destroyed C. questioned D. recalled
+阅读下面短文，掌握其大意，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。
 
-2\. A. protested B. wondered C. forgot D. warned
+The Gift of Forgiveness
 
-3\. A. maximum B. restricted C. sufficient D. additional
+![](images/image1.png)The summer I turned 16, my father gave me his old 69 Chevy Malibu convertible. What did I know about classic cars? For me, the important thing was that Hannah and I could 11 around Tucson with the top down.
 
-4\. A. plot B. spot C. atmosphere D. situation
+Hannah was my best friend, a year younger but much 12 . That summer she 13 with a modeling agency, doing catalog and runway work.
 
-5\. A. spared B. contained C. shared D. exhibited
+_69 Chevy Malibu convertible_
 
-6\. A. wise B. plain C. familiar D. sharp
+A month after my birthday, Hannah and I went to the movies. On the way home, we 14 at the McDonald's drive-through, putting the fries in the space between us to 15 . "Let's ride around awhile," I said. It was a clear night, hot, full moon hanging low over the desert. Taking a curve (弯) too 16 , I ran over some dirt and fishtailed. I then moved quickly through a neighbor's landscape wall and drove into a full-grown palm tree. The front wheel came to rest halfway 17 the tree trunk.
 
-7\. A. mistakes B. dreams C. challenges D. doubts
+There were French fries on the floor, the dash (仪表盘) and my lap. An impossible amount of 18 was on Hannah's face, pieces of skin hanging around her eyes. We were taken in separate ambulances. In the emergency room, my parents spoke quietly: "Best plastic surgeon (整容医生) in the city…but it is more likely the 19 of her modeling career…"
 
-8\. A. go away B. look up C. make sense D. fall apart
+We'd been wearing lap belts, 20 the car didn't have shoulder belts. I'd broken my cheekbone on the steering wheel; Hannah's 21 had split wide open on the dash. What would I say to her?
 
-9\. A. frequently B. slightly C. completely D. occasionally
+When her mother, Sharon, came into my hospital room, I started to cry, preparing myself for her 22 . She sat beside me and took my hand. "I drove into the back of the car of my best friend when I was your age," she said. "I completely 23 her car and mine."
 
-10\. A. intention B. imagination C. urge D. faith
+"I'm so sorry," I said.
 
-第二节（共10 小题；每小题1.5 分, 共15 分）
+"You're both 24 ," she said. "Everything else doesn't matter." I started to explain, and Sharon stopped me. "I 25 you. Hannah will too."
 
-阅读下列短文，根据短文内容填空。在未给提示词的空白处仅填写 1 个适当的单词，在给出提示词的空白处用括号内所给词的正确形式填空。请在答题卡指定区域作答。
+Sharon's forgiveness allowed Hannah and me to get back in the car together that summer, to stay 26 throughout high school and college, to be in each other's weddings. I think of her gift of forgiveness every time I tend to feel angry about someone for a perceived（可感知到的） 27 , and whenever I see Hannah. The scars (伤疤) are now 28 and no one else would notice, but in the sunlight I can still 29 the faint, shiny skin just below her hairline-for 30 , a sign of forgiveness.
 
-**A**
+11\. A. drive B. run C. wander D. march
 
-As a variant of American football, flag football is a type of sport in which a player must remove a flag belt from the ball carrier to end a down. The first rule of the game is that contact 11 players is not permitted. Recently, it 12 (gain) great popularity in China among young people. It’s engaging and ridiculously fun. That’s why the percentage of people 13 (join) a flag football club through online channels has risen to a new high level.
+12\. A. stronger B. healthier C. taller D. smaller
 
-**B**
+13\. A. competed B. chatted C. signed D. bargained
 
-Old Connections, a telecommunications museum in Seattle, with a working exchange from the 1940s, 14 (show) how telephones brought us together, but also tore us apart. Perhaps it should not be 15 (surprise) that the Internet has brought with it a new wave of horrific destructiveness. History itself is a kind of radio programme, broadcast to us in frequencies that become harder to receive as we forget the old ways. But as long as we keep the ancient exchanges running, we have a way to remember and understand 16 we come from.
+14\. A. stopped B. ate C. aimed D. stood
 
-**C**
+15\. A. catch B. share C. hold D. spare
 
-Wang Dakang, aged 88, is a model of lifelong learning. In the 1980s, he was the first person 17 (accomplish) a round trip of China using only a bicycle. To edit this experience into his book, Wang decided to go to college. At the age of 61, he 18 (admit) into college, majoring in journalism. By 2012, he had completed three majors in college. At present, Wang lives in Leshan, where he spends his days following carefully 19 (plan) routines. His study starts at 6 am every morning, during 20 he reads and takes notes from newspapers. Wang said, “There is so much to learn and I will continue learning until the very end.”
+16\. A. fast B. seriously C. softly D. slow
 
-第二部分 阅读理解（共两节，38 分）
+17\. A. across B. up C. below D. along
 
-第一节（共14 小题；每小题2 分，共28 分）
+18\. A. blood B. petrol C. water D. sweat
 
-阅读下列短文，从每题所给的 A、B、C、D 四个选项中，选出最佳选项，并在答题卡 上将该项涂黑。
+19\. A. path B. base C. point D. end
 
-**A**
+20\. A. and B. but C. or D. so
 
-Columbia Engineering’s Summer High School Academic Program for Engineers (SHAPE) is a selective pre-college program for high school students and recent graduates. SHAPE is tailored for students with a gift for STEM: science, technology, engineering, and mathematics. Each 3-week session offers college-level, project-based courses in engineering taught by celebrated professors at the university.
+21\. A. shoulders B. arms C. chest D. forehead
 
-SHAPE gives students a more realistic picture of what it means to be an engineer, and its professional development components help students develop the skills they need to get there.
+22\. A. anger B. regret C. sorrow D. concern
 
-**Courses**
+23\. A. attacked B. dragged C. damaged D. removed
 
-SHAPE features creative problem-solving courses and exposes students to innovative engineering techniques and knowledge presented by professors. Please note that SHAPE does not provide college credit.
+24\. A. alike B. relieved C. injured D. alive
 
-Students gain access to the famous MakerSpace and state-of-the-art research laboratories after completing the safety training and will only do so under close guidance.
+25\. A. help B. love C. understand D. forgive
 
-SHAPE also provides students with workshops to explore career fields, professional development, and guidance on sharpening one’s college application from admissions officers. Students in the program will be visiting companies and organizations that show the classroom content in practice.
+26\. A. sisters B. friends C. classmates D. colleagues
 
-**Application**
+27\. A. need B. effort C. wrong D. threat
 
-Students are selected based on the following criteria:
+28\. A. left B. marked C. shown D. faded
 
-1\. Strong academic record
+29\. A. touch B. see C. feel D. learn
 
-2\. Personal statement to demonstrate excitement and interest in STEM through engagement in challenging courses, activities, projects, etc.
+30\. A. them B. you C. me D. her
 
-3\. Enthusiastic letter of recommendation submitted by a math or science teacher
+第二部分：阅读理解（共两节，40分）
 
-4\. Creative responses to two required questions and one of the three optional questions
+第一节（共15小题；每小题2分，共30分）
 
-We encourage all students to apply by the priority deadline of June 15, 2023, so there is no application fee. After the priority deadline, a $50 application fee is required.
+阅读下列短文，从每题所给的A、B、C、D四个选项中，选出最佳选项，并在答题卡上将该项涂黑。
 
-SHAPE is dedicated to supporting students and their families in need of financial assistance. We offer a limited number of need-based scholarships, which cover the full cost of SHAPE. To be considered for a need-based scholarship, families will need to provide a recent pay receipt and complete a Family Income and Expense Worksheet.
+A
 
-Email: shape@columbia.edu for more information.
+If you've always wanted to start your own herb or vegetable garden but don't have the yard space or the "green thumb" to pull it off, there's now another option. The OGarden Smart is an indoor gardening system that grows up to 90 plants at one time-20 of which are safe to eat.
 
-21\. What can we learn about SHAPE?
+Strawberries, green beans, peppers, green onions, and cherry tomatoes are just a few of the fruits and vegetables the OGarden can grow. Up to 30 potted plants can be placed on a lower shelf, where the seeds are allowed to germinate (发芽). Once they germinate, the plants can then be moved to the turning wheel up above, which holds up to 60 plants at a time. It takes about 30 to 40 days to harvest the produce, depending on the type of plant grown.
 
-A. It suits students talented in STEM.
+The system is self-watering and uses automatic LED lights to provide the right amount of sunlight, no matter what season it is. The only work that's required is planting the seeds and refilling the water tank once a week.
 
-B. It shows the procedure of learning STEM.
+The OGarden Smart is the second product introduced by company co-founders Pierre Nibart and Pierre-Etienne Bourget, of Quebec, Canada. The original OGarden appeared in 2017, and the Smart upgrade adds a few new features, including automatic watering, automatic LED lighting, and a water warning system. Some reviewers of the original OGarden commented that the system is easy to use, and that the vegetables taste better than store-bought produce.
 
-C. It serves as the start of students’ college life.
+The OGarden Smart will set you back \$859 Canadian dollars (about \$650 USD) if you order it on Kickstarter at a discounted rate, but the company's founders are quick to point out that it will help you save money in the long-run. The system lets you grow organic (有机的) produce at a small part of the price you'd pay at your local grocery store.
 
-D. It gives students chances to work with engineers.
+To see some of the buying options available, check out the project's Kickstarter page. Any orders that are placed will be delivered this May.
 
-22\. In SHAPE, students can \___\___\___\_.
+31\. What is the OGarden Smart?
 
-A. be free to explore the MakerSpace
+A. A self-watering system.
 
-B. earn college credit for future study
+B. A water warning system.
 
-C. put school knowledge into practice
+C. An indoor gardening system.
 
-D. be equipped with skills for engineering
+D. An automatic lighting system.
 
-23\. To secure a place in SHAPE, students need to \___\___\___\_.
+32\. What can you learn about the OGarden Smart from the passage?
 
-A. show their family financial state B. answer all the given questions
+A. It can be used all year round.
 
-C. pay application fees before deadline D. prove their learning capability
+B. It grows up to 60 plants at a time.
 
-**B**
+C. It is designed for people who have a yard.
 
-I lost my leg to cancer at 30. My first trip out of the house as a one-legged woman would be to see a sick friend in hospital with my mom.
+D. It moves the plants from the shelf automatically.
 
-As I made my way through the hospital, I was prepared for looks of curiosity, sympathy, and even shock. But one thing shook me to a depth I had never experienced before. Two kids were playing in the hallway. As I passed by on my crutches (拐杖), they looked up at me, and suddenly, the little boy pointed at me. “Look at that lady!” It seemed that he was shouting loud enough for the entire hospital to hear. “She only has one leg! Doesn’t that look funny?”
+33\. The OGarden Smart can help you save money in the long-run mainly because of its_\_**\_**\___\__.
 
-Both of the kids burst into laughter. Heads turned, and I felt the blood rush to my face. I put my head down and rushed out as fast as I dared on my crutches. I held my tears back until the car door closed. As I fell into the seats, I cried, “How could they think this is funny?”
+A. automatic upgrade
 
-My mom tried her best to comfort me, “Honey, they are just kids. They don’t know any better.” They were just kids, but that did not excuse their rude behavior. I felt a wave of belief flood through me. I knew what I had to do. “Well, someone has to teach them!” I said. And I knew that someone would be me.
+B. free after-sales service
 
-When I was well enough, I started to visit elementary schools and talk to children about being different. I was teaching children to be respectful of people who are different, and teaching them people come in all shapes, colors and sizes and we are each special and unique.
+C. low energy consumption
 
-Speaking to children was just the beginning for me. I became an inspirational speaker and author and learned that being grateful for all the remaining parts of me was the only way to start and end my day. I shared my story in my book called _I Am Choosing to Smile_. I do, indeed, choose to smile. Waking up every morning, I look down at my one foot and say with all sincerity, “Good morning, five toes. I’m very glad to see you!”
+D. harvest of organic produce
 
-24\. What shocked the author in the hospital?
+B
 
-A. The curious look a boy had. B. The words a boy shouted out.
+As the Camp Fire continued, killing at least 85 people and displacing thousands more in Northern California, Madison waited there.
 
-C. The game the boys were playing. D. The sympathy the boys expressed.
+Gaylord, the Anatolian shepherd mix's owner, was not able to get to her home in Paradise, when the fire began to spread, meaning Madison was left behind. For weeks, all Gaylord could do was pray for Madison's safety, according to California-based animal rescue organization Paw Print Rescue.
 
-25\. How did the experience in the hospital change the author?
+Sullivan, a volunteer with the organization, had already helped locate Madison's brother Miguel in a different city. But Madison was even more difficult to find. Sullivan spotted Madison a few times in a canyon (峡谷), apparently guarding his land, and put out fresh food and water regularly in hopes that the dog would turn up, according to a Facebook post by Sullivan. She even placed an article of clothing that smelled like Gaylord near the home "to keep Madison's hope alive until his people could return," Sullivan wrote.
 
-A. She found the purpose of her life. B. She began to realize her difference.
+When the evacuation (疏散) order was lifted last week and Gaylord went back to her home-which had been ruined by the fire-her prayers were answered: Madison was there, seemingly protecting what little remained of his family's home. "Well, I'm so happy to report that Gaylord was allowed to return to her home today and THERE MADISON WAS!!!! He had stayed to protect what was left of his home, and never gave up on his people!" Sullivan wrote in the comment on her Facebook post. "I'm so happy I'm crying as I write this! He didn't give up through the storms or the fire!" she added.
 
-C. She understood kids’ characteristics. D. She learned the importance of respect.
+Soon afterward, Madison was reunited with Miguel for the first time since the fire broke out. An emotional Gaylord said in an interview with the network that she was overcome with joy to see Madison waiting for her. She also expressed how grateful she was to Sullivan. Gaylord said fighting through tears, "You could never ask for better animals. He is the best dog."
 
-26\. Which of the following words can best describe the author?
+34\. What did Madison do during the Camp Fire?
 
-A. Patient. B. Brave. C. Intelligent. D. Caring.
+A. He rescued Sullivan.
 
-**C**
+B. He waited for Gaylord.
 
-Researchers from a U.K. plant research institute have found a way to provide plants with an antibody-based defense for a specific threat, potentially speeding the creation of crops resistant to any kind of emerging virus, or bacterium (细菌). The strategy is to inoculate a protein from the plant pathogen (病原体) to be targeted to a camel or other camel relatives, purify the unusually small antibodies the camels produce, and engineer the corresponding gene section for them into a plant’s own immune gene.
+C. He stayed with Miguel.
 
-Farmers lose many billions of dollars to plant diseases each year, and emerging pathogens pose new threats to food security in the developing world. Plants have evolved their own immune system, kick-started by cell receptors that recognize general pathogen features, such as a bacterial cell wall, as well as intracellular receptors for molecules (分子) produced by specific pathogens. If a plant cell detects these molecules, it may trigger its own death to save the rest of the plant. But plant pathogens often evolve and escape from those receptors.
+D. He ran away from Paradise.
 
-A long-standing dream in plant biotechnology is to create designer disease resistance genes that could be produced as fast as pathogens emerge. One approach is to edit the gene for a plant immune receptor, changing the protein’s shape to recognize a particular pathogenic molecule.
+35\. Why did Sullivan place an article of clothing smelling like Gaylord near the home?
 
-Instead, Sophien Kamoun, a molecular biologist at the Sainsbury Laboratory, and his colleagues used an animal immune system to help make the receptor adjustments. During an infection with a new pathogen, animals produce billions of slightly different antibodies, ultimately selecting and mass-producing those that best target the virus.
+A. To keep Madison warm.
 
-Camelids, which include camels, are workhorses for antibody design because their immune systems create unusually small versions, called nano-bodies. As a proof of principle of the new plant defense strategy, Kamoun’s group turned to two standard camelid nano-bodies that recognize two different molecules, including one called green fluorescent protein (GFP), to detect test viruses, in this case a potato virus, engineered to make the fluorescent proteins. They investigated how well plants with the nano-body-enhanced receptors detected the changed potato viruses. It was found that the plants increased an active immune response and experienced almost no viral reproduction.
+B. To get Madison to turn up.
 
-“The exciting part about this technology is that we have the potential of made-to-order resistance genes and keeping up with a pathogen,” Kamoun says. “This technology is a potential game changer,” says Jeff Dangl, a plant researcher at the University of North Carolina. Ksenia Krasileva, a scientist at the University of California, Berkeley, says the mixture of nano-bodies with plant immune receptors opens up a vast body of biomedical knowledge for plant scientists. “We can now dig into all of that research and translate it to save crops.”
+C. To help Madison remember his owner.
 
-27\. What does the underlined word “inoculate” in Paragraph 1 probably mean?
+D. To encourage Madison not to give up.
 
-A. Compare. B. Restore. C. Introduce. D. Label.
+36\. Where was Madison finally found?
 
-28\. What is the main purpose of Paragraph 2?
+A. In a different city. B. In a canyon.
 
-A. To illustrate the function of cells in saving the plant.
+C. At a camp. D. At his home.
 
-B. To explain how to strengthen plant receptors effectively.
+37\. What quality is emphasized in this story?
 
-C. To demonstrate the solutions to farmers’ annual heavy losses.
+A. Patience. B. Unity. C. Devotion. D. Wisdom.
 
-D. To reveal why plants fail to handle constantly-updated diseases.
+C
 
-29\. What can we learn from the passage?
+Choosing to forget something might take more mental effort than trying to remember it, researchers at The University of Texas at Austin discovered through neuroimaging (神经成像).
 
-A. Editing plant receptors is to match the shape of pathogens.
+These findings, published in the _Journal of Neuroscience_, suggest that in order to forget an unwanted experience, more attention should be focused on it. This surprising result continues previous research on intentional forgetting, which focused on reducing attention to the unwanted information through redirecting attention away from unwanted experiences or holding back the memory's retrievals (恢复).
 
-B. Nano-bodies can help plants catch up with pathogen changes.
+"We may want to get rid of memories that cause nonadaptive responses, such as upsetting memories, so that we can respond to new experiences in more adaptive ways," said Jarrod Lewis-Peacock, the study's senior author and an assistant professor of psychology at UT Austin. "Decades of research has shown that we have the ability to voluntarily forget something, but how our brains do that is still being questioned. Once we can figure out how memories are weakened and design ways to control this, we can design treatment to help people rid themselves of unwanted memories."
 
-C. Plants select the best antibodies from animals to fight viruses.
+Using neuroimaging to track patterns of brain activity, the researchers showed a group of healthy adults images of scenes and faces, instructing them to either remember or forget each image. Their findings not only confirmed that humans have the ability to control what they forget, but that successful intentional forgetting required "moderate (适中的) levels" of brain activity in these sensory and perceptual areas (感官区域)-more activity than what was required to remember.
 
-D. Plants with nano-bodies respond actively in massive virus copying.
+"A moderate level of brain activity is critical to this forgetting mechanism. Too strong, and it will strengthen the memory; too weak, and you won't change it," said Tracy Wang, lead author of the study and a psychology postdoctoral fellow at UT Austin. "Importantly, it's the intention to forget that increases the activation of the memory, and when this activation hits the 'moderate level' sweet spot, that's when it leads to later forgetting of that experience." The researchers also found that participants were more likely to forget scenes than faces, which can carry much more emotional information, the researchers said.
 
-30\. According to the passage, scientists will \___\___\___\_.
+"We're learning how these mechanisms in our brain respond to different types of information, and it will take a lot of further research and replication (重复) of this work before we understand how to control our ability to forget," said Lewis-Peacock, who has begun a new study using neurofeedback to track how much attention is given to certain types of memories.
 
-A. apply the outcome in the real world
+"This will make way for future studies on how we process, and hopefully get rid of, those really strong, sticky emotional memories, which can have a powerful effect on our health and well-being," Lewis-Peacock said.
 
-B. prove the findings of resistance genes
+38\. Previous studies on intentional forgetting researched \_**\_**.
 
-C. identify similar means to fight diseases
+A. the pattern of brain activity
 
-D. seek more support for the new strategy
+B. the process of recovering a memory
 
-**D**
+C. the way to reduce attention to unwanted information
 
-Superhuman artificial intelligence is already among us. Well, sort of. When it comes to playing games like chess and Go, or solving difficult scientific challenges like predicting protein structures, computers are well ahead of us. But we have one superpower they aren’t close to mastering: mind reading.
+D. the amount of attention required by intentional forgetting
 
-Humans have a mysterious ability to reason the goals, desires and beliefs of others, a crucial skill that means we can anticipate other people’s actions and the consequences of our own. Reading minds comes so easily to us, though, that we often don’t think to spell out what we want. If AIs are to become truly useful in everyday life—to cooperate effectively with us or to understand that a child might run into the road after a bouncing ball—we have to give them this gift that evolution has given us to read other people’s minds.
+39\. According to Tracy Wang, forgetting is possible when \_**\_**.
 
-Psychologists refer to the ability to infer another’s mental state as theory of mind. In humans, this capacity starts to develop at a very young age. How to reproduce the capability in machines is far from clear, though. One of the main challenges is context. For instance, if someone asks whether you are going for a run and you reply “it’s raining”, they can quickly conclude that the answer is no. But this requires huge amounts of background knowledge about running, weather and human preferences.
+A. people respond to new experiences in an adaptive way
 
-Moreover, whether humans or AI, the theory of mind is supposed to emerge naturally from one’s own learning process. Building prior knowledge into AI makes it reliant on our imperfect understanding of theory of mind. In addition, AI may be capable of developing approaches we could never imagine. There can be many forms of theory of mind that we don’t know about simply because we live in a human body that has certain types of senses and a certain ability to think.
+B. the activation of the memory reaches a certain level
 
-Yet we might still want AI to have a more human-like form of theory of mind. Humans can clearly explain their goals and desires to each other using common language and ideas. While letting AI form the theory of mind in their learning process is likely to lead to developing more powerful AI, plainly building in shared ways to represent knowledge may be crucial for humans to trust and communicate with AI.
+C. people have the strongest intention to forget
 
-It is important to remember, though, that the pursuit of machines with theory of mind is about more than just building more useful robots. It is also a stepping stone on the path towards a deeper goal for AI and robotics research: building truly self-aware machines. Whether we will ever get there remains to be seen. But along the way thinking about other people and other agents, we are on the path to learning to think about ourselves.
+D. the information involves more emotion
 
-31\. According to the passage, which of the following contexts can AI understand well?
+40\. Lewis continues his study to find out \_**\_**.
 
-A. When you are asked to eat spicy food for dinner and you reply “a sore throat”.
+A. how to control people's ability to forget
 
-B. When a teacher asks for a boy’s homework and he answers “my dog ate it”.
+B. where to apply the findings of his team's latest study
 
-C. When a mom tells her kid some food is good for health and the kid eats it.
+C. what effects upsetting memories have on people's health
 
-D. When kids see their mom after hurting themselves and they cry louder.
+D. if different types of information requires different levels of attention
 
-32\. The author believes that \___\___\___\_.
+41\. What is the best title of the article?
 
-A. humans’ theory of mind is far from perfect
+A. Where does forgetting take place?
 
-B. humans limit AI’s theory of mind to an extent
+B. How does attention affect memory?
 
-C. we should reject human-like forms of abilities for AI
+C. Forgetting uses more brain power than remembering
 
-D. shared forms of theory of mind result in more powerful AI
+D. Forgetting is far more difficult than we once imagined
 
-33\. As for AIs, what does the author value most?
+D
 
-A. Reliability. B. Practicability.
+The new social robots, including Jibo, Cozmo, Kuri and Meccano M.A.X., bear some resemblance to assistants like Apple's Siri, but these robots come with something more. They are designed to win us over not with their smarts but with their personality. They are sold as companions that do more than talk to us. Time magazine hailed (称赞) the robots that "could fundamentally reshape how we interact with machines." But is reshaping how we interact with machines a good thing, especially for children?
 
-C. Reasoning capability. D. Communication ability.
+Some researchers in favor of the robots don't see a problem with this. People have relationships with many kinds of things. Some say robots are just another thing with which we can have relationships. To support their argument, roboticists sometimes point to how children deal with toy dolls. Children animate (赋予…生命) dolls and turn them into imaginary friends. Jibo, in a sense, will be one more imaginary friend, and arguably a more intelligent and fun one.
 
-34\. Which would be the best title for the passage?
+Getting attached to dolls and sociable machines is different, though. Today's robots tell children that they have emotions, friendships, even dreams to share. In reality, the whole goal of the robots is emotional trickery. For instance, Cozmo the robot needs to be fed, repaired and played with. Boris Sofman, the chief executive of Anki, the company behind Cozmo, says that the idea is to create "a deeper and deeper emotional connection ... And if you neglect him, you feel the pain of that." What is the point of this, exactly? What does it mean to feel the pain of neglecting something that feels no pain at being neglected, or to feel anger at being neglected by something that doesn't even know it is neglecting you?
 
-A. AI with Its Own Theory of Mind Is Expected
+This should not be our only concern. It is troubling that these robots try to empathize with children. Empathy allows us to put ourselves in the place of others, to know what they are feeling. Robots, however, have no emotions to share, and they cannot put themselves in our place. No matter what robotic creatures "say" or squeak, they don't understand our emotional lives. They present themselves as empathy machines, but they are missing the essential equipment. They have not been born, they don't know pain, or death, or fear. Robot thinking may be thinking, but robot feeling is never feeling, and robot love is never love.
 
-B. AI with Theory of Mind Will Reshape Our Future
+What is also troubling is that children take robots' behavior to indicate feelings. When the robots interact with them, children take this as evidence that the robots like them, and when robots don't work when needed, children also take it personally. Their relationships with the robots affect their self-esteem (自尊). In one study, an 8-year-old boy concluded that the robot stopped talking to him because the robot liked his brothers better.
 
-C. AI’s Theory of Mind Is a Blessing or Suffering to Humans
+For so long, we dreamed of artificial intelligence offering us not only simple help but conversation and care. Now that our dream is becoming real, it is time to deal with the emotional downside of living with robots that "feel."
 
-D. Theory of Mind Bridges the Gap Between Humans and AI
+42\. How are the new social robots different from Siri?
 
-第二节（共5 小题；每小题2 分，共10 分）
+A. They are intended to teach children how to talk.
 
-根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项，并在答题卡上将该项涂黑。选项中有两项为多余选项。
+B. They are designed to attract people with their smarts.
 
-In our modern world, there are endless alternatives. Have you ever found yourself wondering whether you should quit or stay in your job, accept an offer or give it up for another? There is a simple and practical method that solves this problem. 35 When you understand the concept, you have the power to measure every alternative with precision and make the right decision.
+C. Their main function is to evaluate children's personality.
 
-In the field of economics, opportunity cost is the value that you have to give up when you choose an option over another good option. 36 Every time you choose something, you give up other alternatives together with their financial benefits. It is not all the other options, but the most valued one that is defined as the opportunity cost.
+D. They have a new way to communicate with human beings.
 
-37 Take the simple example of trying to decide whether to take public transportation for 80 minutes or to drive for 40 minutes. You might save on the cost of gas while riding the bus but double the trip length and miss out on other things you could have done during that time. 38 This is how you create priorities in your daily life.
+43\. In Paragraph 3 Cozmo is used as an example to show that the social robots \_**\_**.
 
-Though useful in decision making, the biggest drawback of opportunity cost is that it’s often related to what’s hard to quantify. 39 After all, putting a number to your peaceful mind or happiness can be difficult.
+A. are deeply connected with human beings
 
-Opportunity cost isn’t cut and dried. It varies from person to person. At the end of the day, you are in charge of what you own and what you want to gain.
+B. are unable to build a real relationship with children
 
-A. It is about finding out the opportunity cost.
+C. are so advanced that they can feel the pain of human beings
 
-B. Weigh the losses and gains, and make your decision.
+D. are not good enough to carry out the instructions of children
 
-C. Opportunity cost matters not only in economics but also in real life.
+44\. The underlined phrase "essential equipment" in Paragraph 4 refers to \_**\_**.
 
-D. This is especially true when the opportunity cost is of non-financial benefit.
+A. emotion B. pain C. fear D. thinking
 
-E. The key principle underlying the idea is that there is no such thing as free lunch.
+45\. Which of the following shows the development of ideas in the passage?
 
-F. Most people overlook opportunity cost because the benefits are usually hidden from view.
+1. ![](images/image2.wmf) B. ![](images/image3.wmf)
 
-G. It is the development of important skills that would help you move forward in your daily life.
+C. ![](images/image4.wmf) D. ![](images/image5.wmf)
 
-第三部分 书面表达（共两节，32 分）
+I: Introduction P: Point Sp: Sub-point (次要点) C: Conclusion
 
-第一节 （共4 小题；第40、41 题各2 分，第42 题3 分，第43 题5 分，共12 分）
+第二节（共5小题；每小题2分，共10分）
 
-阅读下面短文，根据题目要求用英文回答问题。请在答题卡指定区域作答。
+根据短文内容，从短文后的七个选项中选出能填入空白处的最佳选项。选项中有两项为多余选项。
 
-The term “nostalgia” was first coined in 1688 and was defined as a mental illness of soldiers continually thinking about their homeland and longing for return. However, today we have a much more positive attitude to nostalgia. It’s a great example of the benefits of a strong memory.
+Healthy See, Healthy Do
 
-In numerous scientific experiments, researchers have found that subjects are much more likely to report positive feelings from a given piece of music if they’ve heard it before. But there’s also a growing body of research into time travel “the other way”, because memory skills can take people into the future, too. Decades of studies have shown that time travel into the future can bring a whole new set of rewards. For example, athletes who practice by mentally visualizing and imagining successful performances in the future do perform better.
+Visit the grocery store on an empty stomach, and you will probably come home with a few things you did not plan to buy. But hunger is not the only cause of additional purchases. The location of store displays (摆放) also influences our shopping choices. 46
 
-All these findings are inspiring and attractive. How could you become a confident time traveler to the past or into the future? Here are some tips for you:
+The checkout area is a particular hotspot for junk food. Studies have found that the products most commonly found there are sugary and salty snacks. 47 A 2012 study in the Netherlands found that hospital workers were more likely to give up junk food for healthy snacks when the latter were more readily available on canteen shelves, for example. In 2014 Norwegian and Icelandic researchers also found that replacing unhealthy foods with healthy ones in the checkout area significantly increased last-minute sales of healthier foods.
 
-To take pleasure in helpful memories, maybe to reawaken happy feelings, use all your senses—not just sight. Smell, taste, touch and sound will also help you to recreate the past in rich clarity.
+48 It has been working with more than 1,000 store owners to encourage them to order and promote nutritious foods. "We know that the stores are full of cues (暗示) meant to encourage consumption," says Tamar Adjoian, a research scientist at the department, "Making healthy foods more convenient or appealing can lead to increased sales of those products."
 
-If you find a memory that’s particularly helpful—for reassurance, say—keep using it! You’ll get faster at finding it, and add extra layers of detail each time.
+Adjoian and her colleagues wondered if such findings would apply to their city's crowded urban checkout areas, so they selected three Bronx supermarkets for their own study. 49 Then they recorded purchases over six three-hour periods in each store for two weeks.
 
-When you’re procrastinating (拖延), visualize an end result. Flash forward to see the floor swept or the essay finished, and use that positive image to drive you into action.
+Of the more than 2,100 shoppers they observed, just 4 percent bought anything from the checkout area. Among those who did, however, customers in the healthy lines purchased nutritious foods more than twice as often as those in the standard lines. 5 The findings were reported in September in the _Journal of Nutrition Education and Behavior_.
 
-Ahead of major challenges, imagine the full impact of success. Don’t just picture yourself getting that great job: fill your mind with the really big ways it’s going to change your life.
+The potential influence may seem small, but Adjoian believes that changing more checkout lines would open customers' eyes to nutritious, lower-calorie foods. Health department officials are now exploring ways to expand healthy options at checkout counters throughout New York City.
 
-There’ll still be times when old thoughts remind you of sadness, or you’re anxious about what’s next. But the more you learn to control your memory, the better you’ll be at mining your past, and shaping your future, to be your best self now.
+A. These foods give people more energy.
 
-40\. What did nostalgia originally mean?
+B. They bought unhealthy foods 40 percent less often.
 
-41\. What have the researchers found about time travel?
+C. And it may make or break some healthy eating habits.
 
-42\. Please decide which part is false in the following statement, then underline it and explain why.
+D. The supermarkets began to offer nutritious, lower-calorie foods.
 
-➢ **_Memory skills can bring us into the future, so we should imagine a negative end result to drive us into action when procrastinating._**
+E. These findings caught the attention of New York City Department of Health.
 
-43\. Describe one of the helpful time-travel experiences in your life. (**_In about 40 words_**)
+F. They replaced candies and cookies with fruits and nuts near the checkout counter.
 
-第二节（20 分）
+G. And a few studies have suggested that simply swapping in healthier options can change customer behavior.
 
-假设你是红星中学高三学生李华。你最近读完了外教 Jim 推荐的一本英文书，请你用英文给Jim 写一封邮件，内容包括：
+第三部分：书面表达 (共两节，35分)
 
-1. 表达感谢并分享读书收获；
+第一节（15分）
 
-2. 交流后续英文书阅读计划。
+假设你是红星中学高三学生李华。你的英国朋友Jim来信说他在英国学校参加了中国书法俱乐部。擅长书法的你决定写一幅书法作品寄给他，并附上一封信。信的内容包括：
 
-注意：1. 词数100 左右；
+1. 该作品的内容；
+2. 送该作品的原因；
+3. 表示愿意提供帮助。
 
-2. 开头和结尾已给出，不计入总词数。
+注意： 1. 词数不少于50；
 
-_Dear Jim,_ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ \___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\___\____ _Yours,_
+2\. 开头和结尾已给出，不计入总词数。
+
+提示词：书法 calligraphy
+
+_Dear Jim,_
+
+_Yours,_
 
 _Li Hua_
 
 （请务必将作文写在答题卡指定区域内）
 
+第二节（20分）
+
+假设你是红星中学高三学生李华。毕业之际，你们班开展了感谢学校教职员工的活动。请根据下面四幅图的先后顺序，写一篇英文周记，记述活动的全过程。
+
+注意：词数不少于60。
+
+提示词：教职员工 teachers and staff
+
+![](images/image6.png)
+
+（请务必将作文写在答题卡指定区域内）
+
 参考答案
 
-第一部分 知识运用（共两节，30分）
+第一部分：知识运用（共两节，45分）
 
-第一节（共10小题；每小题1.5分，共15分）
+第一节 语法填空（共10小题；每小题1.5分，共15分）
 
-1．B 2．A 3．C 4．D 5．B
+1．that/which 2．Standing 3．threw 4．clearly 5．will go/are going
 
-6．A 7．C 8．B 9．C 10. D
+6．a 7．by 8．were seen 9．decorated 10．their
 
-第二节（共10小题；每小题1.5分，共15分）
+第二节 完形填空（共20小题；每小题1.5分，共30分）
 
-11\. between 12. has gained 13. joining 14. shows 15. surprising
+11．A 12．C 13．C 14．A 15．B
 
-16\. where 17. to accomplish 18. was admitted 19. planned 20. which
+16．A 17．B 18．A 19．D 20．B
 
-第二部分 阅读理解（共两节，38分）
+21．D 22．A 23．C 24．D 25．D
 
-第一节（共14小题；每小题2分，共28分）
+26．B 27．C 28．D 29．B 30．C
 
-21．A 22．D 23．D 24．B 25．A
+第二部分：阅读理解（共两节，40分）
 
-26．B 27．C 28．D 29．B 30．A
+第一节（共15小题；每小题2分，共30分）
 
-31．C 32．B 33．C 34．A
+31．C 32．A 33．D 34．B 35．D
+
+36．D 37．C 38．C 39．B 40．A
+
+41．C 42．D 43．B 44．A 45．B
 
 第二节（共5小题；每小题2分，共10分）
 
-35．A 36．E 37．C 38．B 39．D
+46．C 47．G 48．E 49．F 50．B
 
-第三部分 书面表达（共两节，32分）
+第三部分：书面表达（共两节，35分）
 
-第一节（共4小题；第40、41题各2分，第42题3分，第43题5分，共12分）
+第一节 （15分）
 
-40\. A mental illness of soldiers continually thinking about their homeland and longing for return.
+一、评分原则：
 
-41\. They have found that time travel to the past and into the future both bring benefits to us.
+1．本题总分为15分，按4个档次给分。
 
-42\. ⮚ **_Memory skills can bring us into the future, so we should imagine a negative end result to drive us into action when procrastinating._**
+2．评分时，先根据文章的内容和语言质量初步确定其档次，然后以该档次的要求来衡量，
 
-We should use a positive end result to drive us into action when procrastinating.
+确定或调整档次，最后给分。
 
-43\. (1) I often imagine myself attending my ideal university in September 2023 to cheer myself up. Picturing myself wandering on the campus and enjoying the harvest in the golden autumn can give me the motivation to overcome nervousness and stress at present with an optimistic attitude and in full gear.
+3．评分时应考虑：内容是否完整，条理是否清楚，交际是否得体，语言是否准确。
 
-(2) I recall the time of winning the first prize in a speech contest two years ago. Standing on the stage reaching out for the prize, I was filled with pride. This experience serves as a constant source of encouragement and confidence for me to keep working hard to improve myself.
+4．拼写、标点符号或书写影响内容表达时，应视其影响程度予以考虑。英、美拼写及词汇
 
-**（**请根据学生答题情况酌情给分**）**
+用法均可接受。
 
-第二节（20分）
+5．词数少于50，从总分中减去1分。
+
+二、各档次的给分范围和要求：
+
+| 第一档<br><br>(13分~15分) | 完全完成了试题规定的任务。<br><br>·内容完整，条理清楚；<br><br>·交际得体，表达时充分考虑到了交际的需求；体现出较强的语言运<br><br>用能力。<br><br>完全达到了预期的写作目的。                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 第二档<br><br>(9分~12分)  | 基本完成了试题规定的任务。<br><br>·内容、条理和交际等方面基本符合要求；<br><br>·所用语法和词汇满足了任务的要求；<br><br>·语法和用词方面有一些错误，但不影响理解。<br><br>基本达到了预期的写作目的。 |
+| 第三档<br><br>(4分~8分)   | 未恰当完成试题规定的任务。<br><br>·内容不完整；<br><br>·所用词汇有限，语法或用词方面的错误影响了对所写内容的理解。<br><br>未能清楚地传达信息。                                                      |
+| 第四档<br><br>(1分~3分)   | 未完成试题规定的任务。<br><br>·写了少量相关信息；<br><br>·语法或用词方面错误较多，严重影响了对所写内容的理解。                                                                                      |
+| 0分                       | 未能传达任何信息；所写内容与要求无关。                                                                                                                                                              |
+
+三、One possible version:
 
 _Dear Jim,_
 
-Thank you for your recommendation of the English novel _The Old Man and the Sea._
+I am glad to know that you have joined your school's calligraphy club. The calligraphy piece I sent to you was written by myself. I really hope you will like it.
 
-Having finished reading_,_ I’ve harvested a lot. The tough man who fights against the big fish and sharks alone in the sea inspires me to brave frustrations in my life. And I have learned that we should stick to our dreams no matter what hardships we may encounter.
+The Chinese characters on the piece are "天道酬勤" (Tian Dao Chou Qin), meaning "Hard work pays off." It is a well-known Chinese idiom, widely adopted as a motto by Chinese people. There is a similar calligraphy piece hanging in the study at my home, which was written by my grandfather. He gave it to me when I started to learn calligraphy at age six in hopes that I would practise it often and learn it well. You see now my efforts have paid off. I hope it can serve as an encouragement to you at all times. I wrote this piece in the calligraphic style of my favorite calligrapher, Yan Zhenqing, a renowned master of the Tang Dynasty. His style is Kaishu, a standard script, suitable for beginners. I guess maybe it is the style that you are practising.
 
-The book unfolds a new world to me. Thus, I make a plan for further reading. English novels enlightening my mind will be included in my reading list. I intend to read one book a month. While reading, I will take down my understanding in time to gain more beyond the lines.
-
-I would appreciate it if you could give me more recommendations.
+I know it is not easy to learn Chinese calligraphy. If you have any problems during your study, I would be happy to help you. I sincerely hope you enjoy learning Chinese calligraphy!
 
 _Yours,_
 
 _Li Hua_
+
+第二节（20分）
+
+一、评分原则：
+
+1．本题总分为20分，按5个档次给分。
+
+2．评分时，先根据文章的内容和语言质量初步确定其档次，然后以该档次的要求来衡 量，确定或调整档次，最后给分。
+
+3．评分时应考虑：内容要点的完整性、上下文的连贯、词汇和句式的多样性及语言的准确性。
+
+4．拼写、标点符号或书写影响内容表达时，应视其影响程度予以考虑。英、美拼写及词汇用法均可接受。
+
+5\. 词数少于60，从总分中减去1分。
+
+二、内容要点：
+
+1\. 建议/讨论 2. 写感谢信
+
+3\. 定制礼物 4. 赠送礼物
+
+三、各档次的给分范围和要求：
+
+| 第一档<br><br>(18分~20分) | 完全完成了试题规定的任务。<br><br>·覆盖了所有内容要点；<br><br>·运用了多样的句式和丰富的词汇；<br><br>·语法或用词方面有个别错误，但为尽可能表达丰富的内容所致；体现了较强的语言运用能力；<br><br>·有效地使用了语句间的连接成分，所写内容连贯、结构紧凑。<br><br>完全达到了预期的写作目的。 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 第二档<br><br>(15分~17分) | 完全完成了试题规定的任务。<br><br>·覆盖了所有内容要点；<br><br>·运用的句式和词汇能满足任务要求；<br><br>·语法和用词基本准确，少许错误主要为尽可能表达丰富的内容所致；<br><br>·使用了简单的语句间连接成分，所写内容连贯。<br><br>达到了预期的写作目的。                                     |
+| 第三档<br><br>(12分~14分) | 基本完成了试题规定的任务。<br><br>·覆盖了内容要点；<br><br>·运用的句式和词汇基本满足任务要求；<br><br>·语法和用词方面有一些错误，但不影响理解。<br><br>基本达到了预期的写作目的。                                                                                                          |
+| 第四档<br><br>(6分~11分)  | 未恰当完成试题规定的任务。<br><br>·漏掉或未描述清楚主要内容；<br><br>·所用句式和词汇有限；<br><br>·语法或用词方面的错误影响了对所写内容的理解。<br><br>未能清楚地传达信息。                                                                                                                |
+| 第五档<br><br>(1分~5分)   | 未完成试题规定的任务。<br><br>·明显遗漏内容要点；<br><br>·句式单调、词汇贫乏；<br><br>·语法或用词方面错误较多，严重影响了对所写内容的理解。                                                                                                                                                |
+| 0分                       | 未能传达任何信息；所写内容与要求无关。                                                                                                                                                                                                                                                     |
+
+四、One possible version:
+
+Before graduation, in order to express our sincere gratitude to our beloved teachers and the hard-working staff, we prepared special gifts and "thank you" notes.
+
+Last Monday after class, our monitor came up with an idea to extend our appreciation to the school faculty. After much thought, we decided to present them with cups featuring our class picture as well as write them "thank you" notes.
+
+Soon afterwards, we began our project. In the following two days, some of us wrote the notes conveying our heartfelt appreciation while others carefully folded the finished notes into the shape of a heart. We also logged onto a self-customization cup website in the school's computer room, chose our best class photos to customize the cups and made the purchases.
+
+Last Friday, we received the delivery. With excitement, we got into small groups and presented our special gifts to all the dedicated teachers and staff. Holding the gifts, they all expressed their thanks and best wishes to us. Every day for the past three years, we have enjoyed interesting lessons, delicious meals, and a clean and safe campus. It is their hard work and devotion that has helped us become responsible people.
+
+Graduation will come and go, but the love for our school will last a lifetime.
+
 
 请分析上述试卷，输出结构化的JSON（仅JSON，无markdown fence，无其他文字）：
