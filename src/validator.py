@@ -413,7 +413,8 @@ class FinalJSONValidator:
                     ))
             
             # Validate questions
-            for question in section.get("questions", []):
+            choice_types = {"完形填空", "阅读", "七选五"}
+            for j, question in enumerate(section.get("questions", [])):
                 if "id" not in question:
                     self.errors.append(ValidationError(
                         "error", "INVALID_QUESTION",
@@ -426,6 +427,16 @@ class FinalJSONValidator:
                         "Question missing 'answer' field",
                         section_index=i
                     ))
+                # Check that choice-type questions have options
+                if section.get("type") in choice_types:
+                    options = question.get("options", [])
+                    if not options:
+                        self.errors.append(ValidationError(
+                            "warning", "EMPTY_OPTIONS",
+                            f"第{j+1}题选项为空",
+                            section_index=i,
+                            question_number=j+1
+                        ))
             # Validate questions exist
             if not section.get("questions"):
                 if section.get("type") != "作文":

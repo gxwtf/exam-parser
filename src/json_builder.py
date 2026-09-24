@@ -693,6 +693,8 @@ class JSONBuilder:
         if not answer:
             return ""
         answer = answer.strip()
+        # Normalize "/" separators to "##" (e.g. "replaced/had replaced" → "replaced##had replaced")
+        answer = re.sub(r'\s*/\s*', '##', answer)
         # Collapse "a ## b" → "a##b"
         answer = re.sub(r'\s*##\s*', '##', answer)
         # Lowercase single-letter choice answers (A/B/C/D/E/F/G)
