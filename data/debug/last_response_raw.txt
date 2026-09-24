@@ -1,5 +1,5 @@
-Paper: 2023北京朝阳高三二模英语
-Response Length: 18316 characters
+Paper: 2023北京朝阳高三二模英语（教师版）
+Response Length: 30388 characters
 ================================================================================
 RAW RESPONSE (BEFORE PROCESSING):
 ================================================================================
@@ -11,71 +11,140 @@ RAW RESPONSE (BEFORE PROCESSING):
   "sections": [
     {
       "type": "完形填空",
-      "title": "新生儿重症监护室的希望",
-      "tags": [],
+      "title": "护士的鼓励",
       "questionStart": 1,
       "questionEnd": 10,
       "score": 15,
-      "article": "My son was born with breathing difficulties, so he had to stay in NICU, the hospital unit for newborns needing intensive care. There he could only be fed through a tube. I hated the tube. The lovely dreams I had of nursing my baby were entirely <ClozeBlank></ClozeBlank> .\n\nOn the fifth day, I <ClozeBlank></ClozeBlank> about the tube, saying that I wanted to feed him with a bottle. The doctors agreed to let me try. My son's feedings would be closely recorded to see if he was able to get <ClozeBlank></ClozeBlank> milk intake without the tube. After eighteen hours, it was determined he could not do that and the tube was back. This meant he wasn't getting stronger. The <ClozeBlank></ClozeBlank> felt so dark.\n\nSeated outside the NICU, I started crying. Just then, a young nurse came and sat beside me. When I had <ClozeBlank></ClozeBlank> my sorrow a little, she handed me a tissue and asked if I wanted to talk. I asked again if we could remove the tube. The nurse replied, \"Not today. But remember, tomorrow is a new day.\"\n\nShe seemed much younger than me, but her words were <ClozeBlank></ClozeBlank> and hope-filled, and I held on to them. I remembered her advice and repeated it to myself multiple times a day. The nurse changed my perspective away from current <ClozeBlank></ClozeBlank> to see the hope of tomorrow. Gradually, things started to <ClozeBlank></ClozeBlank> . On day eight, my son drank half of his milk without the tube. On day ten, the doctors approved taking off the tube <ClozeBlank></ClozeBlank> . \"Tomorrow\" came. It just came a few days later than expected. On day fifteen, we were released from the hospital, and my son \"graduated\" from the NICU.\n\nWhat I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with <ClozeBlank></ClozeBlank> . After all, tomorrow is a new day.",
+      "article": "My son was born with breathing difficulties, so he had to stay in NICU, the hospital unit for newborns needing intensive care. There he could only be fed through a tube. I hated the tube. The lovely dreams I had of nursing my baby were entirely <ClozeBlank></ClozeBlank>.\n\nOn the fifth day, I <ClozeBlank></ClozeBlank> about the tube, saying that I wanted to feed him with a bottle. The doctors agreed to let me try. My son's feedings would be closely recorded to see if he was able to get <ClozeBlank></ClozeBlank> milk intake without the tube. After eighteen hours, it was determined he could not do that and the tube was back. This meant he wasn't getting stronger. The <ClozeBlank></ClozeBlank> felt so dark.\n\nSeated outside the NICU, I started crying. Just then, a young nurse came and sat beside me. When I had <ClozeBlank></ClozeBlank> my sorrow a little, she handed me a tissue and asked if I wanted to talk. I asked again if we could remove the tube. The nurse replied, \"Not today. But remember, tomorrow is a new day.\"\n\nShe seemed much younger than me, but her words were <ClozeBlank></ClozeBlank> and hope-filled, and I held on to them. I remembered her advice and repeated it to myself multiple times a day. The nurse changed my perspective away from current <ClozeBlank></ClozeBlank> to see the hope of tomorrow. Gradually, things started to <ClozeBlank></ClozeBlank>. On day eight, my son drank half of his milk without the tube. On day ten, the doctors approved taking off the tube <ClozeBlank></ClozeBlank>. \"Tomorrow\" came. It just came a few days later than expected. On day fifteen, we were released from the hospital, and my son \"graduated\" from the NICU.\n\nWhat I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with <ClozeBlank></ClozeBlank>. After all, tomorrow is a new day.",
       "questions": [
         {
           "id": 1,
+          "content": "The lovely dreams I had of nursing my baby were entirely ___1___.",
+          "options": [
+            {"id": "A", "label": "controlled"},
+            {"id": "B", "label": "destroyed"},
+            {"id": "C", "label": "questioned"},
+            {"id": "D", "label": "recalled"}
+          ],
           "answer": "B",
-          "analysis": "根据语境，作者原本的哺乳梦想因孩子需要插管而完全破灭，故选destroyed。",
+          "analysis": "根据上文\"There he could only be fed through a tube. I hated the tube.\"可知，作者原本梦想亲自哺乳孩子，但孩子只能通过管子进食，所以这个梦想完全被破坏了。destroyed意为\"被破坏\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 2,
+          "content": "On the fifth day, I ___2___ about the tube, saying that I wanted to feed him with a bottle.",
+          "options": [
+            {"id": "A", "label": "protested"},
+            {"id": "B", "label": "wondered"},
+            {"id": "C", "label": "forgot"},
+            {"id": "D", "label": "warned"}
+          ],
           "answer": "A",
-          "analysis": "作者对插管表示抗议，想要用奶瓶喂养，故选protested。",
+          "analysis": "作者对管子感到不满，所以向医生抗议，表示想用奶瓶喂养。protest about意为\"对……提出抗议\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 3,
+          "content": "My son's feedings would be closely recorded to see if he was able to get ___3___ milk intake without the tube.",
+          "options": [
+            {"id": "A", "label": "maximum"},
+            {"id": "B", "label": "restricted"},
+            {"id": "C", "label": "sufficient"},
+            {"id": "D", "label": "additional"}
+          ],
           "answer": "C",
-          "analysis": "医生记录喂养情况，看孩子能否在没有管子的情况下获得足够的奶量，sufficient意为\"足够的\"。",
+          "analysis": "医生记录喂养情况是为了看孩子不用管子能否获得足够的奶量。sufficient意为\"足够的\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 4,
+          "content": "This meant he wasn't getting stronger. The ___4___ felt so dark.",
+          "options": [
+            {"id": "A", "label": "plot"},
+            {"id": "B", "label": "spot"},
+            {"id": "C", "label": "atmosphere"},
+            {"id": "D", "label": "situation"}
+          ],
           "answer": "D",
-          "analysis": "此处指作者面临的处境非常黑暗，situation意为\"处境\"。",
+          "analysis": "孩子没能变得更强壮，作者感到处境非常黑暗。situation意为\"情况、处境\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 5,
+          "content": "When I had ___5___ my sorrow a little, she handed me a tissue and asked if I wanted to talk.",
+          "options": [
+            {"id": "A", "label": "spared"},
+            {"id": "B", "label": "contained"},
+            {"id": "C", "label": "shared"},
+            {"id": "D", "label": "exhibited"}
+          ],
           "answer": "B",
-          "analysis": "作者控制住悲伤后，护士递纸巾，contained意为\"控制，抑制\"。",
+          "analysis": "作者当时在哭泣，护士过来后，作者稍微控制住了悲伤。contain意为\"控制、抑制\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 6,
+          "content": "She seemed much younger than me, but her words were ___6___ and hope-filled, and I held on to them.",
+          "options": [
+            {"id": "A", "label": "wise"},
+            {"id": "B", "label": "plain"},
+            {"id": "C", "label": "familiar"},
+            {"id": "D", "label": "sharp"}
+          ],
           "answer": "A",
-          "analysis": "护士的话充满智慧，故选wise。",
+          "analysis": "护士的话充满智慧且充满希望，作者铭记在心。wise意为\"明智的、充满智慧的\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 7,
+          "content": "The nurse changed my perspective away from current ___7___ to see the hope of tomorrow.",
+          "options": [
+            {"id": "A", "label": "mistakes"},
+            {"id": "B", "label": "dreams"},
+            {"id": "C", "label": "challenges"},
+            {"id": "D", "label": "doubts"}
+          ],
           "answer": "C",
-          "analysis": "护士改变了作者对当前挑战的看法，challenges意为\"挑战\"。",
+          "analysis": "护士让作者从当前的挑战中转移视角，看到明天的希望。challenges意为\"挑战\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 8,
+          "content": "Gradually, things started to ___8___.",
+          "options": [
+            {"id": "A", "label": "go away"},
+            {"id": "B", "label": "look up"},
+            {"id": "C", "label": "make sense"},
+            {"id": "D", "label": "fall apart"}
+          ],
           "answer": "B",
-          "analysis": "事情逐渐好转，look up意为\"好转\"。",
+          "analysis": "根据后文孩子逐渐好转，可知情况开始好转。look up意为\"好转、改善\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 9,
+          "content": "On day ten, the doctors approved taking off the tube ___9___.",
+          "options": [
+            {"id": "A", "label": "frequently"},
+            {"id": "B", "label": "slightly"},
+            {"id": "C", "label": "completely"},
+            {"id": "D", "label": "occasionally"}
+          ],
           "answer": "C",
-          "analysis": "医生批准完全取下管子，completely意为\"完全地\"。",
+          "analysis": "第十天，医生批准完全拔掉管子。completely意为\"完全地\"，符合语境。",
           "score": 1.5
         },
         {
           "id": 10,
+          "content": "What I learned from that nurse was to look beyond today and the suffering of it and to consider tomorrow with ___10___.",
+          "options": [
+            {"id": "A", "label": "intention"},
+            {"id": "B", "label": "imagination"},
+            {"id": "C", "label": "urge"},
+            {"id": "D", "label": "faith"}
+          ],
           "answer": "D",
-          "analysis": "作者学会带着信心期待明天，faith意为\"信心\"。",
+          "analysis": "作者从护士那里学到要超越今天的痛苦，带着信念去期待明天。faith意为\"信念、信心\"，符合语境。",
           "score": 1.5
         }
       ]
@@ -83,166 +152,242 @@ RAW RESPONSE (BEFORE PROCESSING):
     {
       "type": "语法填空",
       "title": "语法填空",
-      "tags": [],
       "questionStart": 11,
       "questionEnd": 20,
       "score": 15,
       "article": "## A\n\nAs a variant of American football, flag football is a type of sport in which a player must remove a flag belt from the ball carrier to end a down. The first rule of the game is that contact <Input></Input> players is not permitted. Recently, it <Input></Input> (gain) great popularity in China among young people. It's engaging and ridiculously fun. That's why the percentage of people <Input></Input> (join) a flag football club through online channels has risen to a new high level.\n\n## B\n\nOld Connections, a telecommunications museum in Seattle, with a working exchange from the 1940s, <Input></Input> (show) how telephones brought us together, but also tore us apart. Perhaps it should not be <Input></Input> (surprise) that the Internet has brought with it a new wave of horrific destructiveness. History itself is a kind of radio programme, broadcast to us in frequencies that become harder to receive as we forget the old ways. But as long as we keep the ancient exchanges running, we have a way to remember and understand <Input></Input> we come from.\n\n## C\n\nWang Dakang, aged 88, is a model of lifelong learning. In the 1980s, he was the first person <Input></Input> (accomplish) a round trip of China using only a bicycle. To edit this experience into his book, Wang decided to go to college. At the age of 61, he <Input></Input> (admit) into college, majoring in journalism. By 2012, he had completed three majors in college. At present, Wang lives in Leshan, where he spends his days following carefully <Input></Input> (plan) routines. His study starts at 6 am every morning, during <Input></Input> he reads and takes notes from newspapers. Wang said, \"There is so much to learn and I will continue learning until the very end.\"",
       "questions": [
         {
-          "id": 11,
+          "id": 1,
+          "content": "The first rule of the game is that contact ___11___ players is not permitted.",
           "answer": "between",
-          "analysis": "contact between players 意为\"球员之间的接触\"，between表示两者之间。",
+          "analysis": "contact between players 表示\"球员之间的接触\"，between 用于两者之间。",
           "score": 1.5
         },
         {
-          "id": 12,
+          "id": 2,
+          "content": "Recently, it ___12___ (gain) great popularity in China among young people.",
           "answer": "has gained",
-          "analysis": "根据Recently可知用现在完成时，主语it为单数，故填has gained。",
+          "analysis": "Recently 常与现在完成时连用，主语 it 是第三人称单数，故填 has gained。",
           "score": 1.5
         },
         {
-          "id": 13,
+          "id": 3,
+          "content": "That's why the percentage of people ___13___ (join) a flag football club through online channels has risen to a new high level.",
           "answer": "joining",
-          "analysis": "people与join是主动关系，且此处为后置定语，故用现在分词joining。",
+          "analysis": "people 与 join 之间是主动关系，且表示正在进行的动作，故用现在分词 joining 作后置定语。",
           "score": 1.5
         },
         {
-          "id": 14,
+          "id": 4,
+          "content": "Old Connections, a telecommunications museum in Seattle, with a working exchange from the 1940s, ___14___ (show) how telephones brought us together, but also tore us apart.",
           "answer": "shows",
-          "analysis": "主语Old Connections是单数，且描述客观事实，用一般现在时，故填shows。",
+          "analysis": "主语是 Old Connections，为单数，且描述一般事实，故用一般现在时 shows。",
           "score": 1.5
         },
         {
-          "id": 15,
+          "id": 5,
+          "content": "Perhaps it should not be ___15___ (surprise) that the Internet has brought with it a new wave of horrific destructiveness.",
           "answer": "surprising",
-          "analysis": "此处作表语，表示\"令人惊讶的\"，用形容词surprising。",
+          "analysis": "此处表示\"令人惊讶的\"，修饰事物，故用 surprising。",
           "score": 1.5
         },
         {
-          "id": 16,
+          "id": 6,
+          "content": "But as long as we keep the ancient exchanges running, we have a way to remember and understand ___16___ we come from.",
           "answer": "where",
-          "analysis": "此处引导宾语从句，从句中缺少地点状语，故用where。",
+          "analysis": "此处表示\"我们来自哪里\"，故用 where 引导宾语从句。",
           "score": 1.5
         },
         {
-          "id": 17,
+          "id": 7,
+          "content": "In the 1980s, he was the first person ___17___ (accomplish) a round trip of China using only a bicycle.",
           "answer": "to accomplish",
-          "analysis": "the first person后常接不定式作定语，故填to accomplish。",
+          "analysis": "当名词前有 the first 等序数词修饰时，常用动词不定式作后置定语，故填 to accomplish。",
           "score": 1.5
         },
         {
-          "id": 18,
+          "id": 8,
+          "content": "At the age of 61, he ___18___ (admit) into college, majoring in journalism.",
           "answer": "was admitted",
-          "analysis": "he与admit是被动关系，且根据At the age of 61可知用一般过去时的被动语态，故填was admitted。",
+          "analysis": "he 与 admit 之间是被动关系，且动作发生在过去，故用一般过去时的被动语态 was admitted。",
           "score": 1.5
         },
         {
-          "id": 19,
+          "id": 9,
+          "content": "At present, Wang lives in Leshan, where he spends his days following carefully ___19___ (plan) routines.",
           "answer": "planned",
-          "analysis": "routines与plan是被动关系，用过去分词作定语，故填planned。",
+          "analysis": "routines 与 plan 之间是被动关系，故用过去分词 planned 作定语。",
           "score": 1.5
         },
         {
-          "id": 20,
+          "id": 10,
+          "content": "His study starts at 6 am every morning, during ___20___ he reads and takes notes from newspapers.",
           "answer": "which",
-          "analysis": "此处为\"介词+关系代词\"引导的非限制性定语从句，先行词为6 am every morning，故填which。",
+          "analysis": "此处是\"介词+关系代词\"引导的非限制性定语从句，先行词是 6 am every morning，故用 which。",
           "score": 1.5
         }
       ]
     },
     {
       "type": "阅读",
-      "title": "哥伦比亚大学SHAPE项目",
+      "title": "SHAPE项目介绍",
       "tags": ["A篇"],
       "questionStart": 21,
       "questionEnd": 23,
       "score": 6,
-      "start": "Columbia Engineering's Summer High School Academic Program for Engineers (SHAPE) is a selective pre-college program",
-      "passageTitle": "Columbia Engineering's Summer High School Academic Program for Engineers (SHAPE)",
+      "start": "Columbia Engineering's Summer High School Academic Program",
       "questions": [
         {
-          "id": 21,
+          "id": 1,
+          "content": "What can we learn about SHAPE?",
+          "options": [
+            {"id": "A", "label": "It suits students talented in STEM."},
+            {"id": "B", "label": "It shows the procedure of learning STEM."},
+            {"id": "C", "label": "It serves as the start of students' college life."},
+            {"id": "D", "label": "It gives students chances to work with engineers."}
+          ],
           "answer": "A",
-          "analysis": "根据第一段\"SHAPE is tailored for students with a gift for STEM\"可知，该项目适合在STEM方面有天赋的学生，故选A。",
+          "analysis": "根据第一段\"SHAPE is tailored for students with a gift for STEM\"可知，SHAPE 适合在 STEM 方面有天赋的学生。故选 A。",
           "score": 2
         },
         {
-          "id": 22,
+          "id": 2,
+          "content": "In SHAPE, students can ___.",
+          "options": [
+            {"id": "A", "label": "be free to explore the MakerSpace"},
+            {"id": "B", "label": "earn college credit for future study"},
+            {"id": "C", "label": "put school knowledge into practice"},
+            {"id": "D", "label": "be equipped with skills for engineering"}
+          ],
           "answer": "D",
-          "analysis": "根据\"its professional development components help students develop the skills they need to get there\"可知，学生能获得工程所需的技能，故选D。",
+          "analysis": "根据第二段\"its professional development components help students develop the skills they need to get there\"可知，SHAPE 帮助学生培养工程技能。故选 D。",
           "score": 2
         },
         {
-          "id": 23,
+          "id": 3,
+          "content": "To secure a place in SHAPE, students need to ___.",
+          "options": [
+            {"id": "A", "label": "show their family financial state"},
+            {"id": "B", "label": "answer all the given questions"},
+            {"id": "C", "label": "pay application fees before deadline"},
+            {"id": "D", "label": "prove their learning capability"}
+          ],
           "answer": "D",
-          "analysis": "根据申请标准第一条\"Strong academic record\"可知，学生需要证明自己的学习能力，故选D。",
+          "analysis": "根据 Application 部分\"Students are selected based on the following criteria: 1. Strong academic record\"可知，学生需要证明自己的学习能力。故选 D。",
           "score": 2
         }
       ]
     },
     {
       "type": "阅读",
-      "title": "失去一条腿后的微笑",
+      "title": "医院里的经历",
       "tags": ["B篇"],
       "questionStart": 24,
       "questionEnd": 26,
       "score": 6,
       "start": "I lost my leg to cancer at 30.",
-      "passageTitle": "I Am Choosing to Smile",
       "questions": [
         {
-          "id": 24,
+          "id": 1,
+          "content": "What shocked the author in the hospital?",
+          "options": [
+            {"id": "A", "label": "The curious look a boy had."},
+            {"id": "B", "label": "The words a boy shouted out."},
+            {"id": "C", "label": "The game the boys were playing."},
+            {"id": "D", "label": "The sympathy the boys expressed."}
+          ],
           "answer": "B",
-          "analysis": "根据第二段小男孩大喊\"She only has one leg! Doesn't that look funny?\"可知，让作者震惊的是男孩喊出的话，故选B。",
+          "analysis": "根据第三段\"the little boy pointed at me. 'Look at that lady!' It seemed that he was shouting loud enough for the entire hospital to hear. 'She only has one leg! Doesn't that look funny?'\"可知，男孩喊出的话让作者震惊。故选 B。",
           "score": 2
         },
         {
-          "id": 25,
+          "id": 2,
+          "content": "How did the experience in the hospital change the author?",
+          "options": [
+            {"id": "A", "label": "She found the purpose of her life."},
+            {"id": "B", "label": "She began to realize her difference."},
+            {"id": "C", "label": "She understood kids' characteristics."},
+            {"id": "D", "label": "She learned the importance of respect."}
+          ],
           "answer": "A",
-          "analysis": "根据后文作者开始去学校演讲、成为励志演说家可知，这次经历让她找到了人生的目标，故选A。",
+          "analysis": "根据第五段\"I knew what I had to do. 'Well, someone has to teach them!' I said. And I knew that someone would be me.\"以及后文作者开始去学校演讲，可知她找到了人生的目标。故选 A。",
           "score": 2
         },
         {
-          "id": 26,
+          "id": 3,
+          "content": "Which of the following words can best describe the author?",
+          "options": [
+            {"id": "A", "label": "Patient."},
+            {"id": "B", "label": "Brave."},
+            {"id": "C", "label": "Intelligent."},
+            {"id": "D", "label": "Caring."}
+          ],
           "answer": "B",
-          "analysis": "作者勇敢面对自己的残疾，并教育孩子尊重差异，体现了勇敢的品质，故选B。",
+          "analysis": "作者在失去一条腿后，勇敢地面对生活，并主动去教育孩子们尊重差异，这体现了她的勇敢。故选 B。",
           "score": 2
         }
       ]
     },
     {
       "type": "阅读",
-      "title": "植物抗病新策略",
+      "title": "植物免疫新策略",
       "tags": ["C篇"],
       "questionStart": 27,
       "questionEnd": 30,
       "score": 8,
-      "start": "Researchers from a U.K. plant research institute have found a way to provide plants with an antibody-based defense",
-      "passageTitle": "Plant Defense Strategy",
+      "start": "Researchers from a U.K. plant research institute",
       "questions": [
         {
-          "id": 27,
+          "id": 1,
+          "content": "What does the underlined word \"inoculate\" in Paragraph 1 probably mean?",
+          "options": [
+            {"id": "A", "label": "Compare."},
+            {"id": "B", "label": "Restore."},
+            {"id": "C", "label": "Introduce."},
+            {"id": "D", "label": "Label."}
+          ],
           "answer": "C",
-          "analysis": "根据第一段\"inoculate a protein from the plant pathogen to be targeted to a camel\"可知，是将病原体蛋白引入骆驼体内，故选C。",
+          "analysis": "根据第一段\"The strategy is to inoculate a protein from the plant pathogen to be targeted to a camel or other camel relatives\"可知，该策略是将植物病原体中的蛋白质引入骆驼体内，故 inoculate 意为\"引入\"。故选 C。",
           "score": 2
         },
         {
-          "id": 28,
+          "id": 2,
+          "content": "What is the main purpose of Paragraph 2?",
+          "options": [
+            {"id": "A", "label": "To illustrate the function of cells in saving the plant."},
+            {"id": "B", "label": "To explain how to strengthen plant receptors effectively."},
+            {"id": "C", "label": "To demonstrate the solutions to farmers' annual heavy losses."},
+            {"id": "D", "label": "To reveal why plants fail to handle constantly-updated diseases."}
+          ],
           "answer": "D",
-          "analysis": "第二段主要说明植物病原体不断进化，逃避植物免疫受体的识别，解释了植物为何难以应对不断更新的病害，故选D。",
+          "analysis": "第二段主要说明植物虽然有自己的免疫系统，但病原体经常进化并逃脱这些受体，从而揭示了植物无法应对不断更新的疾病的原因。故选 D。",
           "score": 2
         },
         {
-          "id": 29,
+          "id": 3,
+          "content": "What can we learn from the passage?",
+          "options": [
+            {"id": "A", "label": "Editing plant receptors is to match the shape of pathogens."},
+            {"id": "B", "label": "Nano-bodies can help plants catch up with pathogen changes."},
+            {"id": "C", "label": "Plants select the best antibodies from animals to fight viruses."},
+            {"id": "D", "label": "Plants with nano-bodies respond actively in massive virus copying."}
+          ],
           "answer": "B",
-          "analysis": "根据最后一段\"we have the potential of made-to-order resistance genes and keeping up with a pathogen\"可知，纳米抗体能帮助植物跟上病原体的变化，故选B。",
+          "analysis": "根据最后一段\"The exciting part about this technology is that we have the potential of made-to-order resistance genes and keeping up with a pathogen\"可知，纳米抗体可以帮助植物跟上病原体的变化。故选 B。",
           "score": 2
         },
         {
-          "id": 30,
+          "id": 4,
+          "content": "According to the passage, scientists will ___.",
+          "options": [
+            {"id": "A", "label": "apply the outcome in the real world"},
+            {"id": "B", "label": "prove the findings of resistance genes"},
+            {"id": "C", "label": "identify similar means to fight diseases"},
+            {"id": "D", "label": "seek more support for the new strategy"}
+          ],
           "answer": "A",
-          "analysis": "根据最后一段科学家们的评论可知，他们希望将这一成果应用于现实世界，故选A。",
+          "analysis": "根据最后一段\"We can now dig into all of that research and translate it to save crops\"可知，科学家将把研究成果应用到现实世界中。故选 A。",
           "score": 2
         }
       ]
@@ -255,30 +400,57 @@ RAW RESPONSE (BEFORE PROCESSING):
       "questionEnd": 34,
       "score": 8,
       "start": "Superhuman artificial intelligence is already among us.",
-      "passageTitle": "AI with Its Own Theory of Mind Is Expected",
       "questions": [
         {
-          "id": 31,
+          "id": 1,
+          "content": "According to the passage, which of the following contexts can AI understand well?",
+          "options": [
+            {"id": "A", "label": "When you are asked to eat spicy food for dinner and you reply \"a sore throat\"."},
+            {"id": "B", "label": "When a teacher asks for a boy's homework and he answers \"my dog ate it\"."},
+            {"id": "C", "label": "When a mom tells her kid some food is good for health and the kid eats it."},
+            {"id": "D", "label": "When kids see their mom after hurting themselves and they cry louder."}
+          ],
           "answer": "C",
-          "analysis": "根据第三段\"if someone asks whether you are going for a run and you reply 'it's raining', they can quickly conclude that the answer is no\"可知，AI能理解基于常识的推理，C项中妈妈告诉孩子食物健康，孩子就吃，符合常识推理，故选C。",
+          "analysis": "根据第三段\"if someone asks whether you are going for a run and you reply 'it's raining', they can quickly conclude that the answer is no. But this requires huge amounts of background knowledge\"可知，AI 需要大量背景知识才能理解语境。选项 C 中妈妈告诉孩子食物对健康有益，孩子就吃了，这个语境相对简单，AI 可能理解。故选 C。",
           "score": 2
         },
         {
-          "id": 32,
+          "id": 2,
+          "content": "The author believes that ___.",
+          "options": [
+            {"id": "A", "label": "humans' theory of mind is far from perfect"},
+            {"id": "B", "label": "humans limit AI's theory of mind to an extent"},
+            {"id": "C", "label": "we should reject human-like forms of abilities for AI"},
+            {"id": "D", "label": "shared forms of theory of mind result in more powerful AI"}
+          ],
           "answer": "B",
-          "analysis": "根据第四段\"Building prior knowledge into AI makes it reliant on our imperfect understanding of theory of mind\"可知，人类对心智理论的理解不完美，限制了AI的发展，故选B。",
+          "analysis": "根据第四段\"Building prior knowledge into AI makes it reliant on our imperfect understanding of theory of mind\"可知，人类将先验知识植入 AI 会使其依赖我们不完美的心智理论理解，从而在一定程度上限制了 AI 的心智理论。故选 B。",
           "score": 2
         },
         {
-          "id": 33,
+          "id": 3,
+          "content": "As for AIs, what does the author value most?",
+          "options": [
+            {"id": "A", "label": "Reliability."},
+            {"id": "B", "label": "Practicability."},
+            {"id": "C", "label": "Reasoning capability."},
+            {"id": "D", "label": "Communication ability."}
+          ],
           "answer": "C",
-          "analysis": "根据最后一段\"It is also a stepping stone on the path towards a deeper goal for AI and robotics research: building truly self-aware machines\"可知，作者最看重推理能力，故选C。",
+          "analysis": "根据第五段\"While letting AI form the theory of mind in their learning process is likely to lead to developing more powerful AI\"可知，作者认为让 AI 在学习过程中形成心智理论可能带来更强大的 AI，即作者最看重 AI 的推理能力。故选 C。",
           "score": 2
         },
         {
-          "id": 34,
+          "id": 4,
+          "content": "Which would be the best title for the passage?",
+          "options": [
+            {"id": "A", "label": "AI with Its Own Theory of Mind Is Expected"},
+            {"id": "B", "label": "AI with Theory of Mind Will Reshape Our Future"},
+            {"id": "C", "label": "AI's Theory of Mind Is a Blessing or Suffering to Humans"},
+            {"id": "D", "label": "Theory of Mind Bridges the Gap Between Humans and AI"}
+          ],
           "answer": "A",
-          "analysis": "文章主要讨论AI拥有心智理论的可能性，故选A。",
+          "analysis": "文章主要讨论了 AI 需要具备心智理论才能更好地与人类合作，并指出让 AI 在学习过程中形成心智理论是可能的，但仍有挑战。因此，标题\"AI with Its Own Theory of Mind Is Expected\"最符合文章主旨。故选 A。",
           "score": 2
         }
       ]
@@ -286,123 +458,107 @@ RAW RESPONSE (BEFORE PROCESSING):
     {
       "type": "七选五",
       "title": "机会成本",
-      "tags": [],
       "questionStart": 35,
       "questionEnd": 39,
       "score": 10,
       "article": "In our modern world, there are endless alternatives. Have you ever found yourself wondering whether you should quit or stay in your job, accept an offer or give it up for another? There is a simple and practical method that solves this problem. <Blank></Blank> When you understand the concept, you have the power to measure every alternative with precision and make the right decision.\n\nIn the field of economics, opportunity cost is the value that you have to give up when you choose an option over another good option. <Blank></Blank> Every time you choose something, you give up other alternatives together with their financial benefits. It is not all the other options, but the most valued one that is defined as the opportunity cost.\n\n<Blank></Blank> Take the simple example of trying to decide whether to take public transportation for 80 minutes or to drive for 40 minutes. You might save on the cost of gas while riding the bus but double the trip length and miss out on other things you could have done during that time. <Blank></Blank> This is how you create priorities in your daily life.\n\nThough useful in decision making, the biggest drawback of opportunity cost is that it's often related to what's hard to quantify. <Blank></Blank> After all, putting a number to your peaceful mind or happiness can be difficult.\n\nOpportunity cost isn't cut and dried. It varies from person to person. At the end of the day, you are in charge of what you own and what you want to gain.",
       "options": [
-        {
-          "id": "A",
-          "label": "It is about finding out the opportunity cost."
-        },
-        {
-          "id": "B",
-          "label": "Weigh the losses and gains, and make your decision."
-        },
-        {
-          "id": "C",
-          "label": "Opportunity cost matters not only in economics but also in real life."
-        },
-        {
-          "id": "D",
-          "label": "This is especially true when the opportunity cost is of non-financial benefit."
-        },
-        {
-          "id": "E",
-          "label": "The key principle underlying the idea is that there is no such thing as free lunch."
-        },
-        {
-          "id": "F",
-          "label": "Most people overlook opportunity cost because the benefits are usually hidden from view."
-        },
-        {
-          "id": "G",
-          "label": "It is the development of important skills that would help you move forward in your daily life."
-        }
+        {"id": "A", "label": "It is about finding out the opportunity cost."},
+        {"id": "B", "label": "Weigh the losses and gains, and make your decision."},
+        {"id": "C", "label": "Opportunity cost matters not only in economics but also in real life."},
+        {"id": "D", "label": "This is especially true when the opportunity cost is of non-financial benefit."},
+        {"id": "E", "label": "The key principle underlying the idea is that there is no such thing as free lunch."},
+        {"id": "F", "label": "Most people overlook opportunity cost because the benefits are usually hidden from view."},
+        {"id": "G", "label": "It is the development of important skills that would help you move forward in your daily life."}
       ],
       "questions": [
         {
-          "id": 35,
+          "id": 1,
+          "content": "___35___",
           "answer": "A",
-          "analysis": "前文提到有简单实用的方法解决问题，后文说理解这个概念，可知此处引出\"机会成本\"，故选A。",
+          "analysis": "前文提到一个简单实用的方法可以解决选择问题，后文说\"When you understand the concept\"，因此此处应引出\"机会成本\"这一概念。选项 A\"It is about finding out the opportunity cost.\"符合语境。",
           "score": 2
         },
         {
-          "id": 36,
+          "id": 2,
+          "content": "___36___",
           "answer": "E",
-          "analysis": "前文解释机会成本的定义，后文说每次选择都放弃其他选择，此处强调没有免费午餐的原则，故选E。",
+          "analysis": "前文解释了机会成本的定义，后文说\"Every time you choose something, you give up other alternatives\"，因此此处应总结机会成本的核心原则。选项 E\"The key principle underlying the idea is that there is no such thing as free lunch.\"符合语境。",
           "score": 2
         },
         {
-          "id": 37,
+          "id": 3,
+          "content": "___37___",
           "answer": "C",
-          "analysis": "后文举例说明机会成本在生活中的应用，此处应承上启下，说明机会成本不仅在经济领域重要，在现实生活中也重要，故选C。",
+          "analysis": "后文举例说明在日常生活中如何应用机会成本，因此此处应承上启下，指出机会成本不仅适用于经济学，也适用于现实生活。选项 C\"Opportunity cost matters not only in economics but also in real life.\"符合语境。",
           "score": 2
         },
         {
-          "id": 38,
+          "id": 4,
+          "content": "___38___",
           "answer": "B",
-          "analysis": "前文举例说明权衡利弊，后文说这就是你如何建立优先事项，此处应总结权衡得失后做决定，故选B。",
+          "analysis": "前文比较了坐公交和开车的利弊，后文说\"This is how you create priorities\"，因此此处应建议权衡得失后做决定。选项 B\"Weigh the losses and gains, and make your decision.\"符合语境。",
           "score": 2
         },
         {
-          "id": 39,
+          "id": 5,
+          "content": "___39___",
           "answer": "D",
-          "analysis": "前文说机会成本的缺点是难以量化，后文说给平静的心态或幸福定价很难，此处应说明当机会成本是非财务利益时尤其如此，故选D。",
+          "analysis": "前文说机会成本的最大缺点是与难以量化的东西有关，后文说\"putting a number to your peaceful mind or happiness can be difficult\"，因此此处应强调非财务利益的情况。选项 D\"This is especially true when the opportunity cost is of non-financial benefit.\"符合语境。",
           "score": 2
         }
       ]
     },
     {
       "type": "阅读表达",
-      "title": "怀旧的力量",
-      "tags": [],
+      "title": "怀旧与时间旅行",
       "questionStart": 40,
       "questionEnd": 43,
       "score": 12,
-      "start": "The term \"nostalgia\" was first coined in 1688 and was defined as a mental illness of soldiers continually thinking about their homeland and longing for return.",
-      "passageTitle": "The Power of Nostalgia",
+      "start": "The term \"nostalgia\" was first coined in 1688",
       "questions": [
         {
-          "id": 40,
+          "id": 1,
+          "content": "What did nostalgia originally mean?",
           "answer": "A mental illness of soldiers continually thinking about their homeland and longing for return.",
-          "analysis": "根据第一段\"was defined as a mental illness of soldiers continually thinking about their homeland and longing for return\"可知答案。",
+          "analysis": "根据第一段\"The term 'nostalgia' was first coined in 1688 and was defined as a mental illness of soldiers continually thinking about their homeland and longing for return.\"可知答案。",
           "score": 2
         },
         {
-          "id": 41,
+          "id": 2,
+          "content": "What have the researchers found about time travel?",
           "answer": "They have found that time travel to the past and into the future both bring benefits to us.",
-          "analysis": "根据第二段\"researchers have found that subjects are much more likely to report positive feelings from a given piece of music if they've heard it before\"和\"time travel into the future can bring a whole new set of rewards\"可知，时间旅行到过去和未来都有好处。",
+          "analysis": "根据第二段\"researchers have found that subjects are much more likely to report positive feelings from a given piece of music if they've heard it before. But there's also a growing body of research into time travel 'the other way', because memory skills can take people into the future, too. Decades of studies have shown that time travel into the future can bring a whole new set of rewards.\"可知，时间旅行到过去和未来都能带来好处。",
           "score": 2
         },
         {
-          "id": 42,
+          "id": 3,
+          "content": "Please decide which part is false in the following statement, then underline it and explain why.\n➢ **_Memory skills can bring us into the future, so we should imagine a negative end result to drive us into action when procrastinating._**",
           "answer": "We should use a positive end result to drive us into action when procrastinating.",
-          "analysis": "根据第四段\"When you're procrastinating, visualize an end result. Flash forward to see the floor swept or the essay finished, and use that positive image to drive you into action.\"可知，应该想象积极的结果，而不是消极的结果。",
+          "analysis": "根据原文\"When you're procrastinating, visualize an end result. Flash forward to see the floor swept or the essay finished, and use that positive image to drive you into action.\"可知，应该想象积极的结果来驱动行动，而不是消极的结果。",
           "score": 3
         },
         {
-          "id": 43,
+          "id": 4,
+          "content": "Describe one of the helpful time-travel experiences in your life. (In about 40 words)",
           "answer": "(1) I often imagine myself attending my ideal university in September 2023 to cheer myself up. Picturing myself wandering on the campus and enjoying the harvest in the golden autumn can give me the motivation to overcome nervousness and stress at present with an optimistic attitude and in full gear.\n\n(2) I recall the time of winning the first prize in a speech contest two years ago. Standing on the stage reaching out for the prize, I was filled with pride. This experience serves as a constant source of encouragement and confidence for me to keep working hard to improve myself.",
-          "analysis": "根据文章内容，描述自己的一次有益的时间旅行经历，答案不唯一，合理即可。",
+          "analysis": "开放性题目，描述一次对自己有帮助的时间旅行经历，如想象未来成功或回忆过去美好经历，并说明其带来的积极影响。",
           "score": 5
         }
       ]
     },
     {
       "type": "作文",
-      "title": "感谢外教推荐英文书并交流阅读计划",
-      "tags": [],
-      "questionStart": null,
-      "questionEnd": null,
+      "title": "感谢外教推荐英文书",
+      "questionStart": 44,
+      "questionEnd": 44,
       "score": 20,
-      "start": "假设你是红星中学高三学生李华。你最近读完了外教 Jim 推荐的一本英文书，请你用英文给Jim 写一封邮件",
-      "passageTitle": "",
+      "start": "假设你是红星中学高三学生李华。",
       "questions": [
         {
           "id": 1,
-          "answer": "Dear Jim,\n\nThank you for your recommendation of the English novel _The Old Man and the Sea._\n\nHaving finished reading_,_ I've harvested a lot. The tough man who fights against the big fish and sharks alone in the sea inspires me to brave frustrations in my life. And I have learned that we should stick to our dreams no matter what hardships we may encounter.\n\nThe book unfolds a new world to me. Thus, I make a plan for further reading. English novels enlightening my mind will be included in my reading list. I intend to read one book a month. While reading, I will take down my understanding in time to gain more beyond the lines.\n\nI would appreciate it if you could give me more recommendations.\n\nYours,\n\nLi Hua",
+          "content": "假设你是红星中学高三学生李华。你最近读完了外教 Jim 推荐的一本英文书，请你用英文给Jim 写一封邮件，内容包括：1. 表达感谢并分享读书收获；2. 交流后续英文书阅读计划。注意：1. 词数100 左右；2. 开头和结尾已给出，不计入总词数。",
+          "answer": "Dear Jim,\n\nThank you for your recommendation of the English novel _The Old Man and the Sea._\n\nHaving finished reading_,_ I've harvested a lot. The tough man who fights against the big fish and sharks alone in the sea inspires me to brave frustrations in my life. And I have learned that we should stick to our dreams no matter what hardships we may encounter.\n\nThe book unfolds a new world to me. Thus, I make a plan for further reading. English novels enlightening my mind will be included in my reading list. I intend to read one book a month. While reading, I will take down my understanding in time to gain more beyond the lines.\n\nI would appreciate it if you could give me more recommendations.\n\nYours,\nLi Hua",
           "analysis": "",
           "score": 20
         }

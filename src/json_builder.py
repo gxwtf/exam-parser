@@ -313,10 +313,10 @@ class JSONBuilder:
             
             # For cloze and reading, AI provides content and options directly
             if question_type in ("cloze", "reading", "en-reading"):
-                q_content = ai_q.get("content", "")
+                q_content = ai_q.get("content", "") if question_type != "cloze" else ""
                 ai_opts = ai_q.get("options", [])
                 if ai_opts:
-                    options = ai_opts
+                    options = self._normalize_ai_options(ai_opts)
             
             # For writing, content is the question text (article == question)
             if question_type == "en-writing":
@@ -709,6 +709,17 @@ class JSONBuilder:
         if re.match(r'^[A-FG]+$', answer):
             answer = answer.lower()
         return answer
+
+    def _normalize_ai_options(self, options: list) -> list:
+        """Normalize AI-generated options: lowercase option IDs"""
+        result = []
+        for opt in options:
+            if isinstance(opt, dict):
+                opt_id = opt.get("id", "")
+                if isinstance(opt_id, str):
+                    opt["id"] = opt_id.lower()
+            result.append(opt)
+        return result
 
     # ──────────────────────────────────────────────────────────────────
     # Output

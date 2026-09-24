@@ -135,8 +135,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 完形填空
 - 输出完整 article（空位替换为 `<ClozeBlank></ClozeBlank>`）
-- 输出每个题目的 content（题干，即MD中原题号后的句子，如"the 1 of the project"）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
-- 不输出 start、不输出 blanks
+- 输出每个题目的 options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
+- 不输出 content、不输出 start、不输出 blanks
 
 ### 语法填空
 - 如果有多组A/B/C，合并为一个section

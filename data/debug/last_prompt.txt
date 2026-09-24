@@ -1,11 +1,13 @@
-Paper: 2023北京朝阳高三二模英语
+Paper: 2023北京朝阳高三二模英语（教师版）
 ================================================================================
 你是一位英语试卷解析专家。请分析以下英语试卷（MD格式），识别其结构、题型，并生成完整的解析结果。
 
-当前试卷名称：2023北京朝阳高三二模英语
+当前试卷名称：2023北京朝阳高三二模英语（教师版）
 
 重要原则：
 1. 只识别这7种题型：完形填空、语法填空、阅读、七选五、选词填空、阅读表达、作文
+   - 注意：并非每份试卷都包含所有题型，阅读表达、选词填空、语法填空可能不存在，不存在的题型不要强行创建
+   - 作文可能有1-2个（如第一节+第二节，但是不要在作文题目内容中显示“第一节”“第二节”这样的文字），每个作文一个独立section
 2. 你读取的是MD格式的试卷，包含完整的文章内容、题目和参考答案
 3. 对于有填空的题型（完形填空、七选五、语法填空、选词填空），你需要输出完整的文章，把挖空位置用对应的标签替换
 4. 对于阅读、阅读表达、作文，输出 start 锚点即可，程序会自动提取文章
@@ -30,8 +32,8 @@ Paper: 2023北京朝阳高三二模英语
 - 选词填空：用 `<Input2></Input2>` 替换每个空
 
 **空格规则（极其重要！）**：
-- 如果空的左右两边都是文章内容（单词/字母），标签前后各加一个空格：`were <ClozeBlank></ClozeBlank> throughout`
-- 如果空后面是标点符号（`.` `,` `;` `!` `?`），标签后不加空格：`XXX <ClozeBlank></ClozeBlank>.`
+- 如果空的左右两边都是文章内容（单词/字母），标签前后各**加一个**空格：`were <ClozeBlank></ClozeBlank> throughout`
+- 如果空后面是标点符号（`.` `,` `;` `!` `?`），标签后**不加**空格：`XXX <ClozeBlank></ClozeBlank>.`
 - 如果空前面是标点符号，标签前加空格：`"XXX. <ClozeBlank></ClozeBlank> XXX`
 
 示例：
@@ -124,7 +126,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
       "questions": [
         {
           "id": 1,
-          "content": "该句子的内容，空位已替换（仅选词填空需要）",
+          "content": "题干内容（阅读/完形填空/选词填空需要填写）",
+          "options": [{"id": "A", "label": "选项内容"}, ...],
           "answer": "答案",
           "analysis": "解析",
           "score": 2
@@ -138,7 +141,7 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 完形填空
 - 输出完整 article（空位替换为 `<ClozeBlank></ClozeBlank>`）
-- 输出每个题目的答案和解析（从MD抄写）
+- 输出每个题目的 content（题干，即MD中原题号后的句子，如"the 1 of the project"）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
 - 不输出 start、不输出 blanks
 
 ### 语法填空
@@ -157,7 +160,7 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 ### 阅读理解
 - 每篇文章一个section
 - 输出 start 锚点（程序自动提取文章）
-- 输出每个题目的答案和解析（从MD抄写）
+- 输出每个题目的 content（题干）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
 - **必须填写 tags 字段**
 - 不输出 article、不输出 blanks
 
@@ -180,7 +183,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 - 不输出 article、不输出 blanks
 
 ### 作文
-- 输出 start 锚点（程序自动提取题目）
+- 有的试卷可能有2个作文（如第一节+第二节，但是不要在作文题目内容中显示“第一节”“第二节”这样的文字），每个作文一个独立section，依次排列
+- 输出 start 锚点（程序自动提取题目题干内容，而不是范文答案内容）
 - 如果MD参考答案中有范文（范文/例文），将范文完整抄写到 answer 字段，保留所有MD格式
 - 如果MD参考答案中有评分标准/解析，抄写到 analysis 字段
 - 如果没有范文：answer=""，analysis 从MD抄写解析内容
