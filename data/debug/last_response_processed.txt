@@ -5,9 +5,8 @@ Paper:
     1. I _____ (go) to school yesterday.
     2. She _____ (be) happy about this.
     
-Response Length: 715 characters
 ================================================================================
-RAW RESPONSE (BEFORE PROCESSING):
+PROCESSED RESPONSE (AFTER MARKDOWN FENCE REMOVAL):
 ================================================================================
 {
   "paper": {
