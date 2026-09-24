@@ -179,6 +179,15 @@ def run_validator(files, output_dir):
         status = "✓" if is_valid else "✗"
         print(f"{status} {rel_path}: 错误 {error_count}, 警告 {warning_count}")
 
+        # Write error report next to JSON file
+        err_file = os.path.splitext(json_path)[0] + ".errors.txt"
+        with open(err_file, "w", encoding="utf-8") as ef:
+            ef.write(f"校验报告: {os.path.basename(json_path)}\n")
+            ef.write("=" * 40 + "\n")
+            for e in errors:
+                prefix = "ERROR" if e.level == "error" else "WARN"
+                ef.write(f"[{prefix}] [{e.code}] {e.message}\n")
+
         for e in errors:
             prefix = "✗" if e.level == "error" else "⚠"
             print(f"   {prefix} [{e.code}] {e.message}")

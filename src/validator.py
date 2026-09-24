@@ -365,7 +365,7 @@ class FinalJSONValidator:
                 stripped = content.strip()
                 if re.match(r'^[a-zA-Z]', stripped):
                     self.errors.append(ValidationError(
-                        "warning", "WRITING_CONTENT_EN",
+                        "error", "WRITING_CONTENT_EN",
                         f"作文第{j+1}题题干以英文开头，疑似未正确解析",
                         section_index=i,
                         question_number=j+1
@@ -432,7 +432,7 @@ class FinalJSONValidator:
                     options = question.get("options", [])
                     if not options:
                         self.errors.append(ValidationError(
-                            "warning", "EMPTY_OPTIONS",
+                            "error", "EMPTY_OPTIONS",
                             f"第{j+1}题选项为空",
                             section_index=i,
                             question_number=j+1
