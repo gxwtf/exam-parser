@@ -131,28 +131,8 @@ class ExamParser:
                         article = f"## {passage_title}\n\n{article}"
                     section_copy["article"] = article
                     
-                    # Extract questionsText from MD for 完形填空
-                    # (选词填空 now gets content directly from AI, 七选五 options from AI, 语法填空 has no options)
-                    if section_type == "完形填空":
-                        # Find article in MD to locate questionsText position
-                        article_search = re.sub(r'<\w+></\w+>', '', article.split('\n')[0][:80]).strip()
-                        article_pos = locator.md_content.find(article_search)
-                        if article_pos < 0:
-                            # Try with normalized spaces
-                            article_search_norm = article_search.replace('\xa0', ' ').replace('  ', ' ')
-                            article_pos = locator.md_content.find(article_search_norm)
-                        if article_pos >= 0:
-                            article_end = locator.find_article_end(
-                                article_pos, question_type, section.get("questionStart")
-                            )
-                            q_start = section.get("questionStart")
-                            q_end = section.get("questionEnd")
-                            if q_start and q_end:
-                                questions_text = locator.find_questions_after_article(
-                                    article_end, q_start, q_end
-                                )
-                                if questions_text:
-                                    section_copy["questionsText"] = questions_text
+                    # 完形填空/七选五/语法填空的 content/options 由 AI 直接提供，不再从 MD 提取
+                    # 选词填空 content 也由 AI 提供
                 else:
                     logger.warning(f"  Section {i} ({section_type}): AI did not provide article")
             
@@ -181,13 +161,7 @@ class ExamParser:
                         else:
                             logger.warning(f"  Section {i} ({section_type}): empty article extracted")
                         
-                        # Extract questions text after article for 阅读/阅读表达
-                        if question_type in ("reading", "en-reading", "reading-expression") and q_start and q_end:
-                            questions_text = locator.find_questions_after_article(
-                                article_end_pos, q_start, q_end
-                            )
-                            if questions_text:
-                                section_copy["questionsText"] = questions_text
+                        # 阅读/阅读表达的 content/options 由 AI 直接提供，不再从 MD 提取
                     else:
                         logger.warning(f"  Section {i} ({section_type}): start not found: {start[:50]}...")
                 else:

@@ -311,6 +311,13 @@ class JSONBuilder:
                 if ai_content:
                     q_content = ai_content
             
+            # For cloze and reading, AI provides content and options directly
+            if question_type in ("cloze", "reading", "en-reading"):
+                q_content = ai_q.get("content", "")
+                ai_opts = ai_q.get("options", [])
+                if ai_opts:
+                    options = ai_opts
+            
             # For writing, content is the question text (article == question)
             if question_type == "en-writing":
                 q_content = questions_text or article
@@ -324,11 +331,12 @@ class JSONBuilder:
                     if i < len(parsed_questions):
                         q_content = parsed_questions[i].get("content", "")
             elif question_type != "seven-choose-five":
-                # Parse question text into individual questions
-                parsed_questions = self._parse_question_text(questions_text, question_type)
-                if i < len(parsed_questions):
-                    q_content = parsed_questions[i].get("content", "")
-                    options = parsed_questions[i].get("options", [])
+                # 完形填空/阅读的 content/options 已由 AI 提供，不再从 MD 解析
+                if question_type not in ("cloze", "reading", "en-reading"):
+                    parsed_questions = self._parse_question_text(questions_text, question_type)
+                    if i < len(parsed_questions):
+                        q_content = parsed_questions[i].get("content", "")
+                        options = parsed_questions[i].get("options", [])
 
             # Build question
             if question_type == "seven-choose-five":

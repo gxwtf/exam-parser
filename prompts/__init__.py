@@ -120,7 +120,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
       "questions": [
         {{
           "id": 1,
-          "content": "该句子的内容，空位已替换（仅选词填空需要）",
+          "content": "题干内容（阅读/完形填空/选词填空需要填写）",
+          "options": [{{"id": "A", "label": "选项内容"}}, ...],
           "answer": "答案",
           "analysis": "解析",
           "score": 2
@@ -134,7 +135,7 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 完形填空
 - 输出完整 article（空位替换为 `<ClozeBlank></ClozeBlank>`）
-- 输出每个题目的答案和解析（从MD抄写）
+- 输出每个题目的 content（题干，即MD中原题号后的句子，如"the 1 of the project"）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
 - 不输出 start、不输出 blanks
 
 ### 语法填空
@@ -147,7 +148,7 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 ### 阅读理解
 - 每篇文章一个section
 - 输出 start 锚点（程序自动提取文章）
-- 输出每个题目的答案和解析（从MD抄写）
+- 输出每个题目的 content（题干）、options（A/B/C/D选项）、answer 和 analysis（从MD抄写）
 - **必须填写 tags 字段**
 - 不输出 article、不输出 blanks
 
