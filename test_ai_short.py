@@ -4,7 +4,7 @@ Quick test script to verify AI connectivity with a short prompt
 """
 
 import logging
-from config import OPENAI_API_KEY, OPENAI_MODEL, SHOW_AI_DEBUG
+from config import OPENAI_API_KEY, OPENAI_MODEL, API_TYPE, SHOW_AI_DEBUG
 from src.ai_client import AIClient
 
 # Configure logging
@@ -26,7 +26,7 @@ def test_short_prompt():
     
     # Initialize client
     try:
-        client = AIClient(OPENAI_API_KEY, model=OPENAI_MODEL)
+        client = AIClient(OPENAI_API_KEY, model=OPENAI_MODEL, api_type=API_TYPE)
         print("✓ AI Client initialized successfully\n")
     except Exception as e:
         print(f"✗ Failed to initialize AI Client: {e}\n")

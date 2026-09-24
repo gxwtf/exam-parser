@@ -26,7 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from config import (
-    PROJECT_ROOT, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, LOG_LEVEL, LOG_FILE
+    PROJECT_ROOT, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, API_TYPE, LOG_LEVEL, LOG_FILE
 )
 from src.parser import ExamParser
 
@@ -237,6 +237,7 @@ def main():
     api_key = args.api_key or os.getenv("OPENAI_API_KEY", OPENAI_API_KEY)
     base_url = args.base_url or os.getenv("OPENAI_BASE_URL", OPENAI_BASE_URL)
     model = args.model or os.getenv("OPENAI_MODEL", OPENAI_MODEL)
+    api_type = os.getenv("API_TYPE", API_TYPE)
 
     if not api_key:
         logger.error("OPENAI_API_KEY 未设置，请在 .env 中配置或用 -k 指定")
@@ -264,7 +265,7 @@ def main():
             print(f"已转换，跳过: {json_file}")
             return
 
-        exam_parser = ExamParser(api_key, model, base_url)
+        exam_parser = ExamParser(api_key, model, base_url, api_type)
         if not exam_parser.ai_client.test_connection():
             print("API 连接失败")
             sys.exit(1)
@@ -357,7 +358,7 @@ def main():
         print("所有文件已转换完毕。")
         return
 
-    exam_parser = ExamParser(api_key, model, base_url)
+    exam_parser = ExamParser(api_key, model, base_url, api_type)
     logger.info("测试 API 连接...")
     if not exam_parser.ai_client.test_connection():
         logger.error("API 连接失败")

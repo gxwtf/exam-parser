@@ -13,7 +13,8 @@ INPUT_DIR = DATA_DIR / "input"
 OUTPUT_DIR = DATA_DIR / "output"
 DEBUG_DIR = DATA_DIR / "debug"
 
-# OpenAI Configuration
+# API Configuration
+API_TYPE = os.getenv("API_TYPE", "openai")  # "openai" or "anthropic"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")  # Set this environment variable
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com")  # API base URL
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo")  # Default model

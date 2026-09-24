@@ -20,16 +20,18 @@ logger = logging.getLogger(__name__)
 class ExamParser:
     """Main exam parser orchestrator"""
     
-    def __init__(self, api_key: str, model: str = "gpt-4-turbo", base_url: str = None):
+    def __init__(self, api_key: str, model: str = "gpt-4-turbo", base_url: str = None,
+                 api_type: str = "openai"):
         """
         Initialize parser
         
         Args:
-            api_key: OpenAI API key
+            api_key: API key
             model: Model name
             base_url: API base URL (optional)
+            api_type: "openai" or "anthropic" (default: "openai")
         """
-        self.ai_client = AIClient(api_key, model, base_url)
+        self.ai_client = AIClient(api_key, model, base_url, api_type)
         self.paper_loader = PaperLoader()
         self.json_builder = JSONBuilder()
         self._last_validation_errors = []
