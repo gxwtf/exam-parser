@@ -18,6 +18,7 @@
 import os
 import sys
 import json
+import re
 import time
 import argparse
 import logging
@@ -45,8 +46,9 @@ logger = logging.getLogger(__name__)
 
 
 def clean_stem(name):
-    """去掉文件名中的 （教师版）(教师版) 等后缀"""
+    """去掉文件名中的 （教师版）(教师版) 含答案 等后缀"""
     name = name.replace("（教师版）", "").replace("(教师版)", "").strip()
+    name = re.sub(r'含答案$', '', name)
     return name
 
 
