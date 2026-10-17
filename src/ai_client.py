@@ -21,6 +21,15 @@ logger = logging.getLogger(__name__)
 _THINKING_OFF = {"none", "off", "disabled", "false", "0", ""}
 
 
+def _is_degenerate_response(text: str) -> bool:
+    """判断响应是否退化成重复循环（本机模型偶发：整段下划线/同一字符刷几百万字符）"""
+    if not text:
+        return False
+    if len(text) > 200_000:
+        return True
+    return re.search(r'(.)\1{499,}', text) is not None
+
+
 class AIClient:
     """Client for calling OpenAI or Anthropic API"""
 
@@ -137,6 +146,9 @@ class AIClient:
         try:
             return self._request_completion(prompt, OPENAI_REASONING_EFFORT)
         except ValueError as e:
+            if "degenerate" in str(e):
+                logger.warning("响应退化成重复循环，换温度重试一次：%s", str(e)[:120])
+                return self._request_completion(prompt, OPENAI_REASONING_EFFORT, temperature=0.4)
             # 思考模型可能把整个 max_tokens 花在 reasoning 上、content 为空。
             # 这种情况自动关掉思考重试一次（用 OPENAI_REASONING_EFFORT=high 跑批时尤其重要）。
             if "empty content" in str(e) and OPENAI_REASONING_EFFORT.lower() not in _THINKING_OFF:
@@ -147,7 +159,7 @@ class AIClient:
                 return self._request_completion(prompt, "none")
             raise
 
-    def _request_completion(self, prompt: str, reasoning_effort: str) -> str:
+    def _request_completion(self, prompt: str, reasoning_effort: str, temperature: float = 0.1) -> str:
         """发送一次 chat/completions 请求，返回正文文本（content）"""
         kwargs = {
             "model": self.model,
@@ -163,7 +175,7 @@ class AIClient:
                     "content": prompt
                 }
             ],
-            "temperature": 0.1,
+            "temperature": temperature,
             "max_tokens": OPENAI_MAX_TOKENS,
             "timeout": OPENAI_TIMEOUT,
         }
@@ -192,7 +204,13 @@ class AIClient:
                 f"increasing max_tokens."
             )
 
-        return message.content.strip()
+        text = message.content.strip()
+        if _is_degenerate_response(text):
+            raise ValueError(
+                f"AI returned a degenerate/looping response ({len(text)} chars). "
+                f"Retrying may help."
+            )
+        return text
 
     def _call_anthropic(self, prompt: str) -> str:
         """Call Anthropic-compatible API and return response text"""

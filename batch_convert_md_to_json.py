@@ -225,6 +225,8 @@ def main():
     parser.add_argument("-m", "--model", default=None, help=f"模型名称（默认: {OPENAI_MODEL}）")
     parser.add_argument("-k", "--api-key", default=None, help="API Key（默认从 .env 读取）")
     parser.add_argument("--base-url", default=None, help=f"API 地址（默认: {OPENAI_BASE_URL}）")
+    parser.add_argument("-g", "--grades", nargs="*", default=None,
+                        help="按年级过滤（高一 高二 高三），默认全部")
     parser.add_argument("-s", "--subjects", nargs="*", default=SUBJECTS,
                         help=f"要转换的学科（默认全部: {' '.join(SUBJECTS)}）")
     parser.add_argument("-T", "--types", nargs="*", default=list(TYPES.keys()),
@@ -311,12 +313,15 @@ def main():
                     all_types[k] = v
                     break
     subjects = [s for s in args.subjects if s in SUBJECTS]
+    GRADES_ALL = ["高一", "高二", "高三"]
+    grades = [g for g in (args.grades or GRADES_ALL) if g in GRADES_ALL]
 
     print(f"输入目录: {input_dir}")
     print(f"输出目录: {output_dir}")
     print(f"模型: {model}")
     print(f"类型: {' '.join(all_types.keys())}")
     print(f"学科: {' '.join(subjects)}")
+    print(f"年级: {' '.join(grades)}")
     print()
 
     all_files = collect_files(input_dir)
@@ -327,7 +332,9 @@ def main():
             continue
         file_type = parts[0]
         file_subject = parts[1]
-        if file_type in all_types and file_subject in subjects:
+        paper_folder = parts[2]
+        grade = next((g for g in GRADES_ALL if g in paper_folder), "")
+        if file_type in all_types and file_subject in subjects and grade in grades:
             files.append((rel_path, abs_path))
 
     print(f"共找到 {len(files)} 个文件（总 {len(all_files)} 个）")
