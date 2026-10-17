@@ -134,6 +134,8 @@ data/input/*
 !data/input/.gitkeep
 data/output/*
 !data/output/.gitkeep
+# 每次运行都会重写的调试产物（AI 提示词/响应转储），不入库
+data/debug/*
 exam_parser.log
 *.log
 .DS_Store
