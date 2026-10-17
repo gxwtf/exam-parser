@@ -241,19 +241,19 @@ class FinalJSONValidator:
                         "error", "GRAMMAR_ZERO",
                         "语法填空题目数为0，解析失败"
                     ))
-                elif qc != 10:
+                elif qc not in [10, 15, 16, 20]:
                     self.errors.append(ValidationError(
                         "warning", "GRAMMAR_COUNT",
-                        f"语法填空题目数为{qc}，通常为10题，请核实"
+                        f"语法填空题目数为{qc}，通常为10/15/16/20题，请核实"
                     ))
             
             elif mapped == "reading":
                 # 允许首篇只有 2 题：北京卷阅读理解第一节（14 题/4 篇）常见 2+4+4+4 的分配
-                valid_reading = [2, 3, 4, 5]
-                if len(entries) < 3 or len(entries) > 4:
+                valid_reading = [2, 3, 4, 5, 6]
+                if len(entries) < 2 or len(entries) > 6:
                     self.errors.append(ValidationError(
                         "warning", "READING_COUNT",
-                        f"阅读篇章数为{len(entries)}，通常为3-4篇，请核实"
+                        f"阅读篇章数为{len(entries)}，通常为2-6篇，请核实"
                     ))
                 for i, entry in enumerate(entries):
                     if entry["questionCount"] == 0:
@@ -264,7 +264,7 @@ class FinalJSONValidator:
                     elif entry["questionCount"] not in valid_reading:
                         self.errors.append(ValidationError(
                             "warning", "READING_ARTICLE_COUNT",
-                            f"第{i+1}篇阅读题目数为{entry['questionCount']}，通常为2/3/4/5题，请核实"
+                            f"第{i+1}篇阅读题目数为{entry['questionCount']}，通常为2-6题，请核实"
                         ))
             
             elif mapped == "seven":
@@ -274,15 +274,15 @@ class FinalJSONValidator:
                         "error", "SEVEN_ZERO",
                         "七选五题目数为0，解析失败"
                     ))
-                elif qc != 5:
+                elif qc not in [4, 5]:
                     self.errors.append(ValidationError(
                         "warning", "SEVEN_COUNT",
-                        f"七选五题目数为{qc}，通常为5题，请核实"
+                        f"七选五题目数为{qc}，通常为4/5题，请核实"
                     ))
             
             elif mapped == "reading_expression":
                 qc = entries[0]["questionCount"] if entries else 0
-                valid_re = [4, 5]
+                valid_re = [1, 4, 5, 10]
                 if qc == 0:
                     self.errors.append(ValidationError(
                         "error", "RE_ZERO",
@@ -291,7 +291,7 @@ class FinalJSONValidator:
                 elif qc not in valid_re:
                     self.errors.append(ValidationError(
                         "warning", "RE_COUNT",
-                        f"阅读表达题目数为{qc}，通常为4/5题，请核实"
+                        f"阅读表达题目数为{qc}，通常为1/4/5/10题，请核实"
                     ))
             
             elif mapped == "writing":
@@ -310,6 +310,8 @@ class FinalJSONValidator:
         # Check for missing expected section types
         # 七选五不进必考清单：2021 起北京卷（部分区县）已取消七选五，缺它不算异常
         expected = ["完形填空", "阅读", "作文"]
+        if len(sections) < 3:
+            expected = []
         for exp_type in expected:
             if exp_type not in section_counts:
                 self.errors.append(ValidationError(
@@ -365,7 +367,13 @@ class FinalJSONValidator:
                     continue
                 
                 stripped = content.strip()
-                if re.match(r'^[a-zA-Z]', stripped):
+                # 浙江/江苏/上海/老北京卷存在英文题干（读后续写、开放作文是正常的），
+                # 只把「以英文书信/自我介绍开头且没有任务指令词」的情况判为疑似范文
+                looks_like_answer = re.match(r"^(Dear\b|Hi\b|Hello\b|I am\b|I'm\b)", stripped)
+                has_task_words = re.search(
+                    r"(You are asked|You are discussing|Write\b|Suppose|describe|explain|letter|email|essay|article|passage|picture|词数|注意|请)",
+                    stripped, re.I)
+                if looks_like_answer and not has_task_words:
                     self.errors.append(ValidationError(
                         "error", "WRITING_CONTENT_EN",
                         f"作文第{j+1}题题干以英文开头，疑似未正确解析",

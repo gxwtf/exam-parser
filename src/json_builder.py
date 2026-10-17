@@ -642,10 +642,15 @@ class JSONBuilder:
                 break
 
         # Extract exam type
-        for exam_type in ["期末", "期中", "一模", "二模", "真题"]:
-            if exam_type in source:
-                tags.append(exam_type)
-                break
+        # 「真题」除了字面匹配，也把「高考」类卷名（如 2024上海高考英语作文题目、
+        # 2017北京高考英语试卷解析）归入真题，否则它们会漏掉 真题 tag
+        if "真题" in source or "高考" in source:
+            tags.append("真题")
+        else:
+            for exam_type in ["期末", "期中", "一模", "二模"]:
+                if exam_type in source:
+                    tags.append(exam_type)
+                    break
 
         # Extract year
         year_match = re.search(r'(\d{4})', source)
