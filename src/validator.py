@@ -248,7 +248,8 @@ class FinalJSONValidator:
                     ))
             
             elif mapped == "reading":
-                valid_reading = [3, 4, 5]
+                # 允许首篇只有 2 题：北京卷阅读理解第一节（14 题/4 篇）常见 2+4+4+4 的分配
+                valid_reading = [2, 3, 4, 5]
                 if len(entries) < 3 or len(entries) > 4:
                     self.errors.append(ValidationError(
                         "warning", "READING_COUNT",
@@ -263,7 +264,7 @@ class FinalJSONValidator:
                     elif entry["questionCount"] not in valid_reading:
                         self.errors.append(ValidationError(
                             "warning", "READING_ARTICLE_COUNT",
-                            f"第{i+1}篇阅读题目数为{entry['questionCount']}，通常为3/4/5题，请核实"
+                            f"第{i+1}篇阅读题目数为{entry['questionCount']}，通常为2/3/4/5题，请核实"
                         ))
             
             elif mapped == "seven":
@@ -307,7 +308,8 @@ class FinalJSONValidator:
                     ))
         
         # Check for missing expected section types
-        expected = ["完形填空", "阅读", "七选五", "作文"]
+        # 七选五不进必考清单：2021 起北京卷（部分区县）已取消七选五，缺它不算异常
+        expected = ["完形填空", "阅读", "作文"]
         for exp_type in expected:
             if exp_type not in section_counts:
                 self.errors.append(ValidationError(

@@ -18,12 +18,28 @@ class AnchorRange:
     confidence: str = "high"  # high, medium, low
 
 
+# 全角标点/符号 → 半角（用于锚点模糊匹配；Word 导出的试卷 MD 大量使用全角）
+_FULLWIDTH_TO_ASCII = str.maketrans({
+    '，': ',', '。': '.', '．': '.', '、': ',', '：': ':', '；': ';',
+    '？': '?', '！': '!', '（': '(', '）': ')', '［': '[', '］': ']',
+    '｛': '{', '｝': '}', '【': '[', '】': ']', '〈': '<', '〉': '>',
+    '“': '"', '”': '"', '‘': "'", '’': "'", '＂': '"', '＇': "'",
+    '－': '-', '～': '~', '％': '%', '＃': '#', '＆': '&', '＊': '*',
+    '＋': '+', '＝': '=', '＜': '<', '＞': '>', '／': '/', '＼': '\\',
+    '｜': '|', '＿': '_', '＾': '^', '｀': '`', '＄': '$', '＠': '@',
+    '　': ' ', '·': '.', '・': '.', '–': '-', '—': '-', '―': '-',
+    '…': '...', '∶': ':', '﹕': ':', '﹐': ',', '﹑': ',', '﹒': '.',
+})
+
+
 def normalize_for_match(text: str) -> str:
     """
     Normalize text for fuzzy matching.
     
     Handles:
     - Unicode smart quotes → straight quotes
+    - Full-width (CJK) punctuation → half-width (Word 导出的 MD 里是 ，．（） 等，
+      而 AI 给的 start 锚点是半角，不折叠就会「start not found」)
     - Multiple whitespace → single space
     - \\r\\n → \\n
     - Markdown escape chars
@@ -45,6 +61,14 @@ def normalize_for_match(text: str) -> str:
     text = text.replace('\u201c', '"').replace('\u201d', '"')
     text = text.replace('\u2013', '-').replace('\u2014', '--')
     text = text.replace('\u2026', '...')
+
+    # 全角标点 → 半角（逐字符 1:1 折叠，不影响位置映射）
+    text = text.translate(_FULLWIDTH_TO_ASCII)
+
+    # 标点前后的空格差异：全角标点后通常没有空格，而 AI 会补一个空格
+    # （MD: "1891，a teacher" → "1891,a teacher"；锚点: "1891, a teacher" → "1891,a teacher"）
+    text = re.sub(r'[ \t]+([,.;:!?)\]}>"\'])', r'\1', text)
+    text = re.sub(r'([,.;:!?(\[{<"\'])[ \t]+', r'\1', text)
     
     # Unicode spaces → normal space
     text = re.sub(r'[\u00a0\u2000-\u200b\u202f\u205f\u3000]', ' ', text)
@@ -54,6 +78,10 @@ def normalize_for_match(text: str) -> str:
     text = text.replace('\\', '')  # Escape chars: \_**\_**\__ → _____
     text = text.replace('*', '')   # Bold markers
     text = text.replace('_', '')   # Italic markers: _bais_ → bais
+
+    # Word 导出残留的 HTML 标签（如 <sup>"</sup>Choose…、friends<sup>9</sup>）
+    # 会挡在锚点第一个字符前，导致 start 匹配失败 → 匹配时统一去掉
+    text = re.sub(r'</?[A-Za-z][A-Za-z0-9]{0,10}[^<>\n]{0,40}>', '', text)
     
     # Multiple whitespace → single space
     text = re.sub(r'[ \t]+', ' ', text)
@@ -104,6 +132,7 @@ class ContentLocator:
             # Slide through original MD, normalize each window, compare
             anchor_norm = normalize_for_match(anchor)
             if anchor_norm:
+                anchor_flat = re.sub(r'\s+', '', anchor_norm)
                 first_char = anchor_norm[0]
                 max_expansion = len(anchor_norm) * 3
                 pos = start_pos
@@ -115,6 +144,10 @@ class ContentLocator:
                     window_norm = normalize_for_match(window)
                     if window_norm.startswith(anchor_norm):
                         logger.debug(f"Anchor found via fuzzy match: {anchor[:50]}... at pos {pos}")
+                        return pos
+                    # 兜底：忽略所有空白差异再比（MD 的换行位置与 AI 输出常不一致）
+                    if re.sub(r'\s+', '', window_norm).startswith(anchor_flat):
+                        logger.debug(f"Anchor found via whitespace-insensitive match: {anchor[:50]}... at pos {pos}")
                         return pos
                     pos += 1
             

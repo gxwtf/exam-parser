@@ -174,6 +174,10 @@ def run_validator(files, output_dir):
 
         if error_count == 0 and warning_count == 0:
             clean_count += 1
+            # 该卷已修好：清掉历史遗留的校验报告，避免误判「还没通过检验」
+            stale_report = os.path.splitext(json_path)[0] + ".errors.txt"
+            if os.path.isfile(stale_report):
+                os.remove(stale_report)
             continue
 
         status = "✓" if is_valid else "✗"

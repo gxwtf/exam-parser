@@ -10,9 +10,15 @@ from typing import Optional, Dict, Any
 from openai import OpenAI
 import requests
 
-from config import SHOW_AI_DEBUG, MAX_LOGGED_RESPONSE_CHARS, DEBUG_DIR
+from config import (
+    SHOW_AI_DEBUG, MAX_LOGGED_RESPONSE_CHARS, DEBUG_DIR,
+    OPENAI_TIMEOUT, OPENAI_MAX_TOKENS, OPENAI_REASONING_EFFORT,
+)
 
 logger = logging.getLogger(__name__)
+
+# 关闭思考的取值（本机模型实测 "none" 生效）
+_THINKING_OFF = {"none", "off", "disabled", "false", "0", ""}
 
 
 class AIClient:
@@ -128,9 +134,24 @@ class AIClient:
 
     def _call_openai(self, prompt: str) -> str:
         """Call OpenAI-compatible API and return response text"""
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
+        try:
+            return self._request_completion(prompt, OPENAI_REASONING_EFFORT)
+        except ValueError as e:
+            # 思考模型可能把整个 max_tokens 花在 reasoning 上、content 为空。
+            # 这种情况自动关掉思考重试一次（用 OPENAI_REASONING_EFFORT=high 跑批时尤其重要）。
+            if "empty content" in str(e) and OPENAI_REASONING_EFFORT.lower() not in _THINKING_OFF:
+                logger.warning(
+                    "AI 把 token 全花在思考上（reasoning_effort=%s），改为关闭思考重试一次",
+                    OPENAI_REASONING_EFFORT,
+                )
+                return self._request_completion(prompt, "none")
+            raise
+
+    def _request_completion(self, prompt: str, reasoning_effort: str) -> str:
+        """发送一次 chat/completions 请求，返回正文文本（content）"""
+        kwargs = {
+            "model": self.model,
+            "messages": [
                 {
                     "role": "system",
                     "content": "You are an expert English exam parser. "
@@ -142,11 +163,16 @@ class AIClient:
                     "content": prompt
                 }
             ],
-            temperature=0.1,
-            max_tokens=32000,
-            timeout=120,
-            extra_body={"reasoning_effort": "low"}
-        )
+            "temperature": 0.1,
+            "max_tokens": OPENAI_MAX_TOKENS,
+            "timeout": OPENAI_TIMEOUT,
+        }
+        # 注意：本机模型不传该参数 = 思考全开（会把 token 烧光），
+        # 所以关闭思考也必须显式传 "none"，而不是省略；留空则完全不传（给外部 API 用）。
+        if reasoning_effort:
+            kwargs["extra_body"] = {"reasoning_effort": reasoning_effort}
+
+        response = self.client.chat.completions.create(**kwargs)
 
         message = response.choices[0].message
         finish_reason = response.choices[0].finish_reason
@@ -188,7 +214,7 @@ class AIClient:
             "temperature": 0.1,
         }
 
-        resp = requests.post(url, headers=headers, json=payload, timeout=180)
+        resp = requests.post(url, headers=headers, json=payload, timeout=OPENAI_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
 

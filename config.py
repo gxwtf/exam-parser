@@ -18,6 +18,15 @@ API_TYPE = os.getenv("API_TYPE", "openai")  # "openai" or "anthropic"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")  # Set this environment variable
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com")  # API base URL
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-turbo")  # Default model
+# Request timeout in seconds. Local (self-hosted) inference can be slower on long
+# JSON outputs, so this is configurable and defaults higher than the old 120s.
+OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "600"))
+OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "32000"))
+
+# 思考等级。本机 deepseek-v4.1-flash 默认开启思考，且会一直思考到把 max_tokens 用完，
+# 导致 content 为空（finish_reason=length）——实测 "low" 也压不住。
+# "none" = 关闭思考（实测 reasoning_tokens=0，内容正常返回）；也可用 low/high/xhigh/max。
+OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "none")
 
 # Supported Question Types
 SUPPORTED_TYPES = [

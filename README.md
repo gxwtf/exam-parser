@@ -24,13 +24,17 @@ pip install -r requirements.txt
 
 ### 2. 配置
 
-复制 `.env.example` 为 `.env`，填入 API Key：
+复制 `.env.example` 为 `.env`，填入 API Key。**默认已切换为本机 API**（new-api 网关 → 本机 vLLM 集群，离线、免费、上下文 1M）：
 
 ```bash
-OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_MODEL=deepseek-v4-flash
+API_TYPE=openai
+OPENAI_BASE_URL=http://localhost:8080/v1
+OPENAI_API_KEY=your_new_api_key_here   # 本机网关 key 找运维要，不入库
+OPENAI_MODEL=deepseek-v4.1-flash
+OPENAI_TIMEOUT=600          # 本地推理出长 JSON 较慢，超时放宽（秒）
 ```
+
+`.env` 里其余被注释的段落是本机网关公网入口（`https://ai.gxwtf.cn/v1`）与官方付费 API 的备选配置，按需启用即可。`API_TYPE` 可选 `openai` / `anthropic`。
 
 ### 3. 放入试卷
 
