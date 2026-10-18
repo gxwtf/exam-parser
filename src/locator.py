@@ -301,18 +301,19 @@ class ContentLocator:
         after_end = remaining[end_match.end():]
         next_match = next_q_pattern.search(after_end)
         
-        # Also check for section headers
-        section_match = re.search(r'(?:^|\n)\s*\*\*', after_end)
-        
-        # Determine end boundary
-        if next_match and section_match:
-            boundary = min(next_match.start(), section_match.start())
-        elif next_match:
+        # 边界只看「下一个题号」与「真正的章节标题」。
+        # 不能再用任意 `**` 行当边界：阅读表达的划线题陈述句形如
+        # `**⮚ _In listening to music, ..._**`，含 `**` 但不是标题，
+        # 一旦被当成边界，陈述句（题干的关键部分）就被截掉了。
+        boundary = len(after_end)
+        if next_match:
             boundary = next_match.start()
-        elif section_match:
-            boundary = section_match.start()
-        else:
-            boundary = len(after_end)
+        _pos = 0
+        for _line in after_end.split('\n'):
+            if self._is_section_header(_line.strip()):
+                boundary = min(boundary, _pos)
+                break
+            _pos += len(_line) + 1
         
         # Calculate absolute positions
         content_start = article_end_pos + start_match.start()

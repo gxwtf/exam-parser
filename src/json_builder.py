@@ -10,6 +10,12 @@ from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# 划线题（阅读表达里的 "decide which part is false … underline it and explain why."）
+# 插入到题干里的作答提示，与题库既有数据保持完全一致。
+_UNDERLINE_INSTRUCTION = (
+    " (**_Write the underlined part directly on the first line of the answer section_**)"
+)
+
 
 class JSONBuilder:
     """Build final exam parser JSON output"""
@@ -537,14 +543,34 @@ class JSONBuilder:
     def _parse_reading_expression_questions(self, text: str) -> List[Dict[str, Any]]:
         questions = self._parse_grammar_questions(text)
         for q in questions:
-            content = q.get("content", "")
-            # Insert writing instruction after "and explain why."
-            content = content.replace(
-                "and explain why.",
-                "and explain why. (**_Write the underlined part directly on the first line of the answer section_**)"
-            )
+            content = q.get("content", "") or ""
+            if content:
+                content = self._normalize_underline_question(content)
             q["content"] = content
         return questions
+
+    @staticmethod
+    def _normalize_underline_question(content: str) -> str:
+        """划线题（decide which part is false … underline it and explain why.）的例外处理。
+
+        题库既有数据的约定是：题干 = 题面 + 插入说明
+        「(**_Write the underlined part directly on the first line of the answer section_**)」
+        + 原样保留的划线陈述句（➢/⮚/▶/- 等符号与加粗斜体一律照抄 md）。
+
+        这里修两个坑：
+        1. md 里这句话常被换行切断（"...then underline it and\\n\\nexplain why."），
+           旧的 content.replace("and explain why.", ...) 会失配，说明插不进去；
+        2. 说明只插一次，重复解析不会叠加。
+        """
+        if "**_Write the underlined part" in content:
+            return content
+        m = re.search(r"underline it and\s+explain why\s*[.．。?？]", content)
+        if not m:
+            return content
+        return (content[:m.start()]
+                + "underline it and explain why."
+                + _UNDERLINE_INSTRUCTION
+                + content[m.end():])
 
     def _parse_writing_questions(self, text: str) -> List[Dict[str, Any]]:
         if not text:

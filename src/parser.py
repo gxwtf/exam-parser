@@ -163,7 +163,21 @@ class ExamParser:
                         else:
                             logger.warning(f"  Section {i} ({section_type}): empty article extracted")
                         
-                        # 阅读/阅读表达的 content/options 由 AI 直接提供，不再从 MD 提取
+                        # 阅读表达/阅读的题干：从 MD 中「文章之后、题号区间之内」提取。
+                        # 阅读表达的题干只能来自这里（prompt 明确不输出 article、也不给题干），
+                        # 一旦缺失，落库 Question.content 就是空串，前端整个题干不显示。
+                        if question_type in ("reading-expression", "reading", "en-reading") \
+                                and q_start and q_end:
+                            questions_text = locator.find_questions_after_article(
+                                article_end_pos, q_start, q_end
+                            )
+                            if questions_text:
+                                section_copy["questionsText"] = questions_text
+                            else:
+                                logger.warning(
+                                    f"  Section {i} ({section_type}): questionsText 提取为空 "
+                                    f"(题号 {q_start}-{q_end})"
+                                )
                     else:
                         logger.warning(f"  Section {i} ({section_type}): start not found: {start[:50]}...")
                 else:
