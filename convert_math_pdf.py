@@ -92,7 +92,9 @@ PAGE_PROMPT = """这是一张北京高中数学试卷（或参考答案）的页
 REPAIR_PROMPT = """这张图是数学试卷（或答案）的一页。请只处理第 {no} 题：
 - 若本页印有该题的四个选项，输出 {{"options": [{{"id": "a", "label": "$...$"}}, {{"id": "b", "label": "$...$"}}, {{"id": "c", "label": "$...$"}}, {{"id": "d", "label": "$...$"}}]}}
 - 若本页印有该题的答案，输出 {{"answer": "X"}}。答案可能不在答案表里，而在解析末尾，形如「故选 A．」「故答案为：X」「故填：X」——这些都算该题答案（多空答案用「；」分隔并全部保留）
-- 两者都有就都输出；都没有则输出 {{}}
+- 若本页有该题题干的**续写部分**（例如结论 ①②③④、以及最后一行「其中所有正确结论的序号是 ____」），
+  请输出 {{"stem": "该题完整题干（用本页续写补全，空位写成 <Input2></Input2>，公式用 $...$）"}}
+- 以上都没有则输出 {{}}
 只输出 JSON，不要解释。"""
 
 
@@ -427,13 +429,16 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
         need_opt = [no for no, q in all_q.items()
                     if q["questionType"] != "input2" and any(not o["label"] for o in q["options"])]
         need_ans = [no for no in all_q if not answers.get(no)]
-        for no in sorted(set(need_opt) | set(need_ans)):
+        # 填空题识别不到空位 → 多半是题干跨页被截断，去相邻页补全题干
+        need_stem = [no for no, q in all_q.items()
+                     if q["questionType"] == "input2" and q["content"].count("<Input2>") == 0]
+        for no in sorted(set(need_opt) | set(need_ans) | set(need_stem)):
             cand = []
             if no in q_page:
                 cand += [q_page[no], q_page[no] + 1]
             cand += answer_pages
             # 缺答案时：候选页不够就扩到全卷（答案常藏在被预筛跳过的解析页里）
-            if no in need_ans:
+            if no in need_ans or no in need_stem:
                 extra = [i for i in range(1, len(pages) + 1) if i not in cand]
                 cand += extra
             cand = [p for p in dict.fromkeys(cand) if 1 <= p <= len(pages)]
@@ -451,12 +456,18 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
                         all_q[no]["options"] = fixed
                         log(f"  补漏：第{no}题选项（第{pno}页）")
                         need_opt.remove(no)
+                stemv = (got.get("stem") or "").strip()
+                if no in need_stem and stemv and len(stemv) > len(all_q[no]["content"]):
+                    if "<Input2>" in stemv:
+                        all_q[no]["content"] = normalize_latex(stemv)
+                        log(f"  补漏：第{no}题题干（第{pno}页补全，含空位）")
+                        need_stem.remove(no)
                 ansv = (got.get("answer") or "").strip()
                 if no in need_ans and ansv:
                     answers[no] = ansv
                     log(f"  补漏：第{no}题答案（第{pno}页）")
                     need_ans.remove(no)
-                if no not in need_opt and no not in need_ans:
+                if no not in need_opt and no not in need_ans and no not in need_stem:
                     break
 
     # ── 组装 sections
