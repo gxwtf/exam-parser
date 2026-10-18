@@ -328,6 +328,31 @@ def delims_plain(tex: str) -> str:
     return tex
 
 
+
+_CJK = re.compile(r"[\u4e00-\u9fff\u3000-\u303f\uff01-\uff60]")
+_CIRCLED = re.compile(r"[\u2460-\u2473]")
+
+
+def wrap_plain_math(label: str) -> str:
+    """裸数字/裸表达式选项自动包上 $...$（如 4 → $4$、(2,3) → $(2,3)$）"""
+    lab = (label or "").strip()
+    if not lab or "$" in lab:
+        return label
+    # 纯数字列表（含中文顿号/逗号）先归一化分隔符再包起来（要在 CJK 判断之前，否则全角逗号会提前返回）
+    if re.fullmatch(r"[\s0-9.,;:()\[\]\-\u2212+\u3001\uff0c\uff1b\uff1a]+", lab) and re.search(r"[0-9]", lab):
+        inner = (lab.replace("\uff0c", ",").replace("\u3001", ",").replace("\uff1b", ",")
+                    .replace("\uff1a", ":").replace("\u2212", "-"))
+        inner = re.sub(r"\s*,\s*", ",", inner)
+        inner = re.sub(r",+", ",", inner).strip(",")
+        return f"${inner}$"
+    if _CJK.search(lab) or _CIRCLED.search(lab):
+        return label
+    if not (re.search(r"[0-9]", lab) or re.search(r"[+\-\u2212\u00d7\u00f7\u221a\u221e\u03c0]", lab)):
+        return label
+    inner = lab.replace("\u2212", "-").replace("\u2013", "-").replace("\u2014", "-").strip()
+    return f"${inner}$"
+
+
 def strip_opt_prefix(label: str) -> str:
     """去掉选项标签里的 (A)/(B)/A． 这类前缀"""
     return OPT_PREFIX.sub("", label or "").strip()
@@ -380,7 +405,7 @@ def normalize_question(q: dict, section: str) -> dict | None:
     stem = normalize_latex(strip_notes(q.get("stem") or ""))
 
     coerced = coerce_options(q.get("options"))
-    options = [{"id": k, "label": strip_opt_prefix(v)} for k, v in coerced.items() if k in "abcd"]
+    options = [{"id": k, "label": wrap_plain_math(strip_opt_prefix(v))} for k, v in coerced.items() if k in "abcd"]
     if section == "choice":
         # 保证 a-d 四个槽位都在
         have = {o["id"] for o in options}
