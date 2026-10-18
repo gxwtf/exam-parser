@@ -34,11 +34,12 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1").rstrip("/")
-API_KEY = os.getenv("OPENAI_API_KEY", "")
+BASE_URL = (os.getenv("MATH_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")).rstrip("/")
+API_KEY = os.getenv("MATH_VISION_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 MODEL = os.getenv("MATH_VISION_MODEL") or os.getenv("OPENAI_MODEL", "deepseek-v4.1-flash")
 MAX_TOKENS = int(os.getenv("MATH_MAX_TOKENS", "8000"))
 DPI = int(os.getenv("MATH_DPI", "150"))
+CONCURRENCY = int(os.getenv("MATH_CONCURRENCY", "1"))
 
 SYSTEM_PROMPT = (
     "你是数学试卷录入员，负责把试卷页面的图像精确转成结构化 JSON。"
@@ -87,13 +88,95 @@ PAGE_PROMPT = """这是一张北京高中数学试卷（或参考答案）的页
 
 REPAIR_PROMPT = """这张图是数学试卷（或答案）的一页。请只处理第 {no} 题：
 - 若本页印有该题的四个选项，输出 {{"options": [{{"id": "a", "label": "$...$"}}, {{"id": "b", "label": "$...$"}}, {{"id": "c", "label": "$...$"}}, {{"id": "d", "label": "$...$"}}]}}
-- 若本页印有该题的答案（包括藏在解析里的「故答案为：X」），输出 {{"answer": "X"}}（多空答案用「；」分隔并全部保留）
+- 若本页印有该题的答案，输出 {{"answer": "X"}}。答案可能不在答案表里，而在解析末尾，形如「故选 A．」「故答案为：X」「故填：X」——这些都算该题答案（多空答案用「；」分隔并全部保留）
 - 两者都有就都输出；都没有则输出 {{}}
 只输出 JSON，不要解释。"""
 
 
 def log(msg: str):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def chat_json(messages: list, model: str, max_tokens: int, retries: int = 4) -> dict:
+    """调用多模态接口并解析 JSON（带 429/5xx 重试）"""
+    payload = {"model": model, "max_tokens": max_tokens, "temperature": 0.1, "messages": messages}
+    if os.getenv("MATH_REASONING", "none").lower() in ("none", "off", "false"):
+        payload["reasoning_effort"] = "none"   # 本地/OpenAI 兼容端点：关掉思考，直接输出 JSON
+    headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+    if "openrouter" in BASE_URL:
+        headers.update({"HTTP-Referer": "https://ti.gxwtf.cn", "X-Title": "gxexercise-math-parser"})
+    last_err = None
+    for attempt in range(retries):
+        try:
+            resp = requests.post(f"{BASE_URL}/chat/completions", json=payload, headers=headers,
+                                 timeout=int(os.getenv("MATH_REQUEST_TIMEOUT", "240")))
+            if resp.status_code == 400 and "reasoning" in (resp.text or "").lower() and "reasoning_effort" in payload:
+                payload.pop("reasoning_effort", None)
+                log("    该端点不支持 reasoning_effort，去掉后重试")
+                continue
+            if resp.status_code == 429 or resp.status_code >= 500:
+                wait = 15 * (attempt + 1)
+                log(f"    HTTP {resp.status_code}，{wait}s 后重试（{attempt+1}/{retries}）")
+                time.sleep(wait)
+                last_err = f"HTTP {resp.status_code}"
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            ch = data["choices"][0]
+            text = (ch["message"].get("content") or "").strip()
+            if ch.get("finish_reason") == "length" and len(text) < 200:
+                # 推理模型被长度截断且内容太少 → 加倍重试
+                payload["max_tokens"] = min(max_tokens * 2, 32000)
+                log(f"    输出被截断（finish=length），把 max_tokens 提到 {payload['max_tokens']} 重试")
+                last_err = "finish=length"
+                continue
+            text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
+            if not text:
+                last_err = "空内容"
+                time.sleep(5)
+                continue
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                m = re.search(r"\{.*\}", text, re.S) or re.search(r"\[.*\]", text, re.S)
+                if m:
+                    return json.loads(m.group(0))
+                raise
+        except Exception as e:
+            last_err = str(e)[:120]
+            time.sleep(5 * (attempt + 1))
+    raise RuntimeError(f"调用模型失败：{last_err}")
+
+
+def select_pages(pdf: Path, n_pages: int) -> set[int]:
+    """用 PDF 文字层预筛：只保留可能含选择题/填空题或其答案的页，解答题页直接跳过
+    （实测解答题页约占一半，这些页送模型纯属浪费）"""
+    keep: set[int] = set()
+    ans_pages: list[int] = []
+    for i in range(1, n_pages + 1):
+        try:
+            txt = subprocess.run(
+                ["pdftotext", "-f", str(i), "-l", str(i), str(pdf), "-"],
+                capture_output=True, text=True, timeout=30,
+            ).stdout or ""
+        except Exception:
+            keep.add(i)          # 拿不到文字层就保守处理，照常送模型
+            continue
+        flat = txt.replace(" ", "")
+        if "参考答案" in flat or "答案与解析" in flat or "答案解析" in flat:
+            ans_pages.append(i)
+        if "选择题" in flat or "填空题" in flat:
+            keep.add(i)
+        elif re.search(r"[（(]\s*([1-9]|1[0-5])\s*[）)]", txt):
+            keep.add(i)
+        elif "故答案为" in flat or "故选" in flat:
+            keep.add(i)
+        elif re.search(r"^\s*(1[0-5]|[1-9])\s*[.．、]", txt, re.M):
+            keep.add(i)
+    # 答案区前 2 页一定保留（选择题答案表 / 填空题答案通常在最前面）
+    for p in ans_pages[:1]:
+        keep.update({p, p + 1})
+    return {p for p in keep if 1 <= p <= n_pages}
 
 
 def render_pages(pdf: Path, dpi: int, out_dir: Path, max_pages: int | None = None) -> list[Path]:
@@ -113,37 +196,16 @@ def render_pages(pdf: Path, dpi: int, out_dir: Path, max_pages: int | None = Non
 def ask_page(image: Path, model: str) -> dict:
     """调多模态模型识别一页"""
     b64 = base64.b64encode(image.read_bytes()).decode()
-    payload = {
-        "model": model,
-        "max_tokens": MAX_TOKENS,
-        "temperature": 0.1,
-        "messages": [
+    return chat_json(
+        [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": [
                 {"type": "text", "text": PAGE_PROMPT},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
             ]},
         ],
-    }
-    resp = requests.post(
-        f"{BASE_URL}/chat/completions",
-        json=payload,
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        timeout=600,
+        model, MAX_TOKENS,
     )
-    resp.raise_for_status()
-    data = resp.json()
-    text = (data["choices"][0]["message"].get("content") or "").strip()
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
-    if not text:
-        raise ValueError("模型返回空内容")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.S)
-        if m:
-            return json.loads(m.group(0))
-        raise
 
 
 def crop_figures(image: Path, figures: list[dict], out_img_dir: Path, stem: str) -> dict[int, str]:
@@ -175,6 +237,15 @@ def crop_figures(image: Path, figures: list[dict], out_img_dir: Path, stem: str)
     return saved
 
 
+def normalize_latex(text: str) -> str:
+    r"""把模型输出的 \(...\) / \[...\] 统一成 $...$ / $$...$$（题库用 remark-math 渲染）"""
+    t = text or ""
+    if "\\(" in t or "\\[" in t:
+        t = t.replace("\\[", "$$").replace("\\]", "$$").replace("\\(", "$").replace("\\)", "$")
+    t = re.sub(r"[ \t]{2,}", " ", t)
+    return t.strip()
+
+
 def classify(q: dict, choice_max: int) -> str:
     """判定选择题/填空题：优先用模型给的 type，缺失时按是否有选项 + 题号兜底
     （北京卷选择题数量因年份而异：2014 年是 8 题、2024 年是 10 题）"""
@@ -202,13 +273,12 @@ def normalize_question(q: dict, section: str) -> dict | None:
     if section == "choice":
         qtype = "multiple" if raw_type.startswith("multi") else "single"
 
-    stem = (q.get("stem") or "").strip()
-    stem = re.sub(r"[ \t]{2,}", " ", stem)
+    stem = normalize_latex(q.get("stem") or "")
 
     options = []
     for o in (q.get("options") or []):
         oid = str(o.get("id") or "").strip().lower()
-        label = (o.get("label") or "").strip()
+        label = normalize_latex(o.get("label") or "")
         if oid in {"a", "b", "c", "d"}:
             options.append({"id": oid, "label": label})
     if section == "choice":
@@ -232,28 +302,19 @@ def normalize_question(q: dict, section: str) -> dict | None:
 def repair_question(image: Path, no: int, model: str) -> dict:
     """针对单题定向补漏：只问四选项 / 答案"""
     b64 = base64.b64encode(image.read_bytes()).decode()
-    payload = {
-        "model": model, "max_tokens": 2000, "temperature": 0.0,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": [
-                {"type": "text", "text": REPAIR_PROMPT.format(no=no)},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-            ]},
-        ],
-    }
-    resp = requests.post(f"{BASE_URL}/chat/completions", json=payload,
-                         headers={"Authorization": f"Bearer {API_KEY}"}, timeout=300)
-    resp.raise_for_status()
-    text = (resp.json()["choices"][0]["message"].get("content") or "").strip()
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text).strip()
-    if not text:
-        return {}
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.S)
-        return json.loads(m.group(0)) if m else {}
+        return chat_json(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": [
+                    {"type": "text", "text": REPAIR_PROMPT.format(no=no)},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ]},
+            ],
+            model, 4000, retries=2,
+        )
+    except Exception:
+        return {}
 
 
 def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: str, args) -> tuple[dict, list[str]]:
@@ -264,18 +325,55 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
     answer_pages: list[int] = []
     review: list[str] = []
 
-    for idx, page in enumerate(pages, 1):
+    # ① 预筛页面：跳过解答题页（约占一半）
+    selected = None
+    if getattr(args, "smart_pages", True):
+        selected = select_pages(pdf, len(pages))
+        skipped = [i for i in range(1, len(pages) + 1) if i not in selected]
+        if skipped:
+            log(f"  预筛：跳过 {len(skipped)}/{len(pages)} 页（解答题页），只送 {len(selected)} 页")
+    todo = [(i, p) for i, p in enumerate(pages, 1) if selected is None or i in selected]
+
+    # ② 逐页识别（页级并发，结果按页序合并）
+    page_results: dict[int, dict] = {}
+
+    def _one(idx: int, page: Path):
         t0 = time.time()
         try:
             data = ask_page(page, model)
+            log(f"  第 {idx}/{len(pages)} 页：{len(data.get('questions') or [])} 题、"
+                f"{len(data.get('answers') or [])} 个答案（{time.time()-t0:.1f}s）")
+            return idx, data, None
         except Exception as e:
-            review.append(f"第 {idx} 页识别失败：{str(e)[:120]}")
-            log(f"  第 {idx}/{len(pages)} 页失败：{str(e)[:120]}")
-            continue
+            msg = str(e)[:120]
+            log(f"  第 {idx}/{len(pages)} 页失败：{msg}")
+            return idx, None, msg
+
+    workers = max(1, int(getattr(args, "concurrency", 1) or 1))
+    if workers > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            for fut in as_completed([ex.submit(_one, i, p) for i, p in todo]):
+                idx, data, err = fut.result()
+                if err:
+                    review.append(f"第 {idx} 页识别失败：{err}")
+                else:
+                    page_results[idx] = data
+    else:
+        for i, p in todo:
+            idx, data, err = _one(i, p)
+            if err:
+                review.append(f"第 {idx} 页识别失败：{err}")
+            else:
+                page_results[idx] = data
+
+    # ③ 按页序合并
+    for idx in sorted(page_results):
+        page = pages[idx - 1]
+        data = page_results[idx]
         qs = data.get("questions") or []
         ans = data.get("answers") or []
         figs = data.get("figures") or []
-        log(f"  第 {idx}/{len(pages)} 页：{len(qs)} 题、{len(ans)} 个答案（{time.time()-t0:.1f}s）")
 
         # 图形裁剪需要知道每题属于哪类（本页题号即可判断：题号 > 选择题上限的算填空）
         for q in qs:
@@ -331,6 +429,10 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
             if no in q_page:
                 cand += [q_page[no], q_page[no] + 1]
             cand += answer_pages
+            # 缺答案时：候选页不够就扩到全卷（答案常藏在被预筛跳过的解析页里）
+            if no in need_ans:
+                extra = [i for i in range(1, len(pages) + 1) if i not in cand]
+                cand += extra
             cand = [p for p in dict.fromkeys(cand) if 1 <= p <= len(pages)]
             for pno in cand:
                 try:
@@ -460,6 +562,7 @@ def process_pdf(pdf: Path, out_root: Path, args) -> None:
 
 
 def main():
+    global BASE_URL, API_KEY
     ap = argparse.ArgumentParser(description="数学试卷 PDF → JSON（多模态模型）")
     ap.add_argument("-p", "--path", help="单个 PDF 路径")
     ap.add_argument("--dir", default=str(PROJECT_ROOT.parent / "gaozhong"), help="批量模式：素材根目录")
@@ -468,6 +571,9 @@ def main():
     ap.add_argument("-g", "--grade", default="高三", help="年级（用于 tag / paper.grade）")
     ap.add_argument("-o", "--output", default=str(PROJECT_ROOT.parent / "output_json_math"), help="输出根目录")
     ap.add_argument("-m", "--model", default=MODEL, help=f"多模态模型（默认 {MODEL}）")
+    ap.add_argument("--base-url", default=BASE_URL, help=f"接口地址（默认 {BASE_URL}）")
+    ap.add_argument("--api-key", default=None, help="接口密钥（默认取 MATH_VISION_API_KEY / OPENAI_API_KEY）")
+    ap.add_argument("-w", "--concurrency", type=int, default=CONCURRENCY, help="页级并发数（默认 1）")
     ap.add_argument("--dpi", type=int, default=DPI)
     ap.add_argument("--pages", type=int, default=None, help="只处理前 N 页（调试用）")
     ap.add_argument("--choice-max", type=int, default=10, help="选择题最大题号（默认 10）")
@@ -476,7 +582,12 @@ def main():
     ap.add_argument("--duration", type=int, default=120)
     ap.add_argument("--force", action="store_true", help="覆盖已有 JSON")
     ap.add_argument("--no-repair", dest="repair", action="store_false", help="关闭定向补漏")
+    ap.add_argument("--no-smart-pages", dest="smart_pages", action="store_false", help="关闭页面预筛（所有页都送模型）")
     args = ap.parse_args()
+
+    BASE_URL = args.base_url.rstrip("/")
+    if args.api_key:
+        API_KEY = args.api_key
 
     out_root = Path(args.output)
     if args.path:

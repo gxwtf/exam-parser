@@ -305,3 +305,23 @@ MATH_MAX_TOKENS=8000
 | 2016北京东城高三一模（理） | 14（8+6） | 13/14 | 8/8 | 8 | 3 |
 
 注意：**北京卷选择题数量随年份变化**（2014 年是 8 题、2024 年是 10 题），脚本按模型返回的题型判定分组，不看题号区间。
+
+### 速度优化（实测 66s/份 → 9s/份）
+
+| 优化 | 说明 |
+| --- | --- |
+| `reasoning_effort: none` | 关闭思考模式（最大的提速项，单页 15~37s → 2~5s）；可用 `MATH_REASONING=on` 关闭该行为 |
+| 页面预筛 | 先用 `pdftotext` 看文字层，跳过解答题页/解答题答案页（每份能跳过 2~6 页） |
+| 页级并发 `-w` | 本机建议 8，vLLM 批处理吃满 |
+| 请求超时/重试 | `MATH_REQUEST_TIMEOUT`（默认 240s），429/502 自动退避重试 |
+
+换用其它多模态模型（如 OpenRouter）：
+
+```bash
+python3 convert_math_pdf.py -p xxx.pdf \
+  --base-url https://openrouter.ai/api/v1 \
+  --api-key sk-or-xxx \
+  -m nvidia/nemotron-3.5-super-vl:free -w 3
+```
+
+脚本会自动处理 `\(...\)` → `$...$` 分隔符归一化，并对 429/502 重试、对 `finish=length` 自动加大 max_tokens。
