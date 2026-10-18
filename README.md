@@ -134,6 +134,8 @@ python3 batch_convert_md_to_json.py -p ./path/to/paper.md
 exam-parser/
 ├── main.py                      # 主入口（单目录模式）
 ├── batch_convert_md_to_json.py  # 批量转换脚本（保持类型/学科层级）
+├── validate_json.py             # 只校验 JSON 结构（不调 AI）
+├── backfill_re_stems.py         # 阅读表达题干回填（用 md 重算，不调 AI）
 ├── config.py                    # 配置文件
 ├── test_with_existing_response.py  # 测试脚本（用已有 AI 响应）
 ├── prompts/
@@ -151,6 +153,35 @@ exam-parser/
     ├── output/                  # 输出目录（生成的 JSON）
     └── debug/                   # 调试文件（AI 提示词、响应等）
 ```
+
+## 日常运维：增量爬取 / 更新题库 / 修复存量数据
+
+整条流水线（爬取 → md → JSON → 入库）的操作手册在 [`../README.md`](../README.md)，这里只列
+和解析器直接相关的脚本：
+
+| 脚本 | 用途 |
+|------|------|
+| `../check_missing.py` | **仅爬新题**：比对线上清单与本地文件，只下载缺失的卷子（不碰解析器） |
+| `../update_bank.py` | **手动更新题库数据**：按卷子依次跑 md → JSON → 校验 → 入库（内部调用本目录脚本） |
+| `batch_convert_md_to_json.py` | md → JSON（调大模型）。**真题卷请用单文件模式 `-p`**，批量模式会因卷名没有年级而整批跳过 |
+| `validate_json.py` | 只校验 JSON 结构、不调 AI：`venv/bin/python3 validate_json.py <json...>` |
+| `backfill_re_stems.py` | 用 md 重算「阅读表达」题干并回填 JSON / 数据库（`content` 为空时用，不调 AI） |
+
+```bash
+# 常用组合（在 jingshibang 根目录执行）
+PY=exam-parser/venv/bin/python3
+
+python3 check_missing.py                                  # 看线上还缺哪些卷子（只读）
+python3 check_missing.py --download                        # 只补缺失的
+$PY update_bank.py --list                                  # 看哪些卷子还没 md / json / 入库
+$PY update_bank.py --new --steps md,json,validate          # 跑到 JSON 并校验（不写库）
+$PY update_bank.py --new --steps md,json,validate,import   # 含入库（写生产库，慎用）
+$PY backfill_re_stems.py --all --dry-run                   # 阅读表达题干回填演练
+```
+
+改解析逻辑时留意三处历史坑（详见 [`../README.md`](../README.md) 第三节）：阅读表达的
+`questionsText` 必须从 md 提取（不能指望 AI 给题干）、划线题作答提示的插入要容忍断行与
+`explain why?` 写法、`find_questions_after_article` 的结束边界不能用任意 `**` 行。
 
 ## 支持的题型
 
