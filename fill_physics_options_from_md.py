@@ -83,8 +83,16 @@ def main():
                 src = by_no if len(by_no) >= len(miss) else (md_order[pos] if pos < len(md_order) else {}).get("options", {})
                 got = 0
                 for o in miss:
-                    lab = src.get(o["id"], "").strip()
-                    if "![" in lab:      # 选项内容是图片 → 交给 fill_physics_option_images.py
+                    raw = src.get(o["id"], "").strip()
+                    if not raw:
+                        continue
+                    # 去掉图片占位（.wmf 浏览器无法渲染）；若只剩文字就用文字
+                    stripped = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", raw).strip(" ，,．.")
+                    if stripped:
+                        lab = stripped
+                    elif "![" in raw:
+                        continue      # 纯图片选项 → 交给 fill_physics_option_images.py
+                    else:
                         continue
                     if lab:
                         lab = M.wrap_numbers_in_text(M.wrap_plain_math(M.strip_opt_prefix(M.normalize_latex(lab))))
