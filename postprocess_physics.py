@@ -6,6 +6,7 @@
 import argparse, json, re, shutil
 from pathlib import Path
 
+IMGREF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
 ROOT = Path(__file__).parent.parent
 MD_ROOT = ROOT / "output_docx_to_md"
 JROOT = ROOT / "output_json_math"
@@ -70,6 +71,22 @@ def main():
                     lab = re.sub(r"\.wmf\)", ".png)", src)
                     if lab != o["label"]:
                         o["label"] = lab; overwritten += 1; changed = True
+                # 选项里串了多张图（A/B/C/D 挤在一个 label）→ 每个选项只留自己那张
+                counts = [len(IMGREF.findall(str(o["label"]))) for o in q["options"]]
+                if max(counts or [0]) > 1:
+                    names = [Path(m).name for o in q["options"] for m in IMGREF.findall(str(o["label"]))]
+                    uniq = list(dict.fromkeys(names))
+                    if len(uniq) >= 4:
+                        for i, o in enumerate(q["options"]):
+                            o["label"] = f"![](images/{uniq[i]})"
+
+                # 题干里不要重复选项图
+                opt_imgs = {Path(m).name for o in q["options"] for m in IMGREF.findall(str(o["label"]))}
+                if opt_imgs:
+                    q["content"] = re.sub(r"\n{3,}", "\n\n", IMGREF.sub(
+                        lambda m: "" if Path(m.group(1)).name in opt_imgs else m.group(0), q["content"]
+                    )).strip()
+
                 # 表格里的 wmf → png
                 newc = re.sub(r"\.wmf\)", ".png)", q["content"])
                 if newc != q["content"]:
