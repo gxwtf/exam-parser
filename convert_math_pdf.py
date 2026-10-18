@@ -367,9 +367,15 @@ _CIRC = "①②③④⑤⑥⑦⑧⑨⑩"
 
 
 def split_circled(t: str) -> str:
-    """把行内的 ①②③④ 结论拆到独立行（真题卷里每条结论单占一行）"""
+    """把 ①②③④ 结论拆到独立行。
+    注意：markdown 里单个换行会被折成空格，必须用 <br /> 才能真正换行。"""
     t = re.sub(r"(?<!\n)[ \t\u3000]*([" + _CIRC + r"])", r"\n\1", t or "")
-    return re.sub(r"\n{2,}", "\n", t).strip()
+    t = re.sub(r"\n{2,}", "\n", t).strip()
+    # 每条圈号结论前插入 <br />（已存在则不重复插）
+    t = re.sub(r"\n([" + _CIRC + r"])", r"<br />\n\1", t)
+    # 「结论：」后面紧跟圈号却没换行的情况
+    t = re.sub(r"([：:])\s*([" + _CIRC + r"])", r"\1<br />\n\2", t)
+    return t
 
 
 def space_before_input(t: str) -> str:
