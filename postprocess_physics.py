@@ -68,6 +68,10 @@ def main():
                     src = mopt.get(o["id"], "")
                     if "![" not in src:
                         continue
+                    cur = str(o["label"]).strip()
+                    # AI 已经识别出文字/LaTeX 的，以 AI 为准，不要用 MD 的图片覆盖
+                    if cur and "![" not in cur:
+                        continue
                     lab = re.sub(r"\.wmf\)", ".png)", src)
                     if lab != o["label"]:
                         o["label"] = lab; overwritten += 1; changed = True
