@@ -353,6 +353,15 @@ def wrap_plain_math(label: str) -> str:
     return f"${inner}$"
 
 
+
+def wrap_numbers_in_text(label: str) -> str:
+    """选项文本里的独立数字串也包成 $...$（如「10种」→「$10$种」），公式段内不动"""
+    parts = str(label or "").split("$")
+    for i in range(0, len(parts), 2):
+        parts[i] = re.sub(r"(?<![\d.])(-?\d+(?:\.\d+)?)(?![\d.])", r"$\1$", parts[i])
+    return "$".join(parts)
+
+
 def strip_opt_prefix(label: str) -> str:
     """去掉选项标签里的 (A)/(B)/A． 这类前缀"""
     return OPT_PREFIX.sub("", label or "").strip()
@@ -405,7 +414,7 @@ def normalize_question(q: dict, section: str) -> dict | None:
     stem = normalize_latex(strip_notes(q.get("stem") or ""))
 
     coerced = coerce_options(q.get("options"))
-    options = [{"id": k, "label": wrap_plain_math(strip_opt_prefix(v))} for k, v in coerced.items() if k in "abcd"]
+    options = [{"id": k, "label": wrap_numbers_in_text(wrap_plain_math(strip_opt_prefix(v)))} for k, v in coerced.items() if k in "abcd"]
     if section == "choice":
         # 保证 a-d 四个槽位都在
         have = {o["id"] for o in options}
