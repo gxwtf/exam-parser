@@ -366,6 +366,26 @@ def wrap_numbers_in_text(label: str) -> str:
 _CIRC = "①②③④⑤⑥⑦⑧⑨⑩"
 
 
+
+_NUM_PREFIX = re.compile(r"^\s*\d{1,2}\s*[.．、]\s*(?:[（(]\s*\d+\s*分\s*[）)])?\s*")
+_NUM_TAIL = re.compile(r"(?<!<br />\n)(?<!\n)\s*(其中[^。\n]{0,12}序号是|则下列[^。\n]{0,10}是|其中所有[^。\n]{0,12}是)")
+
+
+def strip_number_prefix(t: str) -> str:
+    """题干开头的「9.（5分）」这类题号去掉（前端会自己渲染题号，重复了很难看）"""
+    m = _NUM_PREFIX.match(t or "")
+    if m and m.end() > 0:
+        rest = t[m.end():]
+        if rest.strip() and not rest[:1].isdigit():
+            return rest
+    return t
+
+
+def split_tail_sentence(t: str) -> str:
+    """「④…．其中所有正确结论的序号是」这种小结句前换行"""
+    return _NUM_TAIL.sub(lambda m: "<br />\n" + m.group(1), t or "")
+
+
 def split_circled(t: str) -> str:
     """把 ①②③④ 结论拆到独立行。
     注意：markdown 里单个换行会被折成空格，必须用 <br /> 才能真正换行。"""
@@ -432,7 +452,7 @@ def normalize_question(q: dict, section: str) -> dict | None:
     if section == "choice":
         qtype = "multiple" if raw_type.startswith("multi") else "single"
 
-    stem = space_before_input(split_circled(normalize_latex(strip_notes(q.get("stem") or ""))))
+    stem = space_before_input(split_tail_sentence(split_circled(strip_number_prefix(normalize_latex(strip_notes(q.get("stem") or ""))))))
 
     coerced = coerce_options(q.get("options"))
     options = [{"id": k, "label": wrap_numbers_in_text(wrap_plain_math(strip_opt_prefix(v)))} for k, v in coerced.items() if k in "abcd"]
