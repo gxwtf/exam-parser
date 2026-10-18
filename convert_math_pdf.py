@@ -76,8 +76,9 @@ PAGE_PROMPT = """这是一张北京高中数学试卷（或参考答案）的页
 
 硬性要求：
 1. 题干与选项**逐字照抄原图**，不要改写、不要翻译、不要补全图中没有的内容；图里印错或看不清的，照原样保留并在 note 里说明。
+   **注意：stem 里只能有题干本身，绝对不要写「（题干位于上一页）」「（本页仅显示选项）」这类备注——备注一律放 note 字段。**
 2. 选择题：题干要求"选出符合题目要求的一项"时 type 用 "single"；若本卷选择题说明里写了"多项符合题目要求""有多项符合题目要求"之类，则 type 用 "multiple"。
-3. 选项标签里的公式只写公式本身，不含 (A) 这类前缀；选项在图中确实空缺时 label 用空字符串 ""。
+3. 选项标签只写内容本身，**不要带 (A)/(B)/(C)/(D) 或 A．这类前缀**；选项在图中确实空缺时 label 用空字符串 ""。
 4. 公式用干净的 LaTeX，不要多余空格：\\frac{1}{2}、x^{2}、\\sqrt{3}、\\log_{2}|x|、\\cup、\\infty、\\cap、\\complement_{U}B。
 5. 填空题：把每个空位改写成 <Input2></Input2> 放在原位置（例如"则 A∪B=<Input2></Input2>"）；若原图用下划线表示空位，替换之；若某题看不出空位，note 里写"未识别到空位"。
 6. 题干引用了图形（三视图、程序框图、向量网格图、几何图等）时 hasFigure 置 true，并在 figures 里给出该图在本页的相对坐标 bbox=[x0,y0,x1,y1]（0~1 归一化，左上角为原点）。
@@ -268,12 +269,84 @@ def coerce_options(raw) -> dict[str, str]:
     return {k: normalize_latex(v) for k, v in out.items()}
 
 
+
+def upgrade_inline_frac(tex: str) -> str:
+    r"""行内公式里的 \frac 会被 KaTeX 压成 textstyle（分子分母缩小）；
+    这里升级为 \dfrac 让它按整倍大小排版，上下标内的 \frac 保持不变。"""
+    out = []
+    i, n = 0, len(tex)
+    script_depth = 0
+    brace_stack: list[bool] = []
+    while i < n:
+        if tex.startswith("\\frac", i) and not (i + 5 < n and tex[i + 5].isalpha()):
+            prev = "".join(out[-2:]).rstrip()
+            in_script = script_depth > 0 or prev.endswith(("^", "_"))
+            out.append("\\frac" if in_script else "\\dfrac")
+            i += 5
+            continue
+        ch = tex[i]
+        if ch in "^_":
+            out.append(ch)
+            i += 1
+            if i < n and tex[i] == "{":
+                brace_stack.append(True)
+                script_depth += 1
+                out.append("{")
+                i += 1
+            continue
+        if ch == "{":
+            brace_stack.append(False)
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "}":
+            if brace_stack and brace_stack.pop():
+                script_depth = max(0, script_depth - 1)
+            out.append(ch)
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+
+OPT_PREFIX = re.compile(r"^\s*[（(]?\s*[A-Da-d]\s*[）).．、:：]\s*")
+NOTE_PAREN = re.compile(r"[（(][^（）()]{0,40}(?:本页|跨页|续写|上一页|上页|题干|模型|未识别|不完整|无法)[^（）()]{0,40}[）)]")
+_DELIMS = [("\\left[", "["), ("\\right]", "]"), ("\\left(", "("), ("\\right)", ")"),
+           ("\\left|", "|"), ("\\right|", "|")]
+
+
+def delims_plain(tex: str) -> str:
+    r"""把 \left...\right 自动伸缩括号换成普通括号（真题卷里区间/集合的括号是正常高度，
+    自动伸缩会随分式拉高，出现左右括号高度不一致的观感）。
+    矩阵/分段/array 环境里保留自动伸缩。"""
+    if "\\begin{" in tex:
+        return tex
+    for a, b in _DELIMS:
+        tex = tex.replace(a, b)
+    return tex
+
+
+def strip_opt_prefix(label: str) -> str:
+    """去掉选项标签里的 (A)/(B)/A． 这类前缀"""
+    return OPT_PREFIX.sub("", label or "").strip()
+
+
+def strip_notes(text: str) -> str:
+    """去掉题干里混入的模型备注（如「（题干位于上一页，本页仅显示选项）」）"""
+    out = NOTE_PAREN.sub("", text or "")
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
+
+
 def normalize_latex(text: str) -> str:
     r"""把模型输出的 \(...\) / \[...\] 统一成 $...$ / $$...$$（题库用 remark-math 渲染）"""
     t = text or ""
     if "\\(" in t or "\\[" in t:
         t = t.replace("\\[", "$$").replace("\\]", "$$").replace("\\(", "$").replace("\\)", "$")
     t = re.sub(r"[ \t]{2,}", " ", t)
+    t = re.sub(r"\$([^$]+)\$", lambda m: "$" + upgrade_inline_frac(m.group(1)) + "$", t)
+    t = re.sub(r"\$([^$]+)\$", lambda m: "$" + delims_plain(m.group(1)) + "$", t)
     return t.strip()
 
 
@@ -304,10 +377,10 @@ def normalize_question(q: dict, section: str) -> dict | None:
     if section == "choice":
         qtype = "multiple" if raw_type.startswith("multi") else "single"
 
-    stem = normalize_latex(q.get("stem") or "")
+    stem = normalize_latex(strip_notes(q.get("stem") or ""))
 
     coerced = coerce_options(q.get("options"))
-    options = [{"id": k, "label": v} for k, v in coerced.items() if k in "abcd"]
+    options = [{"id": k, "label": strip_opt_prefix(v)} for k, v in coerced.items() if k in "abcd"]
     if section == "choice":
         # 保证 a-d 四个槽位都在
         have = {o["id"] for o in options}
