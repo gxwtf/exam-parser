@@ -27,7 +27,7 @@ def md_question_segments(md_path: Path) -> dict[int, str]:
             txt = txt[:i]
             break
     segs: dict[int, str] = {}
-    marks = [(m.start(), m.end(), int(m.group(1))) for m in re.finditer(r"(?m)^\s*(\d{1,2})\s*[．.、]\s*", txt) if 1 <= int(m.group(1)) <= 25]
+    marks = [(m.start(), m.end(), int(m.group(1))) for m in re.finditer(r"(?m)^\s*(\d{1,2})\s*\\?[．.、]\s*", txt) if 1 <= int(m.group(1)) <= 25]
     for idx, (_, start, no) in enumerate(marks):
         end = marks[idx + 1][0] if idx + 1 < len(marks) else len(txt)
         segs.setdefault(no, txt[start:end])
@@ -63,10 +63,36 @@ def main():
         changed = False
         for sec in data["sections"]:
             for pos, q in enumerate(sec["questions"]):
+                # 脏数据修复：label 里塞进了多个选项（形如 "![](...) B. ![](...)"）→ 清空重取
+                for o in q["options"]:
+                    if re.search(r"!\[[^\]]*\]\([^)]*\)\s*[B-Da-d]\s*[．.]", str(o["label"])):
+                        o["label"] = ""
+                        changed = True
                 miss = [o for o in q["options"] if not o["label"]]
                 if not miss:
                     continue
                 seg_by_no = segs.get(q["id"], "")
+                # 优先：本页选项就是图片时，形如「A. ![alt](images/x.png) B. ![alt](images/y.png) …」
+                per_opt = dict((m.group(1).lower(), m.group(2))
+                               for m in re.finditer(r"([A-Da-d])\s*\\.?\s*!\[[^\]]*\]\((images/[^)]+)\)", seg_by_no))
+                if len(per_opt) >= 4:
+                    dst_dir.mkdir(parents=True, exist_ok=True)
+                    done = 0
+                    for o in q["options"]:
+                        ref = per_opt.get(o["id"])
+                        if not ref:
+                            continue
+                        src = md.parent / ref
+                        if not src.exists():
+                            continue
+                        name = f"{jf.stem}_q{q['id']}_{o['id']}{src.suffix}"
+                        if not args.dry_run:
+                            shutil.copyfile(src, dst_dir / name)
+                        o["label"] = f"![](images/{name})"
+                        done += 1
+                    if done == 4:
+                        filled_q += 1; filled_o += 4; changed = True
+                        continue
                 n_by_no = len(IMGREF.findall(seg_by_no))
                 seg = seg_by_no if n_by_no >= len(miss) else (seg_order[pos] if pos < len(seg_order) else "")
                 imgs = [md.parent / p for p in IMGREF.findall(seg) if (md.parent / p).exists()]

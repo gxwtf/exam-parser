@@ -13,8 +13,8 @@ ROOT = Path(__file__).parent.parent
 MD_ROOT = ROOT / "output_docx_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 
-QSPLIT = re.compile(r"(?m)^\s*(\d{1,2})\s*[．.、]\s*")
-OPT_LINE = re.compile(r"(?m)^\s*([A-Da-d])\s*[．.、]\s*(.+?)\s*$")
+QSPLIT = re.compile(r"(?m)^\s*(\d{1,2})\s*\\?[．.、]\s*")
+OPT_LINE = re.compile(r"(?m)^\s*([A-Da-d])\s*\\?[．.、]\s*(.+?)\s*$")
 
 
 def md_questions(md_path: Path) -> dict[int, dict]:
@@ -84,6 +84,8 @@ def main():
                 got = 0
                 for o in miss:
                     lab = src.get(o["id"], "").strip()
+                    if "![" in lab:      # 选项内容是图片 → 交给 fill_physics_option_images.py
+                        continue
                     if lab:
                         lab = M.wrap_numbers_in_text(M.wrap_plain_math(M.strip_opt_prefix(M.normalize_latex(lab))))
                         o["label"] = lab

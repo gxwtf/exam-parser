@@ -13,7 +13,7 @@ ROOT = Path(__file__).parent.parent
 MD_ROOT = ROOT / "output_docx_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 
-QSPLIT = re.compile(r"(?m)^\s*(\d{1,2})\s*[．.、]\s*")
+QSPLIT = re.compile(r"(?m)^\s*(\d{1,2})\s*\\?[．.、]\s*")
 IMGREF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
 MIN_W, MIN_H = 120, 60
 
