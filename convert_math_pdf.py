@@ -90,7 +90,9 @@ PAGE_PROMPT = """这是一张北京高中数学试卷（或参考答案）的页
 
 
 REPAIR_PROMPT = """这张图是数学试卷（或答案）的一页。请只处理第 {no} 题：
-- 若本页印有该题的四个选项，输出 {{"options": [{{"id": "a", "label": "$...$"}}, {{"id": "b", "label": "$...$"}}, {{"id": "c", "label": "$...$"}}, {{"id": "d", "label": "$...$"}}]}}
+- 若本页印有该题的选项，输出 {{"options": [...]}}。注意：
+  · 只输出**本页实际印出**的那几项即可（可能只有 a、b，或只有 c、d，跨页时很常见）
+  · 若本页顶部有不带题号的孤立选项行（例如紧接着上一页的题干），它们就属于第 {no} 题，请一并输出
 - 若本页印有该题的答案，输出 {{"answer": "X"}}。答案可能不在答案表里，而在解析末尾，形如「故选 A．」「故答案为：X」「故填：X」——这些都算该题答案（多空答案用「；」分隔并全部保留）
 - 若本页有该题题干的**续写部分**（例如结论 ①②③④、以及最后一行「其中所有正确结论的序号是 ____」），
   请输出 {{"stem": "该题完整题干（用本页续写补全，空位写成 <Input2></Input2>，公式用 $...$）"}}
@@ -242,6 +244,30 @@ def crop_figures(image: Path, figures: list[dict], out_img_dir: Path, stem: str)
     return saved
 
 
+def coerce_options(raw) -> dict[str, str]:
+    """把模型返回的选项统一成 {'a': label, ...}
+    兼容三种形态：{id,label} 数组、纯字符串数组、{"a": "...", "b": "..."}
+    （模型经常把选项写成 ["②", "①③", "②③", "①②"] 这种字符串数组）"""
+    out: dict[str, str] = {}
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            k2 = str(k).strip().lower()
+            if k2 in "abcd":
+                out[k2] = str(v)
+    elif isinstance(raw, list):
+        for i, item in enumerate(raw[:4]):
+            pos = "abcd"[i]
+            if isinstance(item, dict):
+                k = str(item.get("id") or item.get("key") or "").strip().lower()
+                lab = item.get("label")
+                if lab is None:
+                    lab = item.get("text") or item.get("value") or item.get("content") or ""
+                out[k if k in "abcd" else pos] = str(lab)
+            else:
+                out[pos] = str(item)
+    return {k: normalize_latex(v) for k, v in out.items()}
+
+
 def normalize_latex(text: str) -> str:
     r"""把模型输出的 \(...\) / \[...\] 统一成 $...$ / $$...$$（题库用 remark-math 渲染）"""
     t = text or ""
@@ -280,12 +306,8 @@ def normalize_question(q: dict, section: str) -> dict | None:
 
     stem = normalize_latex(q.get("stem") or "")
 
-    options = []
-    for o in (q.get("options") or []):
-        oid = str(o.get("id") or "").strip().lower()
-        label = normalize_latex(o.get("label") or "")
-        if oid in {"a", "b", "c", "d"}:
-            options.append({"id": oid, "label": label})
+    coerced = coerce_options(q.get("options"))
+    options = [{"id": k, "label": v} for k, v in coerced.items() if k in "abcd"]
     if section == "choice":
         # 保证 a-d 四个槽位都在
         have = {o["id"] for o in options}
@@ -435,7 +457,7 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
         for no in sorted(set(need_opt) | set(need_ans) | set(need_stem)):
             cand = []
             if no in q_page:
-                cand += [q_page[no], q_page[no] + 1]
+                cand += [q_page[no], q_page[no] + 1, q_page[no] + 2, q_page[no] - 1]
             cand += answer_pages
             # 缺答案时：候选页不够就扩到全卷（答案常藏在被预筛跳过的解析页里）
             if no in need_ans or no in need_stem:
@@ -447,14 +469,20 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
                     got = repair_question(pages[pno - 1], no, model)
                 except Exception:
                     continue
-                opts = got.get("options") or []
-                if no in need_opt and opts:
-                    fixed = [{"id": str(o.get("id", "")).lower(), "label": (o.get("label") or "").strip()}
-                             for o in opts if str(o.get("id", "")).lower() in "abcd"]
-                    if len(fixed) == 4 and all(o["label"] for o in fixed):
-                        fixed.sort(key=lambda o: "abcd".index(o["id"]))
-                        all_q[no]["options"] = fixed
-                        log(f"  补漏：第{no}题选项（第{pno}页）")
+                opts_map = coerce_options(got.get("options"))
+                if no in need_opt and opts_map:
+                    # 跨页累积：把本页拿到的选项并入已有选项，凑齐 a~d 才算成功
+                    cur = {o["id"]: o for o in all_q[no]["options"]}
+                    added = []
+                    for oid, lab in opts_map.items():
+                        if oid in "abcd" and lab and not cur.get(oid, {}).get("label"):
+                            cur[oid] = {"id": oid, "label": lab}
+                            added.append(oid)
+                    if added:
+                        all_q[no]["options"] = [cur[i] for i in "abcd" if i in cur]
+                        log(f"  补漏：第{no}题选项 {'/'.join(added)}（第{pno}页）")
+                    if all(cur.get(i, {}).get("label") for i in "abcd"):
+                        all_q[no]["options"] = [cur[i] for i in "abcd"]
                         need_opt.remove(no)
                 stemv = (got.get("stem") or "").strip()
                 if no in need_stem and stemv and len(stemv) > len(all_q[no]["content"]):
