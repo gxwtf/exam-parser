@@ -86,13 +86,9 @@ def main():
                     raw = src.get(o["id"], "").strip()
                     if not raw:
                         continue
-                    # 去掉图片占位（.wmf 浏览器无法渲染）；若只剩文字就用文字
-                    stripped = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", raw).strip(" ，,．.")
-                    if stripped:
-                        lab = stripped
-                    elif "![" in raw:
-                        continue      # 纯图片选项 → 交给 fill_physics_option_images.py
-                    else:
+                    # wmf 已批量转成 png：把引用改指 png，图片保留
+                    lab = re.sub(r"\.wmf\)", ".png)", raw)
+                    if not lab.strip():
                         continue
                     if lab:
                         lab = M.wrap_numbers_in_text(M.wrap_plain_math(M.strip_opt_prefix(M.normalize_latex(lab))))
