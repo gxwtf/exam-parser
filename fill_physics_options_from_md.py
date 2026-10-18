@@ -70,14 +70,17 @@ def main():
         if not md:
             continue
         mdq = md_questions(md)
+        # MD 的题号可能和 PDF 不一致（PDF 13–20 vs MD 1–8）→ 按顺序对应
+        md_order = [mdq[k] for k in sorted(mdq)]
         data = json.loads(jf.read_text(encoding="utf-8"))
         changed = False
         for sec in data["sections"]:
-            for q in sec["questions"]:
+            for pos, q in enumerate(sec["questions"]):
                 miss = [o for o in q["options"] if not o["label"]]
                 if not miss:
                     continue
-                src = mdq.get(q["id"], {}).get("options", {})
+                by_no = mdq.get(q["id"], {}).get("options", {})
+                src = by_no if len(by_no) >= len(miss) else (md_order[pos] if pos < len(md_order) else {}).get("options", {})
                 got = 0
                 for o in miss:
                     lab = src.get(o["id"], "").strip()
