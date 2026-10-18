@@ -362,6 +362,21 @@ def wrap_numbers_in_text(label: str) -> str:
     return "$".join(parts)
 
 
+
+_CIRC = "①②③④⑤⑥⑦⑧⑨⑩"
+
+
+def split_circled(t: str) -> str:
+    """把行内的 ①②③④ 结论拆到独立行（真题卷里每条结论单占一行）"""
+    t = re.sub(r"(?<!\n)[ \t\u3000]*([" + _CIRC + r"])", r"\n\1", t or "")
+    return re.sub(r"\n{2,}", "\n", t).strip()
+
+
+def space_before_input(t: str) -> str:
+    """填空组件 <Input2> 前面补一个空格，避免与前面的文字/公式粘连"""
+    return re.sub(r"(?<![ \n\u3000])<Input2>", " <Input2>", t or "")
+
+
 def strip_opt_prefix(label: str) -> str:
     """去掉选项标签里的 (A)/(B)/A． 这类前缀"""
     return OPT_PREFIX.sub("", label or "").strip()
@@ -411,7 +426,7 @@ def normalize_question(q: dict, section: str) -> dict | None:
     if section == "choice":
         qtype = "multiple" if raw_type.startswith("multi") else "single"
 
-    stem = normalize_latex(strip_notes(q.get("stem") or ""))
+    stem = space_before_input(split_circled(normalize_latex(strip_notes(q.get("stem") or ""))))
 
     coerced = coerce_options(q.get("options"))
     options = [{"id": k, "label": wrap_numbers_in_text(wrap_plain_math(strip_opt_prefix(v)))} for k, v in coerced.items() if k in "abcd"]
