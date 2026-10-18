@@ -6,7 +6,7 @@ MD 由 batch_convert_docx_to_md.py 生成：图片已导出到 <卷>/images/，
 
 用法：python3 attach_physics_images.py --type 二模 [--dry-run]
 """
-import argparse, json, re, subprocess
+import argparse, json, re, shutil, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -83,6 +83,13 @@ def main():
                 content = re.sub(r"\n*!\[\]\([^)]*\)", "", q["content"])   # 先清旧图
                 srcs = imgs.get(no, [])
                 if srcs:
+                    # 复制到与试卷名一致的目录，保证 /exam-images/<类型>/<学科>/<卷名>/images/ 可访问
+                    dst_dir = MD_ROOT / args.type / "物理" / stem / "images"
+                    if not args.dry_run:
+                        dst_dir.mkdir(parents=True, exist_ok=True)
+                        for p in srcs:
+                            if not (dst_dir / p.name).exists():
+                                shutil.copyfile(p, dst_dir / p.name)
                     refs = [f"![](images/{p.name})" for p in srcs]
                     content = content.rstrip() + "\n\n" + "\n\n".join(refs)
                     total_img += len(refs)
