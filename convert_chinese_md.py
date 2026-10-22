@@ -287,7 +287,6 @@ def finalize_article(article: str, category: str) -> str:
             lines[i] = f"<RightAlign>{t}</RightAlign>"
     article = "\n".join(lines)
     article = re.sub(r"\n{3,}", "\n\n", article)
-    article = notes_to_footnotes(article)
     return article.strip()
 
 
@@ -333,9 +332,9 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
                     and not re.match(r"^(材料[一二三四]|#|①|②|[（(])", first)
                     and not re.search(r"[。！？；]$", first))
         if is_title:
-            # 标题里的注释角标转成 GFM 脚注引用（稍后统一生成脚注定义）
-            clean = re.sub(r"<sup>\s*【(\d{1,2})】\s*</sup>", lambda m: f"[^{m.group(1)}]", first)
-            clean = re.sub(r"【(\d{1,2})】", lambda m: f"[^{m.group(1)}]", clean).strip()
+            # 标题里的注释角标保持普通上标（不做脚注跳转）
+            clean = re.sub(r"【(\d{1,2})】", lambda m: f"<sup>【{m.group(1)}】</sup>", first)
+            clean = re.sub(r"<sup>\s*<sup>(【\d+】)</sup>\s*</sup>", r"<sup>\1</sup>", clean).strip()
             lines[idx] = "### " + clean
             article = "\n".join(lines)
     # 题目
