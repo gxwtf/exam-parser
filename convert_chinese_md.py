@@ -139,6 +139,23 @@ def section_of(body: str, qno: int) -> tuple[int, int]:
     return start, end
 
 
+def _question_segment(body: str, qno: int) -> str:
+    marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(body)]
+    hit = next(((s2, e2) for s2, e2, n in marks if n == qno), None)
+    if not hit:
+        return ""
+    nxt = next((s2 for s2, _, n in marks if n > qno), len(body))
+    seg = body[hit[1]:nxt]
+    cut = len(seg)
+    for pat in (SEC_SPLIT,
+                re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
+                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d")):
+        m = pat.search(seg)
+        if m and m.start() < cut:
+            cut = m.start()
+    return seg[:cut]
+
+
 def parse_question(body: str, qno: int) -> dict | None:
     marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(body)]
     hit = next(((s, e) for s, e, n in marks if n == qno), None)
@@ -189,6 +206,56 @@ def parse_question(body: str, qno: int) -> dict | None:
         ordered = [{"id": k, "label": merged.get(k, "")} for k in "abcd"]
         return {"id": qno, "questionType": "single", "content": head, "options": ordered, "score": score}
     return {"id": qno, "questionType": "text", "content": seg.strip(), "options": [], "score": score}
+
+
+OPT_PROMPT = r"""下面是一道语文选择题的原文片段（选项可能是两栏排版：A、B 在同一行，下一行分别是 A、B 的续行）。
+
+请把 A、B、C、D 四个选项**完整还原**（把属于该选项的续行也并进去），逐字照抄，不要改写、不要补内容：
+
+{"a":"...","b":"...","c":"...","d":"..."}
+
+要求：不要带 A．/B． 前缀；每项只写该选项自己的内容（不要把另一个选项的文字带进来）；只输出 JSON。
+
+原文：
+"""
+
+
+def looks_broken(q: dict, seg: str) -> bool:
+    """选项是否切坏了：有空项 / 含别的选项标号 / 选项区有续行"""
+    if q.get("questionType") != "single" or not q.get("options"):
+        return False
+    labels = {o["id"]: (o.get("label") or "").strip() for o in q["options"]}
+    if any(not v for v in labels.values()):
+        return True
+    for k, v in labels.items():
+        for other in "ABCD":
+            if other.lower() != k and re.search(rf"(^|\s){other}[．.、]", v):
+                return True
+    # 选项区里有「不以 A-D 开头、但有字」的行 → 说明有续行没并进去
+    m = OPT_LINE.search(seg)
+    if m:
+        tail = seg[m.start():]
+        for ln in tail.split("\n"):
+            t = ln.strip()
+            if t and not OPT_LINE.match(ln) and not re.match(r"^[A-D][．.、]", t):
+                return True
+    return False
+
+
+def ai_options(seg: str) -> dict[str, str]:
+    try:
+        got = chat([{"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": OPT_PROMPT + seg[:4000]}], max_tokens=2000)
+    except Exception:
+        return {}
+    if not isinstance(got, dict):
+        return {}
+    out = {}
+    for k in "abcd":
+        v = str(got.get(k) or "").strip()
+        if v:
+            out[k] = re.sub(r"\s+", " ", v)
+    return out if len(out) == 4 else {}
 
 
 def parse_answers(ans: str) -> dict[int, str]:
@@ -347,6 +414,15 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
         q["answer"] = answers.get(no, "")
         q["analysis"] = ""
         q["score"] = q.get("score") or 0
+        # 选项两栏/带续行时，纯正则切不干净 → 让模型把每个选项整段还原
+        if q["questionType"] == "single":
+            seg_q = _question_segment(body, no)
+            if looks_broken(q, seg_q):
+                fixed = ai_options(seg_q)
+                if fixed:
+                    q["options"] = [{"id": k, "label": fixed[k]} for k in "abcd"]
+                else:
+                    review.append(f"第{no}题选项切分可疑且 AI 未能还原")
         if not q["answer"]:
             review.append(f"第{no}题缺答案")
         qs.append(q)
