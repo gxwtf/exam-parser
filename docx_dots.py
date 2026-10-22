@@ -17,27 +17,32 @@ from xml.etree import ElementTree as ET
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
-def _para_runs(p) -> list[tuple[str, bool]]:
-    """返回 [(文字, 是否加点)]（只取文字 run，忽略表格嵌套里的复杂结构）"""
-    out: list[tuple[str, bool]] = []
+def _para_runs(p) -> list[tuple[str, bool, bool]]:
+    """返回 [(文字, 是否加点, 是否下划线)]（只取文字 run）"""
+    out: list[tuple[str, bool, bool]] = []
     for r in p.iter(W + "r"):
         txt = "".join(t.text or "" for t in r.iter(W + "t"))
         if not txt:
             continue
         rpr = r.find(W + "rPr")
         dotted = False
+        underlined = False
         if rpr is not None:
             em = rpr.find(W + "em")
             if em is not None and (em.get(W + "val") or "dot") == "dot":
                 dotted = True
-        out.append((txt, dotted))
+            u = rpr.find(W + "u")
+            if u is not None and (u.get(W + "val") or "single") not in ("none", "0"):
+                underlined = True
+        out.append((txt, dotted, underlined))
     return out
 
 
 class DocxDots:
     def __init__(self, docx_path: str | Path):
         self.chars: list[str] = []      # 纯文本
-        self.dots: list[bool] = []      # 对应位置是否加点
+        self.dots: list[bool] = []      # 对应位置是否加点（着重号）
+        self.unders: list[bool] = []    # 对应位置是否下划线
         with zipfile.ZipFile(docx_path) as z:
             xml = z.read("word/document.xml")
         root = ET.fromstring(xml)
@@ -46,12 +51,14 @@ class DocxDots:
             return
         for el in body.iter():
             if el.tag == W + "p":
-                for txt, dotted in _para_runs(el):
+                for txt, dotted, underlined in _para_runs(el):
                     for ch in txt:
                         self.chars.append(ch)
                         self.dots.append(dotted)
+                        self.unders.append(underlined)
                 self.chars.append("\n")
                 self.dots.append(False)
+                self.unders.append(False)
         # 预计算「去空白」文本与下标映射，供多次查询复用
         self._idx = [i for i, ch in enumerate(self.chars) if not ch.isspace()]
         self._compact = "".join(self.chars[i] for i in self._idx)
@@ -60,8 +67,8 @@ class DocxDots:
     def _compact_index(self):
         return self._idx
 
-    def _flags_for(self, text: str) -> list[bool] | None:
-        """把 text 与文档文本做「去空白」对齐，返回每个字符（含空格）是否加点"""
+    def _flags_for(self, text: str) -> list[tuple[bool, bool]] | None:
+        """把 text 与文档文本做「去空白」对齐，返回每个字符（含空格）的 (加点, 下划线)"""
         idx = self._compact_index()
         compact = "".join(self.chars[i] for i in idx)
         target = "".join(ch for ch in text if not ch.isspace())
@@ -70,41 +77,54 @@ class DocxDots:
         pos = compact.find(target)
         if pos < 0:
             return None
-        flags: list[bool] = []
+        flags: list[tuple[bool, bool]] = []
         k = pos
         for ch in text:
             if ch.isspace():
-                flags.append(False)
+                flags.append((False, False))
             else:
-                flags.append(self.dots[idx[k]])
+                flags.append((self.dots[idx[k]], self.unders[idx[k]]))
                 k += 1
         return flags
 
     @staticmethod
-    def _apply(text: str, flags: list[bool]) -> str:
-        out, open_tag = [], False
-        for ch, d in zip(text, flags):
-            if d and not open_tag:
-                out.append("<Dot>"); open_tag = True
-            elif not d and open_tag:
-                out.append("</Dot>"); open_tag = False
+    def _apply(text: str, flags: list[tuple[bool, bool]]) -> str:
+        out = []
+        cur = (False, False)
+        for ch, f in zip(text, flags):
+            if f != cur:
+                if cur[1]:
+                    out.append("</U>")
+                if cur[0]:
+                    out.append("</Dot>")
+                if f[0]:
+                    out.append("<Dot>")
+                if f[1]:
+                    out.append("<U>")
+                cur = f
             out.append(ch)
-        if open_tag:
+        if cur[1]:
+            out.append("</U>")
+        if cur[0]:
             out.append("</Dot>")
         return "".join(out)
 
     def annotate(self, text: str) -> str:
-        """把 text 里加点字符包成 <Dot>…</Dot>（保持原文本的空格与标点不变）"""
+        """加点字 → <Dot>…</Dot>，下划线 → <U>…</U>（保持原文空格与标点）"""
         flags = self._flags_for(text)
-        if not flags or not any(flags):
+        if not flags or not any(d or u for d, u in flags):
             return text
         return self._apply(text, flags)
+
+    def has_marks(self, text: str) -> bool:
+        flags = self._flags_for(text)
+        return bool(flags) and any(d or u for d, u in flags)
 
     def _annotate_piece(self, piece: str) -> str:
         """长段落整段对不上时，逐句/逐分句对齐（docx 与 MD 的换行、标点常略不同）"""
         flags = self._flags_for(piece)
         if flags is not None:
-            return self._apply(piece, flags) if any(flags) else piece
+            return self._apply(piece, flags) if any(d or u for d, u in flags) else piece
         for pat in (r"(?<=[。；！？])", r"(?<=[，、：])"):
             segs = [x for x in re.split(pat, piece) if x]
             if len(segs) > 1:

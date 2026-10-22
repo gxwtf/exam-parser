@@ -464,6 +464,56 @@ def notes_to_footnotes(article: str) -> str:
     return body
 
 
+IMG_REF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
+
+
+def _ensure_png(p: Path) -> Path | None:
+    """wmf/emf/tiff 之类转 png（浏览器/nginx 只认 png/jpg/jpeg/gif/webp）"""
+    if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+        return p if p.exists() else None
+    dst = p.with_suffix(".png")
+    if dst.exists():
+        return dst
+    try:
+        import subprocess
+        if p.suffix.lower() == ".wmf":
+            from convert_chemistry_md import wmf_to_png  # 复用化学的 wmf2gd 逻辑
+            wmf_to_png([p])
+        else:
+            subprocess.run(["convert", str(p), "-background", "white", "-alpha", "remove", "-alpha", "off", str(dst)],
+                           capture_output=True, timeout=120)
+    except Exception:
+        return None
+    return dst if dst.exists() else None
+
+
+def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: list[str]) -> str:
+    """把 Markdown 里的相对图片引用改成 nginx 可直接服务的 /exam-images/… 绝对路径"""
+    if not text or "![" not in text:
+        return text
+
+    dst_dir = md_dir.parent.parent / "语文" / stem / "images"   # output_docx_to_md/<类型>/语文/<卷>/images
+
+    def repl(m):
+        ref = m.group(1)
+        src = md_dir / ref
+        png = _ensure_png(src)
+        if png is None:
+            review.append(f"图片缺失：{ref}")
+            return m.group(0)
+        # MD 目录名带「（教师版）」，而入库后的卷名不带 → 复制到按卷名命名的目录，nginx 才服务得到
+        try:
+            import shutil
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            if not (dst_dir / png.name).exists():
+                shutil.copyfile(png, dst_dir / png.name)
+        except Exception as e:
+            review.append(f"图片复制失败：{png.name} {str(e)[:40]}")
+        return f"![]({'/exam-images/' + type_dir + '/语文/' + stem + '/images/' + png.name})"
+
+    return IMG_REF.sub(repl, text)
+
+
 def finalize_article(article: str, category: str) -> str:
     """标题→h3；作者行居中（诗词整段 <Center>）；「（取材于…）」→ <RightAlign>"""
     if not article.strip():
@@ -514,7 +564,8 @@ def finalize_article(article: str, category: str) -> str:
     return article.strip()
 
 
-def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "") -> dict | None:
+def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "",
+                md_dir: Path | None = None, stem_name: str = "", type_dir: str = "二模") -> dict | None:
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
     nos = [int(x) for x in (g.get("questions") or [])]
@@ -648,6 +699,12 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             else:
                 keep.append(dots.annotate_fragments(ln))
         article = "\n".join(keep)
+    if md_dir is not None:
+        article = rewrite_images(article, md_dir, stem_name, type_dir, review)
+        for q in qs:
+            q["content"] = rewrite_images(q["content"], md_dir, stem_name, type_dir, review)
+            for o in q["options"]:
+                o["label"] = rewrite_images(str(o["label"]), md_dir, stem_name, type_dir, review)
     return {
         "category": cat, "questionType": qtype,
         "title": g.get("title") or f"{cat}阅读",
@@ -689,7 +746,7 @@ def process(md: Path, type_dir: str, args) -> str:
     review: list[str] = []
     out_groups = []
     for g in groups:
-        grp = build_group(g, body, answers, review, dots, ans)
+        grp = build_group(g, body, answers, review, dots, ans, md.parent, title, type_dir)
         if grp and grp["questions"]:
             out_groups.append(grp)
 
