@@ -148,6 +148,16 @@ def parse_question(body: str, qno: int) -> dict | None:
     nxt = next((s2 for s2, _, n in marks if n > qno), len(body))
     seg = body[e:nxt]
     seg = re.split(r"\n\s*参考答案", seg)[0]
+    # 截断到下一部分/下一大题/下一组引导语（否则会把「二、本大题共5小题」并进上一题）
+    cut = len(seg)
+    for pat in (SEC_SPLIT,
+                re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
+                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
+                re.compile(r"(?m)^[ \t]*第[二2]部分")):
+        m = pat.search(seg)
+        if m and m.start() < cut:
+            cut = m.start()
+    seg = seg[:cut]
     # 分值：题干第一行里的（N分）/（共N分）
     first_line = seg.split("\n")[0]
     m = re.search(r"[（(]\s*(?:共)?\s*(\d+)\s*分\s*[）)]", first_line)
@@ -203,6 +213,60 @@ def parse_answers(ans: str) -> dict[int, str]:
     return out
 
 
+AUTHOR_RE = re.compile(r"^\\?\[?\s*([唐宋元明清五代先秦两汉魏晋南北朝]{1,6})\s*\\?\]?\s*[·•]?\s*([^\s，。；]{2,10})$")
+SOURCE_RE = re.compile(r"^[（(]\s*取材于[^）)]*[）)]$")
+
+
+def finalize_article(article: str, category: str) -> str:
+    """标题→h3；作者行居中（诗词整段 <Center>）；「（取材于…）」→ <RightAlign>"""
+    if not article.strip():
+        return article
+    lines = article.split("\n")
+    ti = next((i for i, l in enumerate(lines) if l.strip().startswith("### ")), None)
+
+    # 作者行：标题后第一个非空行
+    ai, author = None, None
+    if ti is not None:
+        for j in range(ti + 1, min(len(lines), ti + 4)):
+            t = lines[j].strip()
+            if not t:
+                continue
+            m = AUTHOR_RE.match(t)
+            if m and len(t) <= 16:
+                ai, author = j, f"{m.group(1)}·{m.group(2)}"
+            break
+
+    if category == "古诗" and ti is not None:
+        body = [l for k, l in enumerate(lines[ti + 1:], start=ti + 1) if k != ai]
+        note_at = next((k for k, l in enumerate(body) if re.match(r"^\s*(注释[：:]|【1】)", l)), len(body))
+        poem = [l.strip() for l in body[:note_at] if l.strip()]
+        notes = [l for l in body[note_at:] if l.strip()]
+        head = lines[ti]
+        if author:
+            poem = [author] + poem
+        out = [head, "", "<Center>", ""]
+        out += poem[:1]
+        for l in poem[1:]:
+            out += ["", l]
+        out += ["", "</Center>"]
+        if notes:
+            out += [""] + notes
+        article = "\n".join(out)
+    elif author is not None:
+        lines[ai] = f"<Center>{author}</Center>"
+        article = "\n".join(lines)
+
+    # 出处行「（取材于…）」右对齐
+    lines = article.split("\n")
+    for i, l in enumerate(lines):
+        t = l.strip()
+        if SOURCE_RE.match(t):
+            lines[i] = f"<RightAlign>{t}</RightAlign>"
+    article = "\n".join(lines)
+    article = re.sub(r"\n{3,}", "\n\n", article)
+    return article.strip()
+
+
 def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) -> dict | None:
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
@@ -235,6 +299,21 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
             if a < 0:
                 review.append(f"{cat}：锚点没对上（start={ast[:20]!r}）")
     article = re.sub(r"(?m)^(材料[一二三四])\s*$", r"### \1", article)
+    # 首行若是「标题」（短、不以句末标点结尾、不是 ①② 或「材料一」）→ 升成 Markdown 标题
+    lines = [ln for ln in article.split("\n")]
+    idx = next((i for i, ln in enumerate(lines) if ln.strip()), None)
+    if idx is not None:
+        first = lines[idx].strip()
+        rest = "".join(lines[idx + 1:])
+        is_title = (len(first) <= 40 and len(rest) >= 80
+                    and not re.match(r"^(材料[一二三四]|#|①|②|[（(])", first)
+                    and not re.search(r"[。！？；]$", first))
+        if is_title:
+            # 标题里的注释角标（【1】/<sup>【1】</sup>）去掉，注释本身在文末
+            clean = re.sub(r"<sup>\s*[【(]\s*\d+\s*[】)]\s*</sup>", "", first)
+            clean = re.sub(r"[【(]\s*\d+\s*[】)]\s*$", "", clean).strip()
+            lines[idx] = "### " + clean
+            article = "\n".join(lines)
     # 题目
     qs = []
     for no in nos:
@@ -275,6 +354,7 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
         article = qs[0]["content"]
 
     total = sum(q["score"] for q in qs)
+    article = finalize_article(article, cat)
     return {
         "category": cat, "questionType": qtype,
         "title": g.get("title") or f"{cat}阅读",
