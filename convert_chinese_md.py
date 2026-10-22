@@ -319,6 +319,124 @@ def parse_answers(ans: str) -> dict[int, str]:
     return out
 
 
+def raw_answer(ans: str, qno: int) -> str:
+    """答案区里第 qno 题的原文（**不**在第一个【评分参考】处截断，名著要按小题再拆）"""
+    marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(ans)]
+    for i, (s, e, no) in enumerate(marks):
+        if no != qno:
+            continue
+        nxt = marks[i + 1][0] if i + 1 < len(marks) else len(ans)
+        seg = ans[e:nxt].strip()
+        seg = re.sub(r"^[（(]\s*(?:共)?\s*\d+\s*分\s*[）)]\s*", "", seg).strip()
+        return seg
+    return ""
+
+
+SUBQ_RE = re.compile(r"(?m)^[ \t]*[（(]\s*(\d{1,2})\s*[）)][ \t]*")
+
+# 「根据要求，回答问题。」这类只有指令、没有实际内容的引导语（名著的空题干）
+LEADIN_RES = (
+    re.compile(r"^(?:根据|按)[^。\n]{0,12}(?:要求|提示)[，,]?[^。\n]{0,12}(?:回答|完成|作答)[^。\n]{0,20}[。.]?$"),
+    re.compile(r"^(?:阅读|依据|结合|请)[^。\n]{0,24}(?:回答|完成|作答)[^。\n]{0,16}(?:问题|各题|题目)[^。\n]{0,10}[。.]?$"),
+    re.compile(r"^[^。\n]{0,20}(?:任选|选择)[^。\n]{0,10}(?:一题|其一)[^。\n]{0,10}作答[^。\n]{0,10}[。.]?$"),
+)
+
+PIECE_SCORE_RE = re.compile(r"[（(]\s*(?:共)?\s*(\d+)\s*分\s*[）)]")
+
+
+def strip_leadin(text: str) -> str:
+    """去掉题干开头的「根据要求，回答问题。」之类空引导语（可连续多行）"""
+    t = (text or "").strip()
+    while True:
+        lines = t.split("\n")
+        first = lines[0].strip() if lines else ""
+        if not first or not any(p.match(first) for p in LEADIN_RES):
+            return t.strip()
+        rest = "\n".join(lines[1:]).strip()
+        if not rest:  # 整题只有这句指令 → 保留，别把题干清空
+            return t.strip()
+        t = rest
+
+
+def split_piece_options(piece: str) -> tuple[str, list[dict]]:
+    """小题里若带 A/B/C/D 选项，切出 (题干, 选项)；否则返回 (piece, [])"""
+    m = OPT_LINE.search(piece)
+    if not m:
+        return piece.strip(), []
+    head = piece[:m.start()].strip()
+    body = piece[m.start():]
+    parts = [(mm.start(), mm.group(1).lower()) for mm in re.finditer(r"(?:^|\s)([A-D])[．.、]", body)]
+    if len(parts) < 2:
+        return piece.strip(), []
+    parsed: dict[str, str] = {}
+    for i, (pos, k) in enumerate(parts):
+        endp = parts[i + 1][0] if i + 1 < len(parts) else len(body)
+        parsed.setdefault(k, re.sub(r"^\s*[A-D][．.、]\s*", "", body[pos:endp]).strip())
+    ordered = [{"id": k, "label": parsed.get(k, "")} for k in "abcd"]
+    if sum(1 for o in ordered if o["label"]) < 2:
+        return piece.strip(), []
+    return head, ordered
+
+
+def split_named_book(content: str, ans_raw: str, total_score: int, qno, review: list[str], fallback_answer: str = ""):
+    """名著：材料单独成 content，多个「(1)(2)…」拆成多道小题（每道一个答题框）
+
+    返回 (material, questions)
+    """
+    text = strip_leadin(content)
+    marks = [(m.start(), m.end()) for m in SUBQ_RE.finditer(text)]
+    pieces: list[str] = []
+    material = ""
+    if marks:
+        material = strip_leadin(text[:marks[0][0]])
+        for i, (_s, e) in enumerate(marks):
+            end = marks[i + 1][0] if i + 1 < len(marks) else len(text)
+            pieces.append(text[e:end].strip())
+    else:
+        pieces = [text]
+
+    ans_map: dict[int, str] = {}
+    if ans_raw:
+        amarks = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ_RE.finditer(ans_raw)]
+        for i, (_s, e, n) in enumerate(amarks):
+            end = amarks[i + 1][0] if i + 1 < len(amarks) else len(ans_raw)
+            seg = ans_raw[e:end].strip()
+            seg = re.sub(r"^[（(]\s*(?:共)?\s*\d+\s*分\s*[）)]\s*", "", seg).strip()
+            seg = re.split(r"【评分参考】|【评分标准】", seg)[0].strip()
+            ans_map[n] = seg
+        if len(pieces) > 1 and len(ans_map) != len(pieces):
+            review.append(f"名著：小题数 {len(pieces)} 与答案分段 {len(ans_map)} 不一致")
+
+    questions = []
+    scores: list[int] = []
+    for idx, piece in enumerate(pieces, start=1):
+        m = PIECE_SCORE_RE.search(piece)
+        score = int(m.group(1)) if m else 0
+        if m:
+            piece = (piece[:m.start()] + piece[m.end():]).strip()
+        stem, opts = split_piece_options(piece)
+        q = {
+            "id": f"{qno}-{idx}" if len(pieces) > 1 else qno,
+            "questionType": "single" if opts else "text",
+            "content": stem,
+            "options": opts,
+            "answer": ans_map.get(idx) or (fallback_answer if len(pieces) == 1 else ""),
+            "analysis": "",
+            "score": score,
+        }
+        questions.append(q)
+        scores.append(score)
+
+    # 分值兜底：小题没标分 → 总分给第一题；部分缺 → 差额补最后一题
+    if questions and total_score:
+        s = sum(scores)
+        if s == 0:
+            questions[0]["score"] = total_score
+        elif s < total_score:
+            questions[-1]["score"] += total_score - s
+    return material, questions
+
+
 AUTHOR_RE = re.compile(r"^\\?\[?\s*([唐宋元明清五代先秦两汉魏晋南北朝]{1,6})\s*\\?\]?\s*[·•]?\s*([^\s，。；]{2,10})$")
 SOURCE_RE = re.compile(r"^[（(]\s*取材于[^）)]*[）)]$")
 
@@ -396,7 +514,7 @@ def finalize_article(article: str, category: str) -> str:
     return article.strip()
 
 
-def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None) -> dict | None:
+def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "") -> dict | None:
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
     nos = [int(x) for x in (g.get("questions") or [])]
@@ -495,6 +613,17 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
     if qtype in ("chinese-micro-writing", "chinese-essay") and qs:
         article = qs[0]["content"]
 
+    if cat == "名著" and qs:
+        # 名著：材料（判词/选段）单独作题面，多个「(1)(2)…」拆成多道小题，
+        # 前端按「材料 + 每小题一个答题框」渲染（不再走左右两栏的阅读区）
+        material, sub_qs = split_named_book(qs[0]["content"], raw_answer(ans_raw, nos[0]),
+                                            qs[0].get("score") or 0, nos[0], review,
+                                            qs[0].get("answer") or "")
+        article = material
+        qs = sub_qs
+        if len(qs) > 1:
+            review.append(f"名著：已拆成 {len(qs)} 道小题")
+
     total = sum(q["score"] for q in qs)
     article = finalize_article(article, cat)
     return {
@@ -538,7 +667,7 @@ def process(md: Path, type_dir: str, args) -> str:
     review: list[str] = []
     out_groups = []
     for g in groups:
-        grp = build_group(g, body, answers, review, dots)
+        grp = build_group(g, body, answers, review, dots, ans)
         if grp and grp["questions"]:
             out_groups.append(grp)
 

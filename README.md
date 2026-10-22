@@ -389,3 +389,50 @@ npx tsx scripts/sync-math-json.ts   --type 二模 --subject 化学   # 把 image
 - 未导入 1 份：`2020北京门头沟高三二模化学`（源文件是学生版，整卷无答案，无法判分）。
 - 删除 1 题：`2018北京西城` 第 12 题（答案表只到第 11 题，无答案）。
 - 待人工抽查：16 题「选项整块是图、四等分裁切」、99 处「排版校验未过改用 Unicode 上下标」（见各卷 `.review.txt`）。
+
+---
+
+# 语文（docx → MD → JSON）
+
+语文走的是**和英语同一套「锚点」思路**：文章/材料不交给模型复述，模型只给结构规划（题组划分、
+题号、材料起止锚点），正文与题目一律由脚本从 Markdown 里精确切出。
+
+```bash
+# 单卷（-T 决定输出到 output_json_chinese/<类型>/）
+python3 convert_chinese_md.py -p ../output_docx_to_md/二模/语文/2025北京西城高三二模语文（教师版）/2025北京西城高三二模语文（教师版）.md -T 二模 --force
+
+# 目录批量
+python3 convert_chinese_md.py --dir ../output_docx_to_md -T 二模 -w 3
+```
+
+输出 `../output_json_chinese/<类型>/<卷>.json`：`{paper, groups:[{category, questionType, title,
+intro, content, score, questions[]}]}`，`content` 是该组的**题面材料**，`questions` 是小问。
+`category` 取「多文本 / 文言文 / 古诗 / 文学类 / 名著 / 默写 / 语用 / 微写作 / 作文」，
+入库脚本按它上架到对应题型页。文言文选择题的加点字用 `<Dot>x</Dot>` 标注（读 docx 的 `w:em(dot)`，
+见 `docx_dots.py`）。
+
+## 名著阅读的约定（2026-10-22）
+
+北京卷名著题常见形态是「一句空引导语 + 判词/选段 + (1)(2) 两小问」，题库里按「题面 + 每小题
+一个答题框」呈现，**不再走左右两栏的阅读区**：
+
+1. **去掉空引导语**：`根据要求，回答问题。` / `阅读下面的材料，回答问题。` / `从下面两个题目中
+   任选一题作答。` 这类只有指令、没有实际内容的开头行由 `strip_leadin()` 删掉（`LEADIN_RES` 里维护）。
+2. **材料进 `content`**：第一个小题标号 `(1)`/`（1）` 之前的文字（判词、选段）作为题组 `content`，
+   前端把它排在题干上方（`Problem` 的 `articleLayout="inline"`）。
+3. **多小问拆成多道题**：以行首 `(1)(2)…` 为界拆开，各题从原文里取出自己的分值（`（4分）`），
+   答案同样按 `(1)(2)` 从答案区分段并去掉 `【评分参考】`；分值对不上时有兜底规则（见
+   `split_named_book()`）。
+4. **单问的名著**（没有 `(1)(2)`）：整段仍是一道题，只去掉空引导语，`content` 为空。
+
+## 语文入库
+
+```bash
+cd ~/gxexercise
+npx tsx scripts/import-chinese-json.ts --file ~/jingshibang/output_json_chinese/二模/2025北京西城高三二模语文.json --dry-run
+npx tsx scripts/import-chinese-json.ts --file ... --force   # 覆盖：先删同名套卷再导（作答记录一并删）
+```
+
+前端约定：`category=名著` 的 `chinese-reading` 题组按单栏渲染（材料 + 每小题一个答题框，参考英语
+「阅读表达」的作答体验），其它阅读类（多文本/文言文/古诗/文学类）仍是左文章右题目的两栏；题组
+`content` 为空时不留空的阅读区。
