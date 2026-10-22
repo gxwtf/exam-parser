@@ -319,6 +319,23 @@ def parse_answers(ans: str) -> dict[int, str]:
     return out
 
 
+def answer_blocks(ans: str) -> dict[int, str]:
+    """答案区里每题整段原文（含可能自带的解析文字）"""
+    out: dict[int, str] = {}
+    marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(ans)]
+    for i, (s, e, no) in enumerate(marks):
+        nxt = marks[i + 1][0] if i + 1 < len(marks) else len(ans)
+        seg = ans[e:nxt].strip()
+        seg = re.sub(r"^[（(]\s*(?:共)?\s*\d+\s*分\s*[）)]\s*", "", seg).strip()
+        seg = re.split(r"【评分参考】|【评分标准】", seg)[0].strip()
+        # 同一行里后面还跟着别的题的答案（如「1.（3分）C 2.（3分）A」）→ 截断
+        m = re.search(r"(?<![0-9])\d{1,2}\s*[、.．]\s*[（(]?\s*\d+\s*分", seg)
+        if m:
+            seg = seg[: m.start()].strip()
+        out[no] = seg
+    return out
+
+
 def raw_answer(ans: str, qno: int) -> str:
     """答案区里第 qno 题的原文（**不**在第一个【评分参考】处截断，名著要按小题再拆）"""
     marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(ans)]
@@ -599,8 +616,53 @@ def finalize_article(article: str, category: str) -> str:
     return article.strip()
 
 
-def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "",
+CHOICE_ANALYSIS_PROMPT = r"""下面是若干道语文选择题（含题干、四个选项、正确答案）。
+请为**每一道**写一段解析（60-150 字，中文，专业简洁）：
+
+- 先说正确答案为什么正确（语文题尽量点出原文依据/关键字句/手法）；
+- 再说明其余选项错在哪里（各一句话即可）；
+- 不要复述题干，不要输出与答案无关的内容。
+
+只输出 JSON 对象，键是题号（字符串），值是该题解析文字：
+{"1":"……","2":"……"}
+
+题目：
+"""
+
+
+def ai_choice_analyses(items: list[dict]) -> dict[int, str]:
+    """items: [{id, content, options, answer}] → {id: 解析}"""
+    if not items:
+        return {}
+    payload = []
+    index_map: dict[int, object] = {}
+    for idx, q in enumerate(items, start=1):
+        index_map[idx] = q["id"]
+        opts = "\n".join(f"{o['id'].upper()}．{o['label']}" for o in q.get("options") or [] if str(o.get("label", "")).strip())
+        payload.append(f"【{idx}】\n{q['content']}\n{opts}\n正确答案：{q.get('answer','')}")
+    try:
+        got = chat([{"role": "system", "content": "你是北京高考语文阅卷老师，只输出 JSON。"},
+                    {"role": "user", "content": CHOICE_ANALYSIS_PROMPT + "\n\n".join(payload)[:12000]}],
+                   max_tokens=6000)
+    except Exception as e:
+        log(f"    AI 生成选择题解析失败：{str(e)[:80]}")
+        return {}
+    if not isinstance(got, dict):
+        return {}
+    out = {}
+    for k, v in got.items():
+        try:
+            idx = int(re.sub(r"[^0-9]", "", str(k)))
+        except Exception:
+            continue
+        if idx in index_map and str(v).strip():
+            out[index_map[idx]] = str(v).strip()
+    return out
+
+
+def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "", blocks: dict | None = None,
                 md_dir: Path | None = None, stem_name: str = "", type_dir: str = "二模") -> dict | None:
+    blocks = blocks or {}
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
     nos = [int(x) for x in (g.get("questions") or [])]
@@ -656,6 +718,13 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             continue
         q["answer"] = answers.get(no, "")
         q["analysis"] = ""
+        # 选择题：答案区若自带解析（不只是字母），直接抄过来
+        raw_blk = blocks.get(no, "")
+        if q["questionType"] == "single" and raw_blk:
+            rest = re.sub(r"^\s*[A-D][\s、，,]*", "", raw_blk).strip()
+            rest = re.sub(r"^[A-D]$", "", rest).strip()
+            if len(rest) >= 12:
+                q["analysis"] = rest
         q["score"] = q.get("score") or 0
         # 选项两栏/带续行时，纯正则切不干净 → 让模型把每个选项整段还原
         if q["questionType"] == "single":
@@ -785,11 +854,23 @@ def process(md: Path, type_dir: str, args) -> str:
     out_groups = []
     translation = extract_translation(ans)
     for g in groups:
-        grp = build_group(g, body, answers, review, dots, ans, md.parent, title, type_dir)
+        grp = build_group(g, body, answers, review, dots, ans, answer_blocks(ans), md.parent, title, type_dir)
         if grp and grp["questions"]:
+            # 选择题解析：答案区没有的，让 AI 按答案生成
+            singles = [q for q in grp["questions"] if q["questionType"] == "single" and not (q.get("analysis") or "").strip()]
+            if singles and args.ai_analysis:
+                got = ai_choice_analyses(singles)
+                filled = 0
+                for q in singles:
+                    if got.get(q["id"]):
+                        q["analysis"] = got[q["id"]]
+                        filled += 1
+                if filled:
+                    log(f"  {grp['category']}：AI 补写 {filled} 道选择题解析")
             if translation and grp["category"] == "文言文":
                 for q in grp["questions"]:
-                    q["analysis"] = "【参考译文】\n\n" + translation
+                    base = (q.get("analysis") or "").strip()
+                    q["analysis"] = (base + "\n\n" if base else "") + "【参考译文】\n\n" + translation
                 log(f"  文言文：参考译文已写入 {len(grp['questions'])} 道题的解析")
             out_groups.append(grp)
 
@@ -819,6 +900,7 @@ def main():
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--no-ai", dest="ai", action="store_false")
     ap.add_argument("--no-dots", dest="dots", action="store_false")
+    ap.add_argument("--no-ai-analysis", dest="ai_analysis", action="store_false")
     args = ap.parse_args()
 
     OUT["root"] = Path(args.output)
