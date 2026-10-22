@@ -299,6 +299,7 @@ def ai_options(seg: str) -> dict[str, str]:
 
 def parse_answers(ans: str) -> dict[int, str]:
     """从答案区抽每题答案：选择题取字母，主观题保留整段"""
+    ans = cut_translation_block(ans)
     out: dict[int, str] = {}
     # 先抓「1.（3分）C 2.（3分）A」这种挤在一行的选择题答案
     for m in re.finditer(r"(\d{1,2})\s*[、.．]\s*[（(]\s*(\d+)\s*分\s*[）)]\s*([A-D])(?=[\s\d]|$)", ans):
@@ -319,8 +320,14 @@ def parse_answers(ans: str) -> dict[int, str]:
     return out
 
 
+def cut_translation_block(txt: str) -> str:
+    m = TRANS_RE.search(txt)
+    return txt[: m.start()].rstrip() if m else txt
+
+
 def answer_blocks(ans: str) -> dict[int, str]:
     """答案区里每题整段原文（含可能自带的解析文字）"""
+    ans = cut_translation_block(ans)
     out: dict[int, str] = {}
     marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(ans)]
     for i, (s, e, no) in enumerate(marks):
@@ -766,7 +773,8 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
         article = content
 
     if qtype in ("chinese-micro-writing", "chinese-essay") and qs:
-        article = qs[0]["content"]
+        # 作文/微写作按「直接给题目」渲染，不要阅读框；题干里已经有完整要求
+        article = ""
 
     if cat == "语用" and qs:
         # 语用：题干和选项是同一段原文里的 (1)(2) 两小问，(2) 常被“选项解析”截掉，
