@@ -28,6 +28,29 @@ def _sup(m):
     return inner.translate(SUP)
 
 
+KEEP_TAGS = ("Dot", "U", "Center", "RightAlign", "Input2", "Input", "Superscript", "Blank", "ClozeBlank")
+
+
+def protect_tags(seg: str) -> tuple[str, dict]:
+    import uuid
+    store = {}
+
+    def repl(m):
+        key = f"@@TAG{len(store)}@@"
+        store[key] = m.group(0)
+        return key
+
+    name_re = "|".join(KEEP_TAGS)
+    seg = re.sub(rf"</?({name_re})\s*/?>", repl, seg)
+    return seg, store
+
+
+def restore_tags(seg: str, store: dict) -> str:
+    for k, v in store.items():
+        seg = seg.replace(k, v)
+    return seg
+
+
 def fix_plain(seg: str) -> str:
     seg = re.sub(r"<sub>(.*?)</sub>", _sub, seg, flags=re.S)
     seg = re.sub(r"<sup>(.*?)</sup>", _sup, seg, flags=re.S)
@@ -42,7 +65,9 @@ def fix_plain(seg: str) -> str:
 def fix(text: str) -> str:
     parts = MATH.split(text or "")
     for i in range(0, len(parts), 2):               # 偶数位是数学公式之外
-        parts[i] = fix_plain(parts[i])
+        seg, store = protect_tags(parts[i])
+        seg = fix_plain(seg)
+        parts[i] = restore_tags(seg, store)
     return "".join(parts)
 
 

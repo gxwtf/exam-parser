@@ -39,9 +39,9 @@ BASE_URL = (os.getenv("MATH_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL", "h
 API_KEY = os.getenv("MATH_VISION_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 MODEL = os.getenv("MATH_VISION_MODEL") or os.getenv("OPENAI_MODEL", "deepseek-v4.1-flash")
 
-QSPLIT = re.compile(r"(?m)^[ \t]*(\d{1,2})[、.．](?!\d)\s*")
+QSPLIT = re.compile(r"(?m)^[ \t\u3000\u00a0]*(?:(?:!\[[^\]]*\]\([^)]*\)|⟦IMG\d+⟧)[ \t]*)*\**[ \t]*(\d{1,2})[ \t]*\\?(?:[、．]|\.(?!\d|%))[ \t]*")
 SEC_SPLIT = re.compile(r"(?m)^[ \t]*([一二三四五六七八九十])、\s*本大题共\s*(\d+)\s*小题[，,]\s*共\s*(\d+)\s*分")
-OPT_LINE = re.compile(r"(?m)^[ \t]*([A-D])[．.、]\s*(.+)$")
+OPT_LINE = re.compile(r"(?m)^[ \t\u3000\u00a0]*(?:(?:!\[[^\]]*\]\([^)]*\)|⟦IMG\d+⟧)[ \t]*)*\**[ \t]*([A-D])[ \t]*\\?[．.、][ \t]*(.+)$")
 BLANK = re.compile(r"(?:\\_\*\*)+\\_?\**")
 
 SYSTEM_PROMPT = "你是语文试卷结构化助手，只输出 JSON，不要解释。"
@@ -698,6 +698,46 @@ def ai_choice_analyses(items: list[dict]) -> dict[int, str]:
     return out
 
 
+ANSWER_FIX_PROMPT = r"""下面是一份语文试卷的【参考答案/解析】原文，以及若干「目前没取到答案」的题号与题干。
+请从答案原文里为这些题补出答案：
+
+- 选择题：只给选项字母（多选连写，如 "BD"）；
+- 主观题：摘录答案要点/示例（不要写“见解析”这类空话，尽量原文摘录）；
+- 实在没有的题不要编，跳过。
+
+只输出 JSON 对象：{"题号":"答案"}
+题号与题干：
+{items}
+
+答案原文：
+"""
+
+
+def ai_fill_answers(items: list[dict], ans_text: str, wanted: list) -> dict:
+    if not items or not ans_text.strip():
+        return {}
+    lines = []
+    for q in items:
+        stem = re.sub(r"\s+", " ", str(q.get("content") or ""))[:120]
+        lines.append(f"- {q['id']}｜{stem}")
+    try:
+        got = chat([{"role": "system", "content": "你是语文阅卷老师，只输出 JSON。"},
+                    {"role": "user", "content": ANSWER_FIX_PROMPT.format(items="\n".join(lines)[:6000])
+                     + ans_text[:12000]}], max_tokens=4000)
+    except Exception:
+        return {}
+    if not isinstance(got, dict):
+        return {}
+    out = {}
+    for k, v in got.items():
+        rid = str(k).strip()
+        val = str(v).strip()
+        if not val:
+            continue
+        out[rid] = val
+    return out
+
+
 def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "", blocks: dict | None = None,
                 md_dir: Path | None = None, stem_name: str = "", type_dir: str = "二模") -> dict | None:
     blocks = blocks or {}
@@ -807,6 +847,17 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
         # 作文/微写作按「直接给题目」渲染，不要阅读框；题干里已经有完整要求
         article = ""
 
+    # 旧卷（2016 及以前）：一个大题（1 个题号）里套 (1)(2)… 若干小题 → 拆开
+    if cat in ("多文本", "文言文", "古诗", "文学类", "名著", "语用") and qs:
+        seg_raw0 = _question_segment(body, nos[0])
+        if len(qs) == 1 and len(SUBQ_RE.findall(seg_raw0)) >= 2:
+            material, sub_qs = split_named_book(seg_raw0, raw_answer(ans_raw, nos[0]),
+                                                qs[0].get("score") or 0, nos[0], review,
+                                                qs[0].get("answer") or "")
+            if len(sub_qs) > 1:
+                article = material or article
+                qs = sub_qs
+                review.append(f"{cat}：旧卷小题拆分为 {len(qs)} 题")
     if cat == "语用" and qs:
         # 语用：题干和选项是同一段原文里的 (1)(2) 两小问，(2) 常被“选项解析”截掉，
         # 所以这里回到原文片段里重新按小题切
@@ -832,6 +883,18 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             review.append(f"{cat}：已拆成 {len(qs)} 道小题")
 
     total = sum(q["score"] for q in qs)
+    if total == 0 and nos:
+        # 旧卷/新卷都可能只在「一、本大题共 N 小题，共 X 分」里给总分
+        for m in SEC_SPLIT.finditer(body):
+            # 找到包含本题号的那一段
+            seg_start = m.start()
+            nxt = body.find("、", m.start())  # 仅用于定位，无实义
+            if seg_start <= (next((mm.start() for mm in QSPLIT.finditer(body) if int(mm.group(1)) == nos[0]), 0)):
+                total = int(m.group(3))
+        if total and qs:
+            per = max(1, total // max(1, len(qs)))
+            for q in qs:
+                q["score"] = q["score"] or per
     article = finalize_article(article, cat, guess_poetry_kind(g, (g.get("title") or "")) if cat == "古诗" else "shi")
     if dots is not None and article:
         keep = []
@@ -862,6 +925,31 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
 OUT = {"root": OUT_ROOT}
 
 
+DEFAULT_GROUP_SCORES = {"多文本": 18, "文言文": 18, "古诗": 12, "默写": 8, "名著": 10,
+                        "文学类": 18, "语用": 6, "微写作": 10, "作文": 50}
+
+
+def fix_scores(out_groups: list[dict]) -> None:
+    """旧卷/个别卷的分值解析不到时，用北京卷标准分值兜底（总 150）。"""
+    total = sum(g["score"] for g in out_groups)
+    if total >= 100:
+        return
+    for g in out_groups:
+        default = DEFAULT_GROUP_SCORES.get(g["category"])
+        if not default:
+            continue
+        if g["category"] == "默写":
+            for q in g["questions"]:
+                q["score"] = q["score"] or 1
+            g["score"] = sum(q["score"] for q in g["questions"]) or default
+            continue
+        n = max(1, len(g["questions"]))
+        per = max(1, round(default / n))
+        for q in g["questions"]:
+            q["score"] = per
+        g["score"] = sum(q["score"] for q in g["questions"])
+
+
 def process(md: Path, type_dir: str, args) -> str:
     title = re.sub(r"（教师版）|\(教师版\)|含答案", "", md.stem).strip()
     title = re.sub(r"\s+", "", title)
@@ -872,7 +960,23 @@ def process(md: Path, type_dir: str, args) -> str:
     body, ans = split_paper(txt)
     dots = None
     if args.dots and DocxDots is not None:
-        docxs = sorted((PROJECT_ROOT.parent / "gaozhong" / type_dir / "语文").glob(f"{title}*.docx"))
+        src_dir = PROJECT_ROOT.parent / "gaozhong" / type_dir / "语文"
+        docxs = sorted(src_dir.glob(f"{title}*.docx"))
+        if not docxs:
+            docs = sorted(src_dir.glob(f"{title}*.doc"))
+            if docs:
+                cache = Path("/tmp/cn_docx_cache")
+                cache.mkdir(parents=True, exist_ok=True)
+                target = cache / f"{title}.docx"
+                if not target.exists():
+                    try:
+                        import subprocess
+                        subprocess.run(["soffice", "--headless", "--convert-to", "docx", "--outdir", str(cache), str(docs[0])],
+                                       capture_output=True, timeout=180)
+                    except Exception:
+                        pass
+                if target.exists():
+                    docxs = [target]
         if docxs:
             try:
                 dots = DocxDots(docxs[0])
@@ -913,6 +1017,27 @@ def process(md: Path, type_dir: str, args) -> str:
                 log(f"  文言文：参考译文已写入 {len(grp['questions'])} 道题的解析")
             out_groups.append(grp)
 
+    if args.ai_analysis and ans.strip():
+        missing = []
+        for grp in out_groups:
+            for q in grp["questions"]:
+                if not str(q.get("answer") or "").strip():
+                    missing.append(q)
+        if missing:
+            got = ai_fill_answers(missing, ans, [q["id"] for q in missing])
+            filled = 0
+            for grp in out_groups:
+                for q in grp["questions"]:
+                    if not str(q.get("answer") or "").strip() and got.get(str(q["id"])):
+                        q["answer"] = got[str(q["id"])]
+                        filled += 1
+            if filled:
+                log(f"  {title}：AI 从答案区补 {filled}/{len(missing)} 题答案")
+            left = [q["id"] for grp in out_groups for q in grp["questions"] if not str(q.get("answer") or "").strip()]
+            if left:
+                review.append(f"仍缺答案：{left[:20]}")
+
+    fix_scores(out_groups)
     year = re.search(r"(20\d{2})", title)
     total = sum(g["score"] for g in out_groups)
     paper = {
@@ -940,6 +1065,7 @@ def main():
     ap.add_argument("--no-ai", dest="ai", action="store_false")
     ap.add_argument("--no-dots", dest="dots", action="store_false")
     ap.add_argument("--no-ai-analysis", dest="ai_analysis", action="store_false")
+    ap.add_argument("-w", "--workers", type=int, default=3)
     args = ap.parse_args()
 
     OUT["root"] = Path(args.output)
@@ -950,11 +1076,18 @@ def main():
         root = Path(args.dir) / args.type / "语文"
         files = [sorted(d.glob("*.md"))[0] for d in sorted(root.iterdir()) if d.is_dir() and sorted(d.glob("*.md"))]
     log(f"共 {len(files)} 份 MD")
-    for f in files:
-        try:
-            log("  " + process(f, args.type, args))
-        except Exception as e:
-            log(f"  ✗ {f.parent.name}: {str(e)[:200]}")
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    reps = []
+    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
+        futs = {ex.submit(process, f, args.type, args): f for f in files}
+        for fut in as_completed(futs):
+            try:
+                log("  " + fut.result())
+                reps.append(True)
+            except Exception as e:
+                log(f"  ✗ {futs[fut].parent.name}: {str(e)[:200]}")
+                reps.append(False)
+    log(f"完成：成功 {sum(reps)} / {len(files)}")
 
 
 if __name__ == "__main__":
