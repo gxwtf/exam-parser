@@ -514,6 +514,21 @@ def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: li
     return IMG_REF.sub(repl, text)
 
 
+TRANS_RE = re.compile(r"(?m)^[ \t]*附\s*[：:]?\s*(?:文言文)?参考译文[ \t]*$")
+
+
+def extract_translation(txt: str) -> str:
+    """取「附：文言文参考译文」之后到文末的译文（没有就返回空串）"""
+    m = TRANS_RE.search(txt)
+    if not m:
+        m = re.search(r"(?m)^[ \t]*(?:文言文)?参考译文[ \t]*$", txt)
+    if not m:
+        return ""
+    seg = txt[m.end():].strip()
+    seg = re.sub(r"\n{3,}", "\n\n", seg)
+    return seg
+
+
 def finalize_article(article: str, category: str) -> str:
     """标题→h3；作者行居中（诗词整段 <Center>）；「（取材于…）」→ <RightAlign>"""
     if not article.strip():
@@ -745,9 +760,14 @@ def process(md: Path, type_dir: str, args) -> str:
     answers = parse_answers(ans)
     review: list[str] = []
     out_groups = []
+    translation = extract_translation(ans)
     for g in groups:
         grp = build_group(g, body, answers, review, dots, ans, md.parent, title, type_dir)
         if grp and grp["questions"]:
+            if translation and grp["category"] == "文言文":
+                for q in grp["questions"]:
+                    q["analysis"] = "【参考译文】\n\n" + translation
+                log(f"  文言文：参考译文已写入 {len(grp['questions'])} 道题的解析")
             out_groups.append(grp)
 
     year = re.search(r"(20\d{2})", title)
