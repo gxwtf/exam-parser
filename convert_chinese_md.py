@@ -626,6 +626,15 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
 
     total = sum(q["score"] for q in qs)
     article = finalize_article(article, cat)
+    if dots is not None and article:
+        keep = []
+        for ln in article.split("\n"):
+            t = ln.strip()
+            if (not t) or t.startswith(("#", "<")) or t.startswith("注释") or re.match(r"^【\d+】", t):
+                keep.append(ln)
+            else:
+                keep.append(dots.annotate_fragments(ln))
+        article = "\n".join(keep)
     return {
         "category": cat, "questionType": qtype,
         "title": g.get("title") or f"{cat}阅读",

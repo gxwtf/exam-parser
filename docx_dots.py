@@ -52,16 +52,13 @@ class DocxDots:
                         self.dots.append(dotted)
                 self.chars.append("\n")
                 self.dots.append(False)
-        # 去掉表格段落重复（w:p 在表格里也会被 iter 到，这里只做去重后的正常追加，够用）
+        # 预计算「去空白」文本与下标映射，供多次查询复用
+        self._idx = [i for i, ch in enumerate(self.chars) if not ch.isspace()]
+        self._compact = "".join(self.chars[i] for i in self._idx)
 
     # ---- 查询 ----
     def _compact_index(self):
-        """紧凑化（去空白）后的 字符→原下标 映射"""
-        idx = []
-        for i, ch in enumerate(self.chars):
-            if not ch.isspace():
-                idx.append(i)
-        return idx
+        return self._idx
 
     def _flags_for(self, text: str) -> list[bool] | None:
         """把 text 与文档文本做「去空白」对齐，返回每个字符（含空格）是否加点"""
@@ -83,11 +80,8 @@ class DocxDots:
                 k += 1
         return flags
 
-    def annotate(self, text: str) -> str:
-        """把 text 里加点字符包成 <Dot>…</Dot>（保持原文本的空格与标点不变）"""
-        flags = self._flags_for(text)
-        if not flags or not any(flags):
-            return text
+    @staticmethod
+    def _apply(text: str, flags: list[bool]) -> str:
         out, open_tag = [], False
         for ch, d in zip(text, flags):
             if d and not open_tag:
@@ -99,14 +93,32 @@ class DocxDots:
             out.append("</Dot>")
         return "".join(out)
 
+    def annotate(self, text: str) -> str:
+        """把 text 里加点字符包成 <Dot>…</Dot>（保持原文本的空格与标点不变）"""
+        flags = self._flags_for(text)
+        if not flags or not any(flags):
+            return text
+        return self._apply(text, flags)
+
+    def _annotate_piece(self, piece: str) -> str:
+        """长段落整段对不上时，逐句/逐分句对齐（docx 与 MD 的换行、标点常略不同）"""
+        flags = self._flags_for(piece)
+        if flags is not None:
+            return self._apply(piece, flags) if any(flags) else piece
+        for pat in (r"(?<=[。；！？])", r"(?<=[，、：])"):
+            segs = [x for x in re.split(pat, piece) if x]
+            if len(segs) > 1:
+                return "".join(self._annotate_piece(x) for x in segs)
+        return piece
+
     def annotate_fragments(self, text: str) -> str:
-        """按空白切段逐段标注（两栏选项里每个片段在 docx 里是连续文本，能各自命中）"""
+        """按空白切段逐段标注（两栏选项、长段落都能各自命中）"""
         parts = re.split(r"(\s+)", text or "")
         out = []
         for part in parts:
             if not part:
                 continue
-            out.append(part if part.isspace() else self.annotate(part))
+            out.append(part if part.isspace() else self._annotate_piece(part))
         return "".join(out)
 
     def marked(self, text: str) -> str:
