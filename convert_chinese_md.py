@@ -24,6 +24,11 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+try:
+    from docx_dots import DocxDots
+except Exception:  # 读不了 docx 也不能影响主流程
+    DocxDots = None
+
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -220,6 +225,40 @@ OPT_PROMPT = r"""下面是一道语文选择题的原文片段（选项可能是
 """
 
 
+DOT_PROMPT = r"""下面是一道语文文言文选择题的原文（来自 Word，⟦D:x⟧ 表示 x 这个字在卷面上加了着重号；选项可能是两栏排版：A、B 在同一行，下一行分别是它们的续行）。
+
+请把 A、B、C、D 四个选项**完整还原**（把属于该选项的续行并进去），逐字照抄：
+
+{"a":"...","b":"...","c":"...","d":"..."}
+
+要求：
+1. 不要带 A．/B． 前缀；每个选项只写它自己的文字，不要混入另一个选项。
+2. **所有 ⟦D:x⟧ 标记必须原样保留、位置不变**（这是加点标记，不能丢、不能改）。
+3. 只输出 JSON。
+
+原文：
+"""
+
+
+def ai_options_marked(seg: str) -> dict[str, str]:
+    """用带 ⟦D:x⟧ 的原文让模型还原选项，返回 a-d（标记已转成 <Dot>）"""
+    try:
+        got = chat([{"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": DOT_PROMPT + seg[:4000]}], max_tokens=2500)
+    except Exception:
+        return {}
+    if not isinstance(got, dict):
+        return {}
+    out = {}
+    for k in "abcd":
+        v = str(got.get(k) or "").strip()
+        if not v:
+            return {}
+        v = re.sub(r"\s+", " ", v)
+        out[k] = re.sub(r"⟦D:(.)⟧", r"<Dot>\1</Dot>", v)
+    return out
+
+
 def looks_broken(q: dict, seg: str) -> bool:
     """选项是否切坏了：有空项 / 含别的选项标号 / 选项区有续行"""
     if q.get("questionType") != "single" or not q.get("options"):
@@ -357,7 +396,7 @@ def finalize_article(article: str, category: str) -> str:
     return article.strip()
 
 
-def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) -> dict | None:
+def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None) -> dict | None:
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
     nos = [int(x) for x in (g.get("questions") or [])]
@@ -425,6 +464,10 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
                     review.append(f"第{no}题选项切分可疑且 AI 未能还原")
         if not q["answer"]:
             review.append(f"第{no}题缺答案")
+        if dots is not None and q["questionType"] == "single":
+            q["content"] = dots.annotate_fragments(q["content"])
+            for o in q["options"]:
+                o["label"] = dots.annotate_fragments(o["label"])
         qs.append(q)
 
     if qtype == "chinese-dictation" and qs:
@@ -473,6 +516,15 @@ def process(md: Path, type_dir: str, args) -> str:
         return f"跳过（已存在）：{title}"
     txt = md.read_text(encoding="utf-8")
     body, ans = split_paper(txt)
+    dots = None
+    if args.dots and DocxDots is not None:
+        docxs = sorted((PROJECT_ROOT.parent / "gaozhong" / type_dir / "语文").glob(f"{title}*.docx"))
+        if docxs:
+            try:
+                dots = DocxDots(docxs[0])
+                log(f"  {title}: 已读取 docx 着重号（{docxs[0].name}）")
+            except Exception as e:
+                log(f"  {title}: 读取 docx 着重号失败 {str(e)[:80]}")
 
     plan = {}
     if args.ai:
@@ -486,7 +538,7 @@ def process(md: Path, type_dir: str, args) -> str:
     review: list[str] = []
     out_groups = []
     for g in groups:
-        grp = build_group(g, body, answers, review)
+        grp = build_group(g, body, answers, review, dots)
         if grp and grp["questions"]:
             out_groups.append(grp)
 
@@ -515,6 +567,7 @@ def main():
     ap.add_argument("-o", "--output", default=str(OUT_ROOT))
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--no-ai", dest="ai", action="store_false")
+    ap.add_argument("--no-dots", dest="dots", action="store_false")
     args = ap.parse_args()
 
     OUT["root"] = Path(args.output)
