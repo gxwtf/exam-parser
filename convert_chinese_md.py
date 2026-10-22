@@ -56,7 +56,8 @@ PLAN_PROMPT = r"""下面是一份北京高三语文二模试卷的【试题部�
    "intro":"该题组引导语（原文逐字，如「阅读下面材料，完成1-5题。」；没有就空字符串）",
    "questions":[1,2,3,4,5],
    "article_start":"阅读材料的开头 10-30 个字（原文逐字）",
-   "article_end":"阅读材料的结尾 10-30 个字（原文逐字）"}
+   "article_end":"阅读材料的结尾 10-30 个字（原文逐字）",
+   "poetry":"shi|ci（仅古诗题组：诗写 shi，词写 ci；其它题型留空）"}
 ]}
 
 规则：
@@ -558,6 +559,27 @@ def strip_section_label(text: str) -> str:
     return text
 
 
+CI_PATTERNS = ("念奴娇", "水调歌头", "沁园春", "满江红", "蝶恋花", "青玉案", "破阵子", "临江仙",
+                "渔家傲", "江城子", "卜算子", "如梦令", "相见欢", "苏幕遮", "一剪梅", "声声慢",
+                "雨霖铃", "定风波", "鹧鸪天", "踏莎行", "点绛唇", "忆江南", "长相思", "虞美人",
+                "浣溪沙", "菩萨蛮", "醉花阴", "扬州慢", "望海潮", "桂枝香", "贺新郎", "木兰花")
+
+
+def guess_poetry_kind(g: dict, title: str) -> str:
+    """"shi"（诗，居中）还是 "ci"（词，按普通文段居左）"""
+    kind = (g.get("poetry") or "").strip().lower()
+    if kind in ("shi", "ci"):
+        return kind
+    intro = (g.get("intro") or "") + " " + (title or "")
+    if "这首词" in intro or "本词" in intro or "该词" in intro:
+        return "ci"
+    if any(k in intro for k in CI_PATTERNS):
+        return "ci"
+    if "这首诗" in intro or "本诗" in intro or "这首诗歌" in intro:
+        return "shi"
+    return "shi"
+
+
 TRANS_RE = re.compile(r"(?m)^[ \t]*附\s*[：:]?\s*(?:文言文)?参考译文[ \t]*$")
 
 
@@ -573,7 +595,7 @@ def extract_translation(txt: str) -> str:
     return seg
 
 
-def finalize_article(article: str, category: str) -> str:
+def finalize_article(article: str, category: str, poetry_kind: str = "shi") -> str:
     """标题→h3；作者行居中（诗词整段 <Center>）；「（取材于…）」→ <RightAlign>"""
     if not article.strip():
         return article
@@ -592,7 +614,15 @@ def finalize_article(article: str, category: str) -> str:
                 ai, author = j, f"{m.group(1)}·{m.group(2)}"
             break
 
-    if category == "古诗" and ti is not None:
+    if category == "古诗" and ti is not None and poetry_kind == "ci":
+        # 词：按普通文段居左排版，作者单独一行，不套 <Center>
+        body = [l for k, l in enumerate(lines[ti + 1:], start=ti + 1) if k != ai]
+        blocks = [lines[ti]]
+        if author:
+            blocks.append(author)
+        blocks += [l for l in body if l.strip()]
+        article = "\n\n".join(blocks)
+    elif category == "古诗" and ti is not None:
         body = [l for k, l in enumerate(lines[ti + 1:], start=ti + 1) if k != ai]
         note_at = next((k for k, l in enumerate(body) if re.match(r"^\s*(注释[：:]|【1】)", l)), len(body))
         poem = [l.strip() for l in body[:note_at] if l.strip()]
@@ -801,7 +831,7 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             review.append(f"{cat}：已拆成 {len(qs)} 道小题")
 
     total = sum(q["score"] for q in qs)
-    article = finalize_article(article, cat)
+    article = finalize_article(article, cat, guess_poetry_kind(g, (g.get("title") or "")) if cat == "古诗" else "shi")
     if dots is not None and article:
         keep = []
         for ln in article.split("\n"):
