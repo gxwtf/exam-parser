@@ -54,11 +54,21 @@ def restore_tags(seg: str, store: dict) -> str:
 def fix_plain(seg: str) -> str:
     seg = re.sub(r"<sub>(.*?)</sub>", _sub, seg, flags=re.S)
     seg = re.sub(r"<sup>(.*?)</sup>", _sup, seg, flags=re.S)
-    seg = ALLOWED.sub("\n", seg)
+
+    # 表格行里的 <br> 要保留（换行会把整张表拆坏）；先占位，最后再还原成 <br />
+    out_lines = []
+    for ln in seg.split("\n"):
+        if ln.lstrip().startswith("|"):
+            ln = re.sub(r"<br\s*/?>", "@@BR@@", ln)
+        out_lines.append(ln)
+    seg = "\n".join(out_lines)
+
+    seg = ALLOWED.sub("\n", seg)                    # 其余 <br> 当换行
     seg = re.sub(r"</?[a-zA-Z][^>]*>", "", seg)      # 其它标签去掉，文字保留
     seg = seg.replace("<", "$<$").replace(">", "$>$")
-    seg = re.sub(r"\\+(?=[{}])", "", seg)                   # 先抹掉旧转义（含重复加的斜杠）
-    seg = seg.replace("{", "\\{").replace("}", "\\}")     # MDX 里 {…} 是表达式，必须转义
+    seg = re.sub(r"\\+(?=[{}])", "", seg)              # 先抹掉旧转义（含重复加的斜杠）
+    seg = seg.replace("{", "\\{").replace("}", "\\}")  # MDX 里 {…} 是表达式，必须转义
+    seg = seg.replace("@@BR@@", "<br />")
     return seg
 
 
