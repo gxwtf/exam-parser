@@ -28,7 +28,10 @@ OUT = {"root": OUT_ROOT}
 
 MODULES = ["中特", "经济社会", "政治法治", "哲学文化", "国政国经", "法律生活", "逻辑思维"]
 
-QSPLIT = re.compile(r"(?m)^[ \t\u3000\u00a0]*(?:(?:!\[[^\]]*\]\([^)]*\)|⟦IMG\d+⟧)[ \t]*)*\**[ \t]*(\d{1,2})[ \t]*[.．、][ \t]*")
+QSPLIT = re.compile(r"(?m)^[ \t\u3000\u00a0]*((?:(?:!\[[^\]]*\]\([^)]*\)|⟦IMG\d+⟧)[ \t]*)*)\**[ \t]*(\d{1,2})[ \t]*[.．、][ \t]*")
+SUBQ = re.compile(r"(?m)^[ \t]*[（(]\s*(\d{1,2})\s*[）)][ \t]*")
+BOILER = re.compile(r"[（(]\s*考生务必将答案[^）)]*[）)]")
+RIGHT_LINE = re.compile(r"(?m)^[ \t]*(?:——|—|--|-{2,})\s*(\S.*)$")
 OPT_LINE = re.compile(r"(?m)^[ \t]*([A-D])\s*[.．、]\s*(.+)$")
 SCORE_RE = re.compile(r"[（(]\s*(\d+)\s*分\s*[）)]")
 
@@ -66,6 +69,84 @@ def ai_json(prompt: str, max_tokens=4000) -> dict:
     return got if isinstance(got, dict) else {}
 
 
+def clean_text(t: str) -> str:
+    """政治题干清洗：
+    1) joplin/HTML 表格包裹的列表 → markdown 列表（否则 <th> 会把文字居中）
+    2) 去掉「（考生务必将答案答在答题卡上…）」这类考试须知
+    3) 「——XXX」「（取材于…）」这类出处行 → <RightAlign>
+    """
+    if not t:
+        return t
+    # HTML 列表 → markdown 列表
+    def _html_block(m):
+        block = m.group(0)
+        items = re.findall(r"<li[^>]*>(.*?)</li>", block, flags=re.S)
+        if items:
+            return "\n".join("- " + re.sub(r"<[^>]+>", "", it).strip() for it in items)
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", block, flags=re.S)
+        if rows:
+            out = []
+            for r in rows:
+                cells = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, flags=re.S)]
+                if cells:
+                    out.append("| " + " | ".join(cells) + " |")
+            if out:
+                return "\n".join([out[0], "| " + " | ".join(["---"] * (out[0].count("|") - 1)) + " |"] + out[1:])
+        return re.sub(r"<[^>]+>", "", block)
+    t = re.sub(r"<div[^>]*joplin-table-wrapper[^>]*>.*?</div>", _html_block, t, flags=re.S)
+    t = re.sub(r"<table[^>]*>.*?</table>", _html_block, t, flags=re.S)
+    t = BOILER.sub("", t)
+    lines = []
+    for ln in t.split("\n"):
+        mm = RIGHT_LINE.match(ln)
+        if mm:
+            lines.append(f"<RightAlign>——{mm.group(1).strip()}</RightAlign>")
+        elif re.match(r"^[（(]\s*取材于", ln.strip()):
+            lines.append(f"<RightAlign>{ln.strip()}</RightAlign>")
+        else:
+            lines.append(ln)
+    t = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def split_subs(q: dict, ans_map: dict) -> list[dict]:
+    """解答题：把 (1)(2)(3) 小问拆成多道单题（材料复制到每题前面）"""
+    content = q["content"]
+    marks = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ.finditer(content)]
+    if len(marks) < 2:
+        return [q]
+    material = content[: marks[0][0]].strip()
+    pieces = []
+    for i, (_s, e, no) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(content)
+        piece = content[e:end].strip()
+        m = SCORE_RE.search(piece)
+        score = int(m.group(1)) if m else None
+        if m:
+            piece = (piece[: m.start()] + piece[m.end():]).strip()
+        pieces.append((no, piece, score))
+    # 答案按小问切
+    ans = ans_map.get(q["id"], "")
+    amarks = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ.finditer(ans)]
+    sub_ans: dict[int, str] = {}
+    for i, (_s, e, no) in enumerate(amarks):
+        end = amarks[i + 1][0] if i + 1 < len(amarks) else len(ans)
+        seg = ans[e:end].strip()
+        seg = re.sub(r"^[（(]\s*\d+\s*分\s*[）)]\s*", "", seg).strip()
+        sub_ans[no] = seg
+    out = []
+    for no, piece, score in pieces:
+        out.append({
+            "id": f"{q['id']}-{no}",
+            "questionType": "text",
+            "content": clean_text((material + "\n\n" + f"（{no}）" + piece) if material else f"（{no}）" + piece),
+            "options": [],
+            "score": score,
+            "answer": sub_ans.get(no, "") or (ans if len(pieces) == 1 else ""),
+        })
+    return out
+
+
 def parse_choices(ans: str) -> dict[int, str]:
     """从答案区解析选择题答案（支持「1．A 2．D …」一行多个）"""
     out = {}
@@ -76,7 +157,7 @@ def parse_choices(ans: str) -> dict[int, str]:
 
 def parse_essay_answers(ans: str) -> dict[int, str]:
     out = {}
-    marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(ans)]
+    marks = [(m.start(), m.end(), int(m.group(2))) for m in QSPLIT.finditer(ans)]
     for i, (s, e, no) in enumerate(marks):
         nxt = marks[i + 1][0] if i + 1 < len(marks) else len(ans)
         seg = ans[e:nxt].strip()
@@ -86,12 +167,13 @@ def parse_essay_answers(ans: str) -> dict[int, str]:
 
 
 def parse_questions(body: str):
-    marks = [(m.start(), m.end(), int(m.group(1))) for m in QSPLIT.finditer(body)]
+    marks = [(m.start(), m.end(), int(m.group(2)), m.group(1)) for m in QSPLIT.finditer(body)]
     out = []
-    for i, (s, e, no) in enumerate(marks):
+    for i, (s, e, no, prefix) in enumerate(marks):
         nxt = marks[i + 1][0] if i + 1 < len(marks) else len(body)
-        seg = body[e:nxt]
+        seg = (prefix or "") + body[e:nxt]
         seg = re.split(r"\n\s*参考答案", seg)[0]
+        seg = re.split(r"(?m)^[ \t]*\**[ \t]*第[二2]部分", seg)[0]
         # 分值
         first = seg.split("\n")[0]
         m = SCORE_RE.search(first)
@@ -165,6 +247,9 @@ def process(md: Path, type_dir: str, args) -> str:
         if q["questionType"] != "single":
             continue
         blk = essay_ans.get(q["id"], "")
+        # 选择题的「答案块」可能混进后面的答案列表/第二部分标题 → 先切干净
+        blk = re.split(r"第[二2]部分|第[ⅠⅡI]{1,2}部分", blk)[0]
+        blk = re.split(r"\s\d{1,2}\s*[.．、]\s*[A-D]", blk)[0]
         rest = re.sub(r"^[A-D][\s、，,]*", "", blk).strip()
         if len(rest) >= 12:
             q["analysis"] = rest
@@ -181,12 +266,26 @@ def process(md: Path, type_dir: str, args) -> str:
             if v:
                 q["analysis"] = v
 
-    # 3) 图片改写（政治卷有图表）
+    # 3) 文本清洗 + 解答题拆小问 + 图片改写
     review = []
+    expanded = []
     for q in qs:
-        q["content"] = rewrite_images(q["content"], md.parent, title, type_dir, review)
+        q["content"] = clean_text(q["content"])
+        if q["questionType"] == "text":
+            subs = split_subs(q, essay_ans)
+            for sq in subs:
+                sq["module"] = q["module"]
+                sq["analysis"] = ""
+                expanded.append(sq)
+        else:
+            expanded.append(q)
+    qs = expanded
+    for q in qs:
+        q["content"] = rewrite_images(q["content"], md.parent, title, type_dir, review, "政治")
         for o in q["options"]:
-            o["label"] = rewrite_images(str(o["label"]), md.parent, title, type_dir, review)
+            o["label"] = rewrite_images(str(o["label"]), md.parent, title, type_dir, review, "政治")
+        if q.get("answer"):
+            q["answer"] = rewrite_images(str(q["answer"]), md.parent, title, type_dir, review, "政治")
 
     # 4) 分组：选择题一组 + 每个模块的解答题一组
     choice_qs = [q for q in qs if q["questionType"] == "single"]

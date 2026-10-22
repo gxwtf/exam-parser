@@ -515,12 +515,12 @@ def _ensure_png(p: Path) -> Path | None:
     return dst if dst.exists() else None
 
 
-def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: list[str]) -> str:
+def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: list[str], subject: str = "语文") -> str:
     """把 Markdown 里的相对图片引用改成 nginx 可直接服务的 /exam-images/… 绝对路径"""
     if not text or "![" not in text:
         return text
 
-    dst_dir = md_dir.parent.parent / "语文" / stem / "images"   # output_docx_to_md/<类型>/语文/<卷>/images
+    dst_dir = md_dir.parent.parent / subject / stem / "images"   # output_docx_to_md/<类型>/<学科>/<卷>/images
 
     def repl(m):
         ref = m.group(1)
@@ -537,7 +537,7 @@ def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: li
                 shutil.copyfile(png, dst_dir / png.name)
         except Exception as e:
             review.append(f"图片复制失败：{png.name} {str(e)[:40]}")
-        return f"![]({'/exam-images/' + type_dir + '/语文/' + stem + '/images/' + png.name})"
+        return f"![]({'/exam-images/' + type_dir + '/' + subject + '/' + stem + '/images/' + png.name})"
 
     return IMG_REF.sub(repl, text)
 
