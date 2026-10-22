@@ -155,7 +155,9 @@ def _question_segment(body: str, qno: int) -> str:
     cut = len(seg)
     for pat in (SEC_SPLIT,
                 re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
-                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d")):
+                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
+                re.compile(r"(?m)^[ \t]*\**[ \t]*[一二三四五六七八九十]\s*、"),
+                re.compile(r"(?m)^[ \t]*第[二2]部分")):
         m = pat.search(seg)
         if m and m.start() < cut:
             cut = m.start()
@@ -176,6 +178,7 @@ def parse_question(body: str, qno: int) -> dict | None:
     for pat in (SEC_SPLIT,
                 re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
                 re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
+                re.compile(r"(?m)^[ \t]*\**[ \t]*[一二三四五六七八九十]\s*、"),
                 re.compile(r"(?m)^[ \t]*第[二2]部分")):
         m = pat.search(seg)
         if m and m.start() < cut:
