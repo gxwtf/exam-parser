@@ -217,6 +217,29 @@ AUTHOR_RE = re.compile(r"^\\?\[?\s*([唐宋元明清五代先秦两汉魏晋南�
 SOURCE_RE = re.compile(r"^[（(]\s*取材于[^）)]*[）)]$")
 
 
+NOTE_RE = re.compile(r"【(\d{1,2})】\s*([^【]*)")
+SUP_NOTE_RE = re.compile(r"<sup>\s*【(\d{1,2})】\s*</sup>")
+
+
+def notes_to_footnotes(article: str) -> str:
+    """把「注释：【1】…【2】…」段落转成 GFM 脚注（标题/正文里的 <sup>【N】</sup> → [^N]）"""
+    lines = article.split("\n")
+    note_idx = next((i for i, l in enumerate(lines) if re.match(r"^\s*注释[：:]", l)), None)
+    notes: dict[str, str] = {}
+    if note_idx is not None:
+        raw = " ".join(l.strip() for l in lines[note_idx:])
+        raw = re.sub(r"^\s*注释[：:]\s*", "", raw)
+        for m in NOTE_RE.finditer(raw):
+            notes.setdefault(m.group(1), m.group(2).strip().rstrip("。") + "。")
+    body = "\n".join(lines[:note_idx]) if note_idx is not None else article
+    body = SUP_NOTE_RE.sub(lambda m: f"[^{m.group(1)}]", body)
+    # 正文里没被引用的脚注编号也保留定义（GFM 允许）
+    if notes:
+        defs = "\n".join(f"[^{k}]: {v}" for k, v in sorted(notes.items(), key=lambda x: int(x[0])))
+        body = body.rstrip() + "\n\n" + defs
+    return body
+
+
 def finalize_article(article: str, category: str) -> str:
     """标题→h3；作者行居中（诗词整段 <Center>）；「（取材于…）」→ <RightAlign>"""
     if not article.strip():
@@ -264,6 +287,7 @@ def finalize_article(article: str, category: str) -> str:
             lines[i] = f"<RightAlign>{t}</RightAlign>"
     article = "\n".join(lines)
     article = re.sub(r"\n{3,}", "\n\n", article)
+    article = notes_to_footnotes(article)
     return article.strip()
 
 
@@ -309,9 +333,9 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str]) 
                     and not re.match(r"^(材料[一二三四]|#|①|②|[（(])", first)
                     and not re.search(r"[。！？；]$", first))
         if is_title:
-            # 标题里的注释角标（【1】/<sup>【1】</sup>）去掉，注释本身在文末
-            clean = re.sub(r"<sup>\s*[【(]\s*\d+\s*[】)]\s*</sup>", "", first)
-            clean = re.sub(r"[【(]\s*\d+\s*[】)]\s*$", "", clean).strip()
+            # 标题里的注释角标转成 GFM 脚注引用（稍后统一生成脚注定义）
+            clean = re.sub(r"<sup>\s*【(\d{1,2})】\s*</sup>", lambda m: f"[^{m.group(1)}]", first)
+            clean = re.sub(r"【(\d{1,2})】", lambda m: f"[^{m.group(1)}]", clean).strip()
             lines[idx] = "### " + clean
             article = "\n".join(lines)
     # 题目
