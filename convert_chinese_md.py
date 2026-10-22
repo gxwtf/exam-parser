@@ -514,6 +514,26 @@ def rewrite_images(text: str, md_dir: Path, stem: str, type_dir: str, review: li
     return IMG_REF.sub(repl, text)
 
 
+SECTION_LABELS = {"语言基础运用", "语用", "微写作", "作文", "名著", "默写",
+                  "文言文阅读", "古诗鉴赏", "多文本阅读", "文学类阅读"}
+
+
+def strip_section_label(text: str) -> str:
+    """去掉题面开头单独成行的题型名（如「语言基础运用」「微写作」「作文」），
+    题型已经由题组名/选项卡体现，不必在正文里再写一遍。"""
+    if not text:
+        return text
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i < len(lines) and re.sub(r"[\s*#]", "", lines[i].strip()) in SECTION_LABELS:
+        rest = "\n".join(lines[i + 1:]).lstrip("\n")
+        if rest.strip():
+            return rest
+    return text
+
+
 TRANS_RE = re.compile(r"(?m)^[ \t]*附\s*[：:]?\s*(?:文言文)?参考译文[ \t]*$")
 
 
@@ -714,6 +734,9 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             else:
                 keep.append(dots.annotate_fragments(ln))
         article = "\n".join(keep)
+    article = strip_section_label(article)
+    for q in qs:
+        q["content"] = strip_section_label(q["content"])
     if md_dir is not None:
         article = rewrite_images(article, md_dir, stem_name, type_dir, review)
         for q in qs:
