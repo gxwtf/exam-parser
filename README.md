@@ -325,3 +325,67 @@ python3 convert_math_pdf.py -p xxx.pdf \
 ```
 
 脚本会自动处理 `\(...\)` → `$...$` 分隔符归一化，并对 429/502 重试、对 `finish=length` 自动加大 max_tokens。
+
+---
+
+# 化学（选择题）导入流程
+
+化学二模和数学/物理的导入**结果结构一样**（`output_json_math/<类型>/化学/<卷>.json`，字段
+`paper/sections/questions{id,questionType,content,options,answer,score}`），但**取文字的方式不同**：
+
+> **别用「AI 直接读 PDF 页面」这条路。** 化学教师版 PDF 里大量浮动插图压在文字上
+> （实测 2025 西城第 2–4 题选项被分子图/表格图盖住），模型读图会把被盖住的选项截断。
+> 改用 Word 转出的 Markdown 取文字（完整），AI 只做「排版转换」。
+
+## 一条龙命令
+
+```bash
+cd ~/jingshibang
+
+# ① doc/docx → Markdown（w2m，图片导出到 <卷>/images/）
+python3 batch_convert_docx_to_md.py -T 二模 -s 化学 -w 4
+
+# ② Word 里的 .emf 图形（公式箭头/装置图）→ PNG（ImageMagick 不支持 EMF，走 LibreOffice）
+python3 exam-parser/convert_emf_to_png.py output_docx_to_md/二模/化学
+
+# ③ Markdown → 题库 JSON（切题/选项/答案/图片占位，AI 只做 LaTeX 排版转换）
+cd exam-parser
+python3 convert_chemistry_md.py -T 二模 -w 4
+
+# ④ 收尾：缺题补题、缺答案回退教师版 PDF、图片扩展名与 MDX/KaTeX 安全化
+python3 repair_missing.py --type 二模                    # 读 review.txt 里的「缺题号」，逐页读 PDF 补回
+python3 merge_answers_from_pdf.py --type 二模             # 学生版 docx 没答案时，用（教师版）PDF 取答案
+python3 fix_images.py                                    # .tiff/.emf/.wmf → .png（nginx 只放行 png/jpg/jpeg/gif/webp）
+python3 sanitize_mdx.py                                  # 裸 < > 转 $<$；sub/sup 转 Unicode；{ } 转义
+NODE_PATH=~/gxexercise/node_modules python3 check_katex.py # 全量 KaTeX 校验，应为 0 失败
+
+# ⑤ 导入题库（先 --dry-run 看份数/题数）
+cd ~/gxexercise
+npx tsx scripts/import-math-json.ts --type 二模 --subject 化学 --dry-run
+npx tsx scripts/import-math-json.ts --type 二模 --subject 化学
+npx tsx scripts/sync-math-json.ts   --type 二模 --subject 化学   # 把 images/… 改写成 /exam-images/…
+```
+
+## 每一步在解决什么坑
+
+| 坑 | 处理 |
+| --- | --- |
+| 教师版 PDF 图压字 → 选项截断 | 文字取自 docx→MD，不用 PDF 读图 |
+| `![]()` 占位会被模型抄丢 | 先把图片换成 `⟦IMGn⟧` 占位符交给模型，只在原位保留 |
+| Word 公式/图形是 .wmf/.emf | `wmf2gd` 转 png；EMF 走 `convert_emf_to_png.py`（LibreOffice+pdftoppm+trim） |
+| 选项整块是图（四宫格/表格） | `ocr_options()` 读图转录；失败再四等分裁切并写进 review |
+| 选项是表格列（表头 `A|B|C|D`） | `fix_table_options()` 按列合成选项 |
+| 选项挤在同一行 `A．… B．…` | `expand_inline()` 拆开 |
+| 末尾粘进下一题题干/「第二部分」 | `trim_tail()` 按「题号 > 本题号」或部分标题截断 |
+| Word 把「10．」转成编号列表「1.」 | 用后继题号（11 = 9+2）认回来 |
+| 题号被吞/选项全图切不出 | `repair_missing.py` 逐页读 PDF 补题 |
+| 学生版 docx 没有答案 | `merge_answers_from_pdf.py` 用（教师版）PDF 取答案 |
+| `{ }` 被 MDX 当表达式 | `sanitize_mdx.py` 转义；`check_katex.py` + next-mdx-remote 序列化双校验 |
+
+## 实测结果（2026-10-22）
+
+- 二模化学 108 份源卷 → **导入 107 卷 / 1098 题**：0 缺答案、0 空选项；2263 个图片引用全部存在且线上 200。
+- 全量校验：MDX（next-mdx-remote + remark-gfm/math + rehype-katex）序列化 5490 段 0 失败；KaTeX 4803 段公式 0 失败。
+- 未导入 1 份：`2020北京门头沟高三二模化学`（源文件是学生版，整卷无答案，无法判分）。
+- 删除 1 题：`2018北京西城` 第 12 题（答案表只到第 11 题，无答案）。
+- 待人工抽查：16 题「选项整块是图、四等分裁切」、99 处「排版校验未过改用 Unicode 上下标」（见各卷 `.review.txt`）。
