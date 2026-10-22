@@ -619,7 +619,8 @@ def finalize_article(article: str, category: str, poetry_kind: str = "shi") -> s
         body = [l for k, l in enumerate(lines[ti + 1:], start=ti + 1) if k != ai]
         blocks = [lines[ti]]
         if author:
-            blocks.append(author)
+            # 词：作者仍居中，词句按普通文段居左
+            blocks.append(f"<Center>{author}</Center>")
         blocks += [l for l in body if l.strip()]
         article = "\n\n".join(blocks)
     elif category == "古诗" and ti is not None:
