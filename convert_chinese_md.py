@@ -613,16 +613,29 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
     if qtype in ("chinese-micro-writing", "chinese-essay") and qs:
         article = qs[0]["content"]
 
-    if cat == "名著" and qs:
-        # 名著：材料（判词/选段）单独作题面，多个「(1)(2)…」拆成多道小题，
-        # 前端按「材料 + 每小题一个答题框」渲染（不再走左右两栏的阅读区）
+    if cat == "语用" and qs:
+        # 语用：题干和选项是同一段原文里的 (1)(2) 两小问，(2) 常被“选项解析”截掉，
+        # 所以这里回到原文片段里重新按小题切
+        seg_raw = _question_segment(body, nos[0])
+        if len(SUBQ_RE.findall(seg_raw)) >= 2:
+            material, sub_qs = split_named_book(seg_raw, raw_answer(ans_raw, nos[0]),
+                                                qs[0].get("score") or 0, nos[0], review,
+                                                qs[0].get("answer") or "")
+            article = re.sub(r"[（(]\s*共?\s*\d+\s*分\s*[）)]", "", material or "").strip()
+            qs = sub_qs
+            if len(qs) > 1:
+                review.append(f"语用：已拆成 {len(qs)} 道小题")
+    need_split = cat == "名著" or (cat == "语用" and qs and len(SUBQ_RE.findall(qs[0]["content"])) >= 2)
+    if need_split and qs:
+        # 名著/语用：材料（判词、语段）单独作题面，多个「(1)(2)…」拆成多道小题
+        # （语用的 (1) 带选项 → 选择题；(2) 是长主观题 → text）
         material, sub_qs = split_named_book(qs[0]["content"], raw_answer(ans_raw, nos[0]),
                                             qs[0].get("score") or 0, nos[0], review,
                                             qs[0].get("answer") or "")
         article = material
         qs = sub_qs
         if len(qs) > 1:
-            review.append(f"名著：已拆成 {len(qs)} 道小题")
+            review.append(f"{cat}：已拆成 {len(qs)} 道小题")
 
     total = sum(q["score"] for q in qs)
     article = finalize_article(article, cat)
