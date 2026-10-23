@@ -95,6 +95,30 @@ def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
     return end_pi, end_y
 
 
+def trim_vertical(png: Path, pad: int = 10, thresh: int = 235):
+    """只裁上下空白、保留整页宽度：这样同一份卷里所有题的图等比一致（前端按宽度铺满时字号相同）"""
+    try:
+        from PIL import Image
+    except Exception:
+        return
+    im = Image.open(png).convert("L")
+    w, h = im.size
+    px = im.load()
+    top = None
+    bot = None
+    for y in range(h):
+        row_has = any(px[x, y] < thresh for x in range(0, w, 3))
+        if row_has:
+            if top is None:
+                top = y
+            bot = y
+    if top is None:
+        return
+    top = max(0, top - pad)
+    bot = min(h, bot + pad + 1)
+    im.crop((0, top, w, bot)).save(png)
+
+
 def compact_blank(png: Path, thresh: int = 40, keep: int = 16):
     """把图片里连续的大段空白（页间隔）压短，避免跨页拼接出现大空洞"""
     try:
@@ -157,7 +181,7 @@ def main():
     ap.add_argument("--serve-dir", default=None)
     ap.add_argument("-T", "--type", default="二模")
     ap.add_argument("-s", "--subject", default="化学")
-    ap.add_argument("--dpi", type=int, default=170)
+    ap.add_argument("--dpi", type=int, default=300)
     ap.add_argument("--max-q", type=int, default=25)
     args = ap.parse_args()
 
@@ -228,8 +252,7 @@ def main():
                     subprocess.run(["convert", str(part), "-fill", "white", "-draw",
                                     f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
                                    capture_output=True)
-                subprocess.run(["convert", str(part), "-bordercolor", "white", "-fuzz", "8%", "-trim", "+repage",
-                                "-bordercolor", "white", "-border", "0x8", str(part)], capture_output=True)
+                trim_vertical(part)
                 outs.append(part)
             png = out_dir / f"q{no}.png"
             if len(outs) == 1:
