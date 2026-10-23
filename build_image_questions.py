@@ -52,7 +52,7 @@ def main():
             "no": no,
             "type": "single" if is_choice else "text",
             "image": info["image"],
-            "options": [{"id": k, "label": ""} for k in "abcd"] if is_choice else [],
+            "options": [{"id": k, "label": k.upper()} for k in "abcd"] if is_choice else [],
             "answer": choice_answers.get(no, "") if is_choice else essay_answers.get(no, ""),
             "score": 3 if is_choice else None,
         }
