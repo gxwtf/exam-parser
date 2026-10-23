@@ -113,7 +113,7 @@ def trim_ink(png: Path, thresh: int = 235):
                 ys.append(y)
     if not xs:
         return
-    l, r = max(0, min(xs)), min(w, max(xs) + 1)
+    l, r = max(0, min(xs) - 8), min(w, max(xs) + 4)   # 左侧多留 8px，右侧 4px，避免切到字形/表格边框
     t, b = max(0, min(ys)), min(h, max(ys) + 1)
     im.crop((l, t, r, b)).save(png)
 
