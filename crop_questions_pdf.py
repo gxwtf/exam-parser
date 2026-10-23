@@ -96,6 +96,28 @@ def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
     return end_pi, end_y
 
 
+def trim_ink(png: Path, thresh: int = 235):
+    """按像素把四周白边全部裁掉：图片边界 = 文字墨迹边界"""
+    try:
+        from PIL import Image
+    except Exception:
+        return
+    im = Image.open(png).convert("L")
+    w, h = im.size
+    px = im.load()
+    xs, ys = [], []
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] < thresh:
+                xs.append(x)
+                ys.append(y)
+    if not xs:
+        return
+    l, r = max(0, min(xs)), min(w, max(xs) + 1)
+    t, b = max(0, min(ys)), min(h, max(ys) + 1)
+    im.crop((l, t, r, b)).save(png)
+
+
 def trim_vertical(png: Path, pad: int = 0, thresh: int = 235):
     """只裁上下空白、保留整页宽度：这样同一份卷里所有题的图等比一致（前端按宽度铺满时字号相同）"""
     try:
@@ -246,23 +268,20 @@ def main():
                     if FOOT_RE.match(ln["t"]):
                         foot[p] = ln["y0"]
                         break
-            # 每题单独的左边界：不算题号本身的占位
-            q_left = None
+            # 左边界：题号右端（把题号完全裁掉，题干紧跟在前端题号之后）；
+            # 右边界：本题范围内最右墨迹
+            q_left = min(x_right - 4, wd["x0"] + 5.8 * len(digits) + 6)
+            q_right = x_right - 2
             for p2 in range(pi, npi + 1):
                 for ln2 in build_lines(pages[p2]):
-                    if ln2["y0"] < (y0 if p2 == pi else 0) - 1:
+                    if p2 == pi and ln2["y0"] < y0 - 1:
                         continue
                     if p2 == npi and ln2["y0"] >= ny0 - 1:
                         continue
                     if len(ln2["t"].strip()) < 4:
                         continue
-                    cand = ln2["x0"]
-                    if p2 == pi and abs(ln2["y0"] - y0) < 2:      # 题号所在行
-                        cand = wd["x0"] + 5.8 * len(digits) + 7
-                    q_left = cand if q_left is None else min(q_left, cand)
-            if q_left is None:
-                q_left = x_left   # 全卷统一左边界（去页边距、题干贴左）
-            q_left = x_left   # 全卷统一左边界（去页边距、题干贴左）
+                    q_right = max(q_right, ln2["x1"])
+            q_right = min(x_right + 6, q_right + 3)
 
             starts = {}
             for p in range(pi, npi + 1):
@@ -293,7 +312,9 @@ def main():
             for k, (im, top, bot) in enumerate(pieces):
                 part = Path(td) / f"c{no}_{k}.png"
                 x0px = int(round(q_left * scale))
-                xw = int(round((x_right - q_left) * scale))
+                xw = int(round((min(x_right, q_right) - q_left) * scale))
+                if xw < 50:
+                    xw = int(round((x_right - q_left) * scale))
                 subprocess.run(["convert", str(im), "-crop", f"{xw}x{bot-top}+{x0px}+{top}", "+repage", str(part)],
                                capture_output=True)
                 if False:
@@ -305,7 +326,7 @@ def main():
                     subprocess.run(["convert", str(part), "-fill", "white", "-draw",
                                     f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
                                    capture_output=True)
-                trim_vertical(part)
+                trim_ink(part)
                 outs.append(part)
             png = out_dir / f"q{no}.png"
             if len(outs) == 1:

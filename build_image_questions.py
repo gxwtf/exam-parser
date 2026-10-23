@@ -8,6 +8,7 @@
 """
 import argparse, json, re
 from pathlib import Path
+from PIL import Image
 
 from convert_chemistry_full import parse_essay_answers, QSPLIT
 from convert_chinese_md import split_paper
@@ -55,11 +56,18 @@ def main():
             "answer": choice_answers.get(no, "") if is_choice else essay_answers.get(no, ""),
             "score": 3 if is_choice else None,
         }
+        img_path = qdir / f"q{no}.png"
+        try:
+            wpx = Image.open(img_path).size[0]
+        except Exception:
+            wpx = None
+        q["px"] = wpx
+        q["content"] = f'<QImg src="{q["image"]}" px="{wpx}" />' if wpx else f'![]({q["image"]})'
         questions.append(q)
         (qdir / f"q{no}.json").write_text(json.dumps({
             "paper": stem, "subject": "化学", "no": no, "type": q["type"],
             "image": q["image"], "answer": q["answer"], "score": q["score"],
-            "options": q["options"],
+            "options": q["options"], "px": q.get("px"), "content": q["content"],
         }, ensure_ascii=False, indent=1), encoding="utf-8")
 
     paper = {
