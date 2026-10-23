@@ -16,7 +16,7 @@ OUT_ROOT = Path(__file__).parent.parent / "output_json_chemistry_full"
 OUT = {"root": OUT_ROOT}
 
 CATS = ["物质结构与性质", "化学反应原理", "有机化学基础", "工业流程", "实验探究"]
-QSPLIT = re.compile(r"(?m)^[ \t]*(\d{1,2})\s*(?:．|、(?!\d)|\.(?!\d|%))\s*")
+QSPLIT = re.compile(r"(?m)^[ \t]*(\d{1,2})\s*\\?(?:．|、(?!\d)|\.(?!\d|%))\s*")
 SUBQ = re.compile(r"(?m)^[ \t]*[（(]\s*(\d{1,2})\s*[）)]\s*")
 SCORE_RE = re.compile(r"[（(]\s*(?:共)?\s*(\d+)\s*分\s*[）)]")
 SYSTEM = "你是化学试卷录入员，只输出 JSON。"
