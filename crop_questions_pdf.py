@@ -270,7 +270,7 @@ def main():
                         break
             # 左边界：题号右端（把题号完全裁掉，题干紧跟在前端题号之后）；
             # 右边界：本题范围内最右墨迹
-            q_left = min(x_right - 4, wd["x0"] + 5.8 * len(digits) + 5)
+            q_left = x_left
             q_right = x_right - 2
             for p2 in range(pi, npi + 1):
                 for ln2 in build_lines(pages[p2]):
@@ -317,7 +317,7 @@ def main():
                     xw = int(round((x_right - q_left) * scale))
                 subprocess.run(["convert", str(im), "-crop", f"{xw}x{bot-top}+{x0px}+{top}", "+repage", str(part)],
                                capture_output=True)
-                if False:
+                if k == 0:
                     # 先在「未左右裁剪」的图上涂掉题号，之后再 trim
                     bx0 = (wd["x0"] - q_left) * scale - 2
                     by0 = (wd["y0"] - y0) * scale - 2
@@ -335,7 +335,7 @@ def main():
                 subprocess.run(["convert"] + [str(o) for o in outs] + ["-append", str(png)], capture_output=True)
                 compact_blank(png, thresh=40, keep=12)
             (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
-            url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png"
+            url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png?v={int(png.stat().st_mtime)}"
             (out_dir / f"q{no}.json").write_text(json.dumps({
                 "paper": stem, "subject": args.subject, "no": no, "image": url, "image_file": f"q{no}.png",
             }, ensure_ascii=False, indent=1), encoding="utf-8")
