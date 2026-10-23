@@ -95,6 +95,55 @@ def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
     return end_pi, end_y
 
 
+def compact_blank(png: Path, thresh: int = 40, keep: int = 16):
+    """把图片里连续的大段空白（页间隔）压短，避免跨页拼接出现大空洞"""
+    try:
+        from PIL import Image
+    except Exception:
+        return
+    im = Image.open(png).convert("L")
+    w, h = im.size
+    px = im.load()
+    blank = []
+    for y in range(h):
+        row_blank = True
+        for x in range(0, w, 4):
+            if px[x, y] < 235:
+                row_blank = False
+                break
+        blank.append(row_blank)
+    pieces = []
+    y = 0
+    while y < h:
+        if blank[y]:
+            y2 = y
+            while y2 < h and blank[y2]:
+                y2 += 1
+            run = y2 - y
+            pieces.append(("blank", y, y2, keep if run > thresh else run))
+            y = y2
+        else:
+            y2 = y
+            while y2 < h and not blank[y2]:
+                y2 += 1
+            pieces.append(("img", y, y2, None))
+            y = y2
+    total = sum(p[3] if p[0] == "blank" else (p[2] - p[1]) for p in pieces)
+    if total == h:
+        return
+    out = Image.new("L", (w, total), 255)
+    oy = 0
+    src = Image.open(png).convert("RGB") if png.suffix.lower() in (".png", ".jpg") else im
+    src = Image.open(png).convert("RGB")
+    for kind, a, b, keepn in pieces:
+        if kind == "blank":
+            oy += keepn
+        else:
+            out.paste(src.crop((0, a, w, b)).convert("L"), (0, oy))
+            oy += b - a
+    out.save(png)
+
+
 def render_pages(pdf: Path, dpi: int, out_dir: Path):
     prefix = out_dir / "pg"
     subprocess.run(["pdftoppm", "-png", "-r", str(dpi), str(pdf), str(prefix)], capture_output=True)
@@ -141,12 +190,24 @@ def main():
                     if FOOT_RE.match(ln["t"]):
                         foot[p] = ln["y0"]
                         break
+            starts = {}
+            for p in range(pi, npi + 1):
+                if p == pi:
+                    continue
+                top_y = 0
+                for ln in build_lines(pages[p]):
+                    if ln["y0"] < pages[p]["h"] * 0.05 and len(ln["t"]) <= 30:
+                        top_y = ln["y1"]        # 页眉，跳过
+                    else:
+                        break
+                starts[p] = top_y
+
             for p in range(pi, npi + 1):
                 page_bottom = ny0 if p == npi else pages[p]["h"]
                 if p in foot and foot[p] < page_bottom:
                     page_bottom = foot[p]
                 im = imgs[p]
-                top = int(round((y0 if p == pi else 0) * scale))
+                top = int(round((y0 if p == pi else starts.get(p, 0)) * scale))
                 bot = int(round(page_bottom * scale))
                 if bot - top < 8:
                     continue
@@ -175,6 +236,7 @@ def main():
                 subprocess.run(["convert", str(outs[0]), str(png)], capture_output=True)
             else:
                 subprocess.run(["convert"] + [str(o) for o in outs] + ["-append", str(png)], capture_output=True)
+                compact_blank(png, thresh=40, keep=16)
             (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
             url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png"
             (out_dir / f"q{no}.json").write_text(json.dumps({
