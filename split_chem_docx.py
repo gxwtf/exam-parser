@@ -19,6 +19,30 @@ def para_text(el) -> str:
     return "".join(t.text or "" for t in el.iter(W + "t"))
 
 
+HEADING = re.compile(r"^\s*(?:第[一二]部分.*|本部分共.*题.*|第[一二]部分（.*|参考答案.*|[一二三四五六七八九十]\s*[、.．].*(?:题|分).*)$")
+
+
+def strip_question_number(el, no: int):
+    """把首段里的「N．」去掉（题号可能被拆到多个 run 里；保留分值等其余文字）"""
+    runs = [t for t in el.iter(W + "t")]
+    joined = "".join(t.text or "" for t in runs)
+    m = re.search(rf"(?<![0-9]){no}\s*[．.]\s*", joined)
+    if not m:
+        return el
+    start, end = m.start(), m.end()
+    pos = 0
+    for t in runs:
+        txt = t.text or ""
+        t_start, t_end = pos, pos + len(txt)
+        pos = t_end
+        if t_end <= start or t_start >= end:
+            continue
+        cut_from = max(start, t_start) - t_start
+        cut_to = min(end, t_end) - t_start
+        t.text = txt[:cut_from] + txt[cut_to:]
+    return el
+
+
 def split_questions(docx: Path, max_q: int = 30):
     with zipfile.ZipFile(docx) as z:
         xml = z.read("word/document.xml")
@@ -34,7 +58,7 @@ def split_questions(docx: Path, max_q: int = 30):
             continue
         txt = para_text(el)
         m = re.search(rf"(?<![0-9]){expected}\s*[．.]", txt)
-        if m and m.start() <= 14:
+        if m and m.start() <= 30:
             starts.append((idx, expected))
             expected += 1
             if expected > max_q:
@@ -46,10 +70,47 @@ def split_questions(docx: Path, max_q: int = 30):
     FOOTER = re.compile(r"^\s*第\s*\d+\s*页\s*[/／]\s*共\s*\d+\s*页\s*$")
     for i, (idx, no) in enumerate(starts):
         end = starts[i + 1][0] if i + 1 < len(starts) else len(children)
-        keep = [el for el in children[idx:end]
-                if not (el.tag == W + "p" and FOOTER.match(para_text(el)))]
+        keep = []
+        first = True
+        for el in children[idx:end]:
+            if el.tag != W + "p":
+                keep.append(el)
+                continue
+            txt = para_text(el).strip()
+            if FOOTER.match(txt):
+                continue
+            if HEADING.match(txt):          # 「第二部分」「本部分共5题」这类标题不要
+                continue
+            if first:
+                strip_question_number(el, no)
+                first = False
+            if not para_text(el).strip() and keep:   # 去掉尾部空段
+                continue
+            keep.append(el)
+        # 去掉末尾的空段落
+        while len(keep) > 1 and keep[-1].tag == W + "p" and not para_text(keep[-1]).strip():
+            keep.pop()
         groups.append((no, keep))
     return groups, root, children, sect
+
+
+def inline_anchors(root):
+    """把浮动对象改成内联/去浮动，避免拆题重排后和文字重叠：
+    1) wp:anchor → wp:inline
+    2) 段落 w:framePr（文本框/带框段落）去掉
+    3) VML 图形 w:pict/v:shape 里如果有 style 的 position:absolute，去掉定位
+    """
+    for anchor in root.iter():
+        if anchor.tag.endswith("}anchor"):
+            anchor.tag = anchor.tag.replace("}anchor", "}inline")
+    for ppr in root.iter(W + "pPr"):
+        for fr in ppr.findall(W + "framePr"):
+            ppr.remove(fr)
+    for el in root.iter():
+        if el.tag.endswith("}shape") or el.tag.endswith("}rect"):
+            st = el.get("style")
+            if st:
+                el.set("style", ";".join(x for x in st.split(";") if "position:" not in x and "margin-left" not in x and "margin-top" not in x))
 
 
 def write_docx(src: Path, root, children, sect, keep, dst: Path):
@@ -68,6 +129,7 @@ def write_docx(src: Path, root, children, sect, keep, dst: Path):
     ET.register_namespace("w", W[1:-1])
     for prefix, uri in (("w", W[1:-1]),):
         ET.register_namespace(prefix, uri)
+    inline_anchors(root)
     xml_bytes = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():

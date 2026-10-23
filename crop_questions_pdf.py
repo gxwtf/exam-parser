@@ -167,7 +167,7 @@ def main():
                     subprocess.run(["convert", str(part), "-fill", "white", "-draw",
                                     f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
                                    capture_output=True)
-                subprocess.run(["convert", str(part), "-bordercolor", "white", "-trim", "+repage",
+                subprocess.run(["convert", str(part), "-bordercolor", "white", "-fuzz", "8%", "-trim", "+repage",
                                 "-bordercolor", "white", "-border", "0x8", str(part)], capture_output=True)
                 outs.append(part)
             png = out_dir / f"q{no}.png"
