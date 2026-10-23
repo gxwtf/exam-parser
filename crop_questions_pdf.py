@@ -169,25 +169,33 @@ def compact_blank(png: Path, thresh: int = 40, keep: int = 16):
     out.save(png)
 
 
-def text_column(pages):
-    """整卷正文区的左右边界（pt）。
+def text_column(pages, marks):
+    """试题区（按题号区间）正文的左右边界（pt）。
 
-    左边界取「非题号行」的最小 x0：题号行左端是题号本身，若拿它当左边界，
-    涂掉题号后会留出一段空白（前端看起来就是题号和图片之间有空隙）。
+    只统计「各题范围内、非题号行」的行：这样左边界就是题干正文的左边缘，
+    题号（在更左边）会被裁掉，前端再单独显示序号 → 题干贴齐内容区最左端。
     """
+    nos = sorted(marks)
     left, right = None, None
-    for pg in pages:
-        h = pg["h"]
-        for ln in build_lines(pg):
-            if ln["y0"] < h * 0.05 or ln["y0"] > h * 0.95:
-                continue
-            if len(ln["t"]) < 8:
-                continue
-            if LINE_Q.match(ln["t"]):      # 题号行跳过（题号会被涂掉）
-                continue
-            left = ln["x0"] if left is None else min(left, ln["x0"])
-            right = ln["x1"] if right is None else max(right, ln["x1"])
-    return (left or 0) - 2, (right or 0) + 2
+    for i, no in enumerate(nos):
+        pi, y0, _ln, _d = marks[no]
+        if i + 1 < len(nos):
+            npi, ny0 = marks[nos[i + 1]][0], marks[nos[i + 1]][1]
+        else:
+            npi, ny0 = pi, pages[pi]["h"]
+        for p2 in range(pi, npi + 1):
+            for ln in build_lines(pages[p2]):
+                if p2 == pi and ln["y0"] < y0 - 1:
+                    continue
+                if p2 == npi and ln["y0"] >= ny0 - 1:
+                    continue
+                if len(ln["t"].strip()) < 6:
+                    continue
+                if p2 == pi and abs(ln["y0"] - y0) < 2:      # 本题题号行
+                    continue
+                left = ln["x0"] if left is None else min(left, ln["x0"])
+                right = ln["x1"] if right is None else max(right, ln["x1"])
+    return (left or 0) - 1, (right or 0) + 2
 
 
 def render_pages(pdf: Path, dpi: int, out_dir: Path):
@@ -214,9 +222,9 @@ def main():
     stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
 
     pages = page_words(pdf)
-    x_left, x_right = text_column(pages)
-    print(f"正文区横向范围：{x_left:.1f} ~ {x_right:.1f} pt")
     marks = find_markers(pages, args.max_q)
+    x_left, x_right = text_column(pages, marks)
+    print(f"正文区横向范围：{x_left:.1f} ~ {x_right:.1f} pt")
     print(f"识别题号 {len(marks)} 个：{sorted(marks)}")
     with tempfile.TemporaryDirectory() as td:
         imgs = render_pages(pdf, args.dpi, Path(td))
@@ -253,8 +261,8 @@ def main():
                         cand = wd["x0"] + 5.8 * len(digits) + 7
                     q_left = cand if q_left is None else min(q_left, cand)
             if q_left is None:
-                q_left = x_left
-            q_left = x_left
+                q_left = x_left   # 全卷统一左边界（去页边距、题干贴左）
+            q_left = x_left   # 全卷统一左边界（去页边距、题干贴左）
 
             starts = {}
             for p in range(pi, npi + 1):
