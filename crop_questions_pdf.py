@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""化学：直接从原 PDF 按题裁图（保原版式，不重排 → 不会出现浮动图重叠）。
+
+做法：
+1. pdftoppm 把每页渲染成 PNG；
+2. pdftotext -bbox 拿到每个词的坐标，定位「N．」题号（左侧）与下一条题号/大题标题（第二部分、本部分共…）；
+3. 按题号到下一条题号之间的纵向区间裁图，跨页则首尾拼接；
+4. 用白块盖掉被裁进来的题号本身。
+
+用法：python3 crop_questions_pdf.py -p <pdf> -o <单题目录> --serve-dir <nginx目录> [-T 二模] [-s 化学]
+"""
+import argparse, json, re, subprocess, tempfile
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+LINE_Q = re.compile(r"^(\d{1,2})\s*[.．]")
+HEAD_RE = re.compile(r"^(第[一二]部分|本部分共|参考答案)")
+FOOT_RE = re.compile(r"^第\s*\d+\s*页\s*[/／]\s*共\s*\d+\s*页")
+
+
+def page_words(pdf: Path):
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "w.xml"
+        subprocess.run(["pdftotext", "-bbox", "-q", str(pdf), str(out)], check=True)
+        root = ET.parse(out).getroot()
+    ns = {"x": "http://www.w3.org/1999/xhtml"}
+    pages = []
+    for pg in root.iter("{http://www.w3.org/1999/xhtml}page"):
+        w = float(pg.get("width")); h = float(pg.get("height"))
+        words = []
+        for wd in pg.iter("{http://www.w3.org/1999/xhtml}word"):
+            txt = (wd.text or "").strip()
+            if not txt:
+                continue
+            words.append({
+                "t": txt,
+                "x0": float(wd.get("xMin")), "y0": float(wd.get("yMin")),
+                "x1": float(wd.get("xMax")), "y1": float(wd.get("yMax")),
+            })
+        pages.append({"w": w, "h": h, "words": words})
+    return pages
+
+
+def build_lines(pg):
+    """把同 y 的词合成一行，返回 [{t,x0,y0,y1}]（按 y 排序）"""
+    rows = {}
+    for wd in pg["words"]:
+        key = round(wd["y0"] / 3.0)
+        rows.setdefault(key, []).append(wd)
+    lines = []
+    for key in sorted(rows):
+        ws = sorted(rows[key], key=lambda w: w["x0"])
+        lines.append({
+            "t": "".join(w["t"] for w in ws),
+            "x0": min(w["x0"] for w in ws),
+            "y0": min(w["y0"] for w in ws),
+            "y1": max(w["y1"] for w in ws),
+        })
+    return lines
+
+
+def find_markers(pages, max_q=25):
+    """题号行：「N．…」或单独一个数字（且靠左）。返回 {题号: (页码, y0, 行, 数字串)}"""
+    marks = {}
+    expect = 1
+    for pi, pg in enumerate(pages):
+        for ln in build_lines(pg):
+            if ln["x0"] > pg["w"] * 0.2:
+                continue
+            m = re.match(r"^(\d{1,2})\s*[.．]?", ln["t"])
+            if not m:
+                continue
+            n = int(m.group(1))
+            if n != expect:
+                continue
+            marks[n] = (pi, ln["y0"], ln, m.group(1))
+            expect += 1
+            if expect > max_q:
+                return marks
+    return marks
+
+
+def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
+    """在区间内找「第二部分/本部分共/参考答案」标题行，作为提前结束点"""
+    for pi in range(start_pi, min(end_pi, len(pages) - 1) + 1):
+        pg = pages[pi]
+        y_from = start_y if pi == start_pi else 0
+        for wd in pg["words"]:
+            if wd["y0"] < y_from - 1:
+                continue
+            if pi == end_pi and wd["y0"] > end_y:
+                continue
+            if HEAD_RE.match(wd["t"]):
+                return pi, wd["y0"]
+    return end_pi, end_y
+
+
+def render_pages(pdf: Path, dpi: int, out_dir: Path):
+    prefix = out_dir / "pg"
+    subprocess.run(["pdftoppm", "-png", "-r", str(dpi), str(pdf), str(prefix)], capture_output=True)
+    return sorted(out_dir.glob("pg-*.png")) or sorted(out_dir.glob("pg*.png"))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-p", "--path", required=True)
+    ap.add_argument("-o", "--out", required=True)
+    ap.add_argument("--serve-dir", default=None)
+    ap.add_argument("-T", "--type", default="二模")
+    ap.add_argument("-s", "--subject", default="化学")
+    ap.add_argument("--dpi", type=int, default=170)
+    ap.add_argument("--max-q", type=int, default=25)
+    args = ap.parse_args()
+
+    pdf = Path(args.path)
+    out_dir = Path(args.out); out_dir.mkdir(parents=True, exist_ok=True)
+    serve_dir = Path(args.serve_dir) if args.serve_dir else out_dir
+    serve_dir.mkdir(parents=True, exist_ok=True)
+    stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
+
+    pages = page_words(pdf)
+    marks = find_markers(pages, args.max_q)
+    print(f"识别题号 {len(marks)} 个：{sorted(marks)}")
+    with tempfile.TemporaryDirectory() as td:
+        imgs = render_pages(pdf, args.dpi, Path(td))
+        scale = args.dpi / 72.0
+        mapping = {}
+        nos = sorted(marks)
+        for i, no in enumerate(nos):
+            pi, y0, wd, digits = marks[no]
+            if i + 1 < len(nos):
+                npi, ny0, _, _ = marks[nos[i + 1]]
+            else:
+                npi, ny0 = len(pages) - 1, pages[-1]["h"]
+            # 大题标题提前截断
+            npi, ny0 = find_heading_cut(pages, pi, y0, npi, ny0)
+            pieces = []
+            foot = {}
+            for p in range(pi, npi + 1):
+                for ln in build_lines(pages[p]):
+                    if FOOT_RE.match(ln["t"]):
+                        foot[p] = ln["y0"]
+                        break
+            for p in range(pi, npi + 1):
+                page_bottom = ny0 if p == npi else pages[p]["h"]
+                if p in foot and foot[p] < page_bottom:
+                    page_bottom = foot[p]
+                im = imgs[p]
+                top = int(round((y0 if p == pi else 0) * scale))
+                bot = int(round(page_bottom * scale))
+                if bot - top < 8:
+                    continue
+                pieces.append((im, top, bot))
+            if not pieces:
+                print(f"  ✗ 第{no}题 区间为空"); continue
+            outs = []
+            num_w = 5.8 * len(digits) + 7
+            for k, (im, top, bot) in enumerate(pieces):
+                part = Path(td) / f"c{no}_{k}.png"
+                subprocess.run(["convert", str(im), "-crop", f"x{bot-top}+0+{top}", "+repage", str(part)], capture_output=True)
+                if k == 0:
+                    # 先在「未左右裁剪」的图上涂掉题号，之后再 trim
+                    bx0 = wd["x0"] * scale - 2
+                    by0 = (wd["y0"] - y0) * scale - 2
+                    bx1 = (wd["x0"] + num_w) * scale
+                    by1 = (wd["y1"] - y0) * scale + 2
+                    subprocess.run(["convert", str(part), "-fill", "white", "-draw",
+                                    f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
+                                   capture_output=True)
+                subprocess.run(["convert", str(part), "-bordercolor", "white", "-trim", "+repage",
+                                "-bordercolor", "white", "-border", "0x8", str(part)], capture_output=True)
+                outs.append(part)
+            png = out_dir / f"q{no}.png"
+            if len(outs) == 1:
+                subprocess.run(["convert", str(outs[0]), str(png)], capture_output=True)
+            else:
+                subprocess.run(["convert"] + [str(o) for o in outs] + ["-append", str(png)], capture_output=True)
+            (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
+            url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png"
+            (out_dir / f"q{no}.json").write_text(json.dumps({
+                "paper": stem, "subject": args.subject, "no": no, "image": url, "image_file": f"q{no}.png",
+            }, ensure_ascii=False, indent=1), encoding="utf-8")
+            mapping[no] = {"image": url}
+            print(f"  ✓ 第{no}题 → q{no}.png ({png.stat().st_size//1024} KB, {len(pieces)} 段)")
+    (out_dir / "manifest.json").write_text(json.dumps(mapping, ensure_ascii=False, indent=1), encoding="utf-8")
+    print("输出：", out_dir)
+
+
+if __name__ == "__main__":
+    main()
