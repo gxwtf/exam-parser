@@ -28,7 +28,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 MD_ROOT = PROJECT_ROOT.parent / "output_docx_to_md"
 JSON_ROOT = PROJECT_ROOT.parent / "output_json_math"
-WMF_EX = Path("/tmp/wmfbin/ex")
+WMF_EX = Path.home() / ".local/wmf/ex"
 
 BASE_URL = (os.getenv("MATH_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")).rstrip("/")
 API_KEY = os.getenv("MATH_VISION_API_KEY") or os.getenv("OPENAI_API_KEY", "")
