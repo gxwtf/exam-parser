@@ -270,7 +270,7 @@ def main():
                         break
             # 左边界：题号右端（把题号完全裁掉，题干紧跟在前端题号之后）；
             # 右边界：本题范围内最右墨迹
-            q_left = min(x_right - 4, wd["x0"] + 5.8 * len(digits) + 6)
+            q_left = max(0, wd["x0"] - 1.5)
             q_right = x_right - 2
             for p2 in range(pi, npi + 1):
                 for ln2 in build_lines(pages[p2]):
