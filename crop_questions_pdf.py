@@ -217,7 +217,7 @@ def text_column(pages, marks):
                     continue
                 left = ln["x0"] if left is None else min(left, ln["x0"])
                 right = ln["x1"] if right is None else max(right, ln["x1"])
-    return (left or 0) - 1, (right or 0) + 2
+    return (left or 0) - 9, (right or 0) + 3
 
 
 def render_pages(pdf: Path, dpi: int, out_dir: Path):
@@ -255,6 +255,12 @@ def main():
         nos = sorted(marks)
         for i, no in enumerate(nos):
             pi, y0, wd, digits = marks[no]
+            prev_bottom = 0.0
+            for ln3 in build_lines(pages[pi]):
+                if ln3["y0"] < y0 - 2:
+                    prev_bottom = max(prev_bottom, ln3["y1"])
+            if prev_bottom and prev_bottom > y0:
+                y0 = prev_bottom + 0.6
             if i + 1 < len(nos):
                 npi, ny0, _, _ = marks[nos[i + 1]]
             else:
