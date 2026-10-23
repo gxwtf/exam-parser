@@ -95,7 +95,7 @@ def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
     return end_pi, end_y
 
 
-def trim_vertical(png: Path, pad: int = 10, thresh: int = 235):
+def trim_vertical(png: Path, pad: int = 0, thresh: int = 235):
     """只裁上下空白、保留整页宽度：这样同一份卷里所有题的图等比一致（前端按宽度铺满时字号相同）"""
     try:
         from PIL import Image
@@ -259,7 +259,7 @@ def main():
                 subprocess.run(["convert", str(outs[0]), str(png)], capture_output=True)
             else:
                 subprocess.run(["convert"] + [str(o) for o in outs] + ["-append", str(png)], capture_output=True)
-                compact_blank(png, thresh=40, keep=16)
+                compact_blank(png, thresh=40, keep=12)
             (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
             url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png"
             (out_dir / f"q{no}.json").write_text(json.dumps({
