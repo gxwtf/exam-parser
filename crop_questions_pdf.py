@@ -53,6 +53,7 @@ def build_lines(pg):
         lines.append({
             "t": "".join(w["t"] for w in ws),
             "x0": min(w["x0"] for w in ws),
+            "x1": max(w["x1"] for w in ws),
             "y0": min(w["y0"] for w in ws),
             "y1": max(w["y1"] for w in ws),
         })
@@ -168,6 +169,21 @@ def compact_blank(png: Path, thresh: int = 40, keep: int = 16):
     out.save(png)
 
 
+def text_column(pages):
+    """整卷正文区的左右边界（pt）：取所有正文行的最小 x0 / 最大 x1，跳过页眉页脚区"""
+    left, right = None, None
+    for pg in pages:
+        h = pg["h"]
+        for ln in build_lines(pg):
+            if ln["y0"] < h * 0.05 or ln["y0"] > h * 0.95:
+                continue
+            if len(ln["t"]) < 6:
+                continue
+            left = ln["x0"] if left is None else min(left, ln["x0"])
+            right = ln["x1"] if right is None else max(right, ln["x1"])
+    return (left or 0) - 3, (right or 0) + 3
+
+
 def render_pages(pdf: Path, dpi: int, out_dir: Path):
     prefix = out_dir / "pg"
     subprocess.run(["pdftoppm", "-png", "-r", str(dpi), str(pdf), str(prefix)], capture_output=True)
@@ -192,6 +208,8 @@ def main():
     stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
 
     pages = page_words(pdf)
+    x_left, x_right = text_column(pages)
+    print(f"正文区横向范围：{x_left:.1f} ~ {x_right:.1f} pt")
     marks = find_markers(pages, args.max_q)
     print(f"识别题号 {len(marks)} 个：{sorted(marks)}")
     with tempfile.TemporaryDirectory() as td:
@@ -242,12 +260,15 @@ def main():
             num_w = 5.8 * len(digits) + 7
             for k, (im, top, bot) in enumerate(pieces):
                 part = Path(td) / f"c{no}_{k}.png"
-                subprocess.run(["convert", str(im), "-crop", f"x{bot-top}+0+{top}", "+repage", str(part)], capture_output=True)
+                x0px = int(round(x_left * scale))
+                xw = int(round((x_right - x_left) * scale))
+                subprocess.run(["convert", str(im), "-crop", f"{xw}x{bot-top}+{x0px}+{top}", "+repage", str(part)],
+                               capture_output=True)
                 if k == 0:
                     # 先在「未左右裁剪」的图上涂掉题号，之后再 trim
-                    bx0 = wd["x0"] * scale - 2
+                    bx0 = (wd["x0"] - x_left) * scale - 2
                     by0 = (wd["y0"] - y0) * scale - 2
-                    bx1 = (wd["x0"] + num_w) * scale
+                    bx1 = (wd["x0"] + num_w - x_left) * scale
                     by1 = (wd["y1"] - y0) * scale + 2
                     subprocess.run(["convert", str(part), "-fill", "white", "-draw",
                                     f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
