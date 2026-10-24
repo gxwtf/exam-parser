@@ -9,6 +9,7 @@
 """
 import argparse, json, re
 from pathlib import Path
+from paths import DATA_ROOT
 
 MATH = re.compile(r"(\$\$.*?\$\$|\$[^$]*\$)", re.S)
 ALLOWED = re.compile(r"</?br\s*/?>", re.I)
@@ -83,7 +84,7 @@ def fix(text: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_json_math" / "二模" / "化学"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_json_math" / "二模" / "化学"))
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     n_changed = n_field = 0

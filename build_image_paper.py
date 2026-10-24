@@ -9,9 +9,10 @@
 """
 import argparse, json, re, subprocess, tempfile
 from pathlib import Path
+from paths import DATA_ROOT, OUTPUT_IMAGE_QUESTIONS
 
 PROJ = Path(__file__).parent
-OUT_ROOT = PROJ.parent / "output_image_questions"
+OUT_ROOT = OUTPUT_IMAGE_QUESTIONS
 
 
 def run(cmd, **kw):
@@ -38,14 +39,14 @@ def main():
         raise SystemExit(f"找不到 PDF：{src_dir}")
 
     qdir = OUT_ROOT / args.type / args.subject / stem
-    serve = PROJ.parent / "output_docx_to_md" / args.type / args.subject / stem / "images"
+    serve = DATA_ROOT / "output_docx_to_md" / args.type / args.subject / stem / "images"
     qdir.mkdir(parents=True, exist_ok=True)
     serve.mkdir(parents=True, exist_ok=True)
 
     # 选择题题号：从已有文本版解析结果里读
     cands = [
-        PROJ.parent / "output_json_math" / args.type / args.subject / f"{stem}.json",
-        PROJ.parent / "output_json_math" / args.type / f"{stem}.json",
+        DATA_ROOT / "output_json_math" / args.type / args.subject / f"{stem}.json",
+        DATA_ROOT / "output_json_math" / args.type / f"{stem}.json",
     ]
     choice_json = next((c for c in cands if c.exists()), cands[0])
     choice_ids = []
@@ -93,7 +94,7 @@ def main():
 
     # 3) paper.json
     r = run(["python3", str(PROJ / "build_image_questions.py"), "-d", str(qdir),
-             "--md", str(next(iter(sorted((PROJ.parent / "output_docx_to_md" / args.type / args.subject / docx.stem).glob("*.md"))), "")),
+             "--md", str(next(iter(sorted((DATA_ROOT / "output_docx_to_md" / args.type / args.subject / docx.stem).glob("*.md"))), "")),
              "--choice-json", str(choice_json) if choice_json.exists() else ""])
     print("  ", (r.stdout or r.stderr).strip()[:200])
 

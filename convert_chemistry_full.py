@@ -11,8 +11,9 @@ from pathlib import Path
 
 from convert_chinese_md import split_paper, rewrite_images, chat, log
 import convert_politics_md as P
+from paths import DATA_ROOT, OUTPUT_JSON_CHEMISTRY_FULL
 
-OUT_ROOT = Path(__file__).parent.parent / "output_json_chemistry_full"
+OUT_ROOT = OUTPUT_JSON_CHEMISTRY_FULL
 OUT = {"root": OUT_ROOT}
 
 CATS = ["物质结构与性质", "化学反应原理", "有机化学基础", "工业流程", "实验探究"]
@@ -258,7 +259,7 @@ def process(md: Path, type_dir: str, args) -> str:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--path")
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_docx_to_md"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_docx_to_md"))
     ap.add_argument("-T", "--type", default="二模")
     ap.add_argument("-g", "--grade", default="高三")
     ap.add_argument("-o", "--output", default=str(OUT_ROOT))

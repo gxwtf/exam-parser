@@ -18,6 +18,7 @@ API_KEY = __import__("os").getenv("OPENAI_API_KEY", "")
 MODEL = __import__("os").getenv("OPENAI_MODEL", "deepseek-v4.1-flash")
 
 import convert_math_pdf as M
+from paths import DATA_ROOT, GAOZHONG
 
 PROMPT = r"""这是语文试卷的一页图像。如果本页有【第 {no} 题】的表格，请把它完整转成 Markdown 表格：
 1. 保留原文所有文字与填空标记 ①②③④⑤⑥，不要补答案、不要改写；
@@ -58,13 +59,13 @@ def suspicious(text: str) -> bool:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_json_chinese" / "二模"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_json_chinese" / "二模"))
     ap.add_argument("--type", default="二模")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", default=None)
     args = ap.parse_args()
 
-    pdf_dir = PROJECT_ROOT.parent / "gaozhong" / args.type / "语文"
+    pdf_dir = GAOZHONG / args.type / "语文"
     fixed = 0
     for jf in sorted(Path(args.dir).glob("*.json")):
         if args.only and jf.stem != args.only:

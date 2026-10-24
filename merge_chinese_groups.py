@@ -8,11 +8,12 @@
 """
 import argparse, json
 from pathlib import Path
+from paths import DATA_ROOT
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_json_chinese" / "二模"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_json_chinese" / "二模"))
     args = ap.parse_args()
     changed = 0
     for f in sorted(Path(args.dir).glob("*.json")):

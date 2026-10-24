@@ -9,8 +9,9 @@ MD 里的图片是 PDF 原始图片对象，位置和归属都可靠。
 """
 import argparse, glob, json, os, re, shutil
 from pathlib import Path
+from paths import DATA_ROOT
 
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_pdf_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 IMG_DST_ROOT = ROOT / "output_docx_to_md"

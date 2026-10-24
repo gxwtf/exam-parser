@@ -10,9 +10,10 @@ import argparse, base64, json, re, tempfile, time
 from pathlib import Path
 
 import convert_math_pdf as M
+from paths import DATA_ROOT
 
 PROJECT_ROOT = Path(__file__).parent
-ROOT = PROJECT_ROOT.parent
+ROOT = DATA_ROOT
 JSON_ROOT = ROOT / "output_json_math"
 PDF_ROOT = ROOT / "gaozhong"
 

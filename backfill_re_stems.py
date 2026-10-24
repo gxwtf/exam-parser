@@ -29,8 +29,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from paths import DATA_ROOT
+
 BASE = Path(__file__).resolve().parent
-ROOT = BASE.parent                      # /home/gxwtf/jingshibang
+ROOT = DATA_ROOT
 OUT_MD = ROOT / "output_docx_to_md"
 OUT_JSON = ROOT / "output_json"
 ENV_FILE = Path("/home/gxwtf/gxexercise/.env")

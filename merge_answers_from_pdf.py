@@ -6,9 +6,10 @@
 """
 import argparse, json, re, subprocess, sys
 from pathlib import Path
+from paths import DATA_ROOT
 
 PROJECT_ROOT = Path(__file__).parent
-ROOT = PROJECT_ROOT.parent
+ROOT = DATA_ROOT
 JSON_ROOT = ROOT / "output_json_math"
 PDF_ROOT = ROOT / "gaozhong"
 

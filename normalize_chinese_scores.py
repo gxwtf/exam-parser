@@ -7,6 +7,7 @@
 """
 import argparse, json
 from pathlib import Path
+from paths import DATA_ROOT
 
 DEFAULT = {"多文本": 18, "文言文": 18, "古诗": 12, "默写": 8, "名著": 10,
            "文学类": 18, "语用": 6, "微写作": 10, "作文": 50}
@@ -14,7 +15,7 @@ DEFAULT = {"多文本": 18, "文言文": 18, "古诗": 12, "默写": 8, "名著"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_json_chinese" / "二模"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_json_chinese" / "二模"))
     ap.add_argument("--target", type=int, default=150)
     args = ap.parse_args()
     changed = 0

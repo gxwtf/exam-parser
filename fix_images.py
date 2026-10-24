@@ -6,8 +6,9 @@
 """
 import argparse, json, re, subprocess
 from pathlib import Path
+from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON_MATH
 
-MD_ROOT = Path(__file__).parent.parent / "output_docx_to_md"
+MD_ROOT = OUTPUT_DOCX_TO_MD
 REF = re.compile(r"images/([^)\s]+)")
 
 
@@ -25,7 +26,7 @@ def to_png(src: Path) -> Path | None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(MD_ROOT.parent / "output_json_math" / "二模" / "化学"))
+    ap.add_argument("--dir", default=str(OUTPUT_JSON_MATH / "二模" / "化学"))
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 

@@ -8,8 +8,9 @@ MD 由 batch_convert_docx_to_md.py 生成：图片已导出到 <卷>/images/，
 """
 import argparse, json, re, shutil, subprocess
 from pathlib import Path
+from paths import DATA_ROOT
 
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 

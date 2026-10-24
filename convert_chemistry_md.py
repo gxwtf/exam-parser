@@ -22,12 +22,13 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON_MATH
 
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-MD_ROOT = PROJECT_ROOT.parent / "output_docx_to_md"
-JSON_ROOT = PROJECT_ROOT.parent / "output_json_math"
+MD_ROOT = OUTPUT_DOCX_TO_MD
+JSON_ROOT = OUTPUT_JSON_MATH
 WMF_EX = Path.home() / ".local/wmf/ex"
 
 BASE_URL = (os.getenv("MATH_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")).rstrip("/")

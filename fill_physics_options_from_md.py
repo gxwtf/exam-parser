@@ -8,8 +8,9 @@ MD 里选项通常是 A．/B．/C．/D． 文本行；若某些卷选项本身�
 import argparse, json, re
 from pathlib import Path
 import convert_math_pdf as M
+from paths import DATA_ROOT
 
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 

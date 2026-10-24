@@ -8,9 +8,10 @@
 """
 import argparse, json, re, subprocess, sys, time
 from pathlib import Path
+from paths import DATA_ROOT
 
 PROJ = Path(__file__).parent
-ROOT = PROJ.parent
+ROOT = DATA_ROOT
 
 
 def run(cmd):

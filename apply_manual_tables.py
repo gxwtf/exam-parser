@@ -7,8 +7,9 @@
 """
 import argparse, json, re
 from pathlib import Path
+from paths import DATA_ROOT
 
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 JSON_ROOT = ROOT / "output_json_math"
 TBL_DIR = Path(__file__).parent / "manual_tables"
 

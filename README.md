@@ -1,8 +1,36 @@
-# 英语试卷解析器 (English Exam Parser)
+# 广学五题坊 · 试卷解析器（多学科统一项目）
 
-基于 AI 的英语试卷解析工具，将 Markdown 格式的试卷解析为结构化 JSON。
+把高中试卷（docx / pdf / 扫描图）解析成结构化 JSON 的统一仓库。
 
-## 工作流程
+**一个学科可能有多条解析链路**，它们不是替代关系，而是针对不同的“坏法”取长补短：
+
+| 链路类型 | 做法 | 典型学科 |
+| --- | --- | --- |
+| 文本链路 | docx → MD（w2m）→ 脚本确定性切题 + AI 只做排版转换 | 英语、语文、政治、化学（选择题） |
+| PDF 页图链路 | 每页渲染成图 → 多模态模型逐页读成 JSON | 数学、物理、化学（PDF 版） |
+| 图片版链路 | 按题裁图 + 多模态逐题写解析，保留原版式 | 化学（当前主线） |
+
+**学科 × 链路总表、每条链路的完整命令与输出目录，见 [PIPELINES.md](PIPELINES.md)。**
+
+| 学科 | 已有链路 | 入口 |
+| --- | --- | --- |
+| 英语 | ① MD→JSON | `main.py`、`batch_convert_md_to_json.py` |
+| 数学 | ② PDF 页图→JSON | `convert_math_pdf.py` |
+| 物理 | ③ PDF 页图→JSON（选择题） | `convert_physics_pdf.py` |
+| 化学 | ④ MD→JSON　⑤ 整卷　⑥ PDF 页图→JSON　⑦ 图片版 | `convert_chemistry_md.py`、`convert_chemistry_full.py`、`convert_chemistry_pdf.py`、`batch_image_papers.py` |
+| 语文 | ⑧ MD→JSON | `convert_chinese_md.py` |
+| 政治 | ⑨ MD→JSON | `convert_politics_md.py` |
+| 生物 / 历史 / 地理 | 暂无 | — |
+
+## 通用约定
+
+- **数据根**：`gaozhong/`（原始卷）与所有 `output_*`（产物）都在 `EXAM_DATA_ROOT` 下，
+  由 [`paths.py`](paths.py) 统一定义；默认 = 仓库的上级目录（本机即 `/home/gxwtf/jingshibang`）。
+- **AI 网关**：默认本机 new-api（`127.0.0.1:8080` → vLLM，模型 `deepseek-v4.1-flash`，离线免费）。
+- **图片直出**：`https://gxwtf.cn/exam-images/<类型>/<学科>/<卷>/images/…`（nginx alias 到 `output_docx_to_md/…/images/`）。
+- **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `import-chinese-json.ts`。
+
+## 英语链路工作流程（链路 ①）
 
 ```
 MD 文件 → AI 分析 → 内容提取 → JSON 构建 → 验证 → 输出
@@ -35,6 +63,12 @@ OPENAI_TIMEOUT=600          # 本地推理出长 JSON 较慢，超时放宽（�
 ```
 
 `.env` 里其余被注释的段落是本机网关公网入口（`https://ai.gxwtf.cn/v1`）与官方付费 API 的备选配置，按需启用即可。`API_TYPE` 可选 `openai` / `anthropic`。
+
+数据根默认是**仓库的上级目录**（本机 `/home/gxwtf/jingshibang`），换机器/换目录时不用改代码，在 `.env` 里加一行即可：
+
+```bash
+EXAM_DATA_ROOT=/data/exam     # 目录下需有 gaozhong/ 与 output_*/（不存在会自动按需创建）
+```
 
 ### 3. 放入试卷
 
@@ -131,27 +165,60 @@ python3 batch_convert_md_to_json.py -p ./path/to/paper.md
 ## 项目结构
 
 ```
-exam-parser/
-├── main.py                      # 主入口（单目录模式）
-├── batch_convert_md_to_json.py  # 批量转换脚本（保持类型/学科层级）
-├── validate_json.py             # 只校验 JSON 结构（不调 AI）
-├── backfill_re_stems.py         # 阅读表达题干回填（用 md 重算，不调 AI）
-├── config.py                    # 配置文件
-├── test_with_existing_response.py  # 测试脚本（用已有 AI 响应）
-├── prompts/
-│   ├── __init__.py              # AI 提示词模板
-│   └── extraction_prompt.py
-├── src/
-│   ├── ai_client.py             # AI API 客户端
-│   ├── parser.py                # 主解析流程编排
-│   ├── loader.py                # MD 文件加载
-│   ├── locator.py               # 内容定位（start 锚点查找）
-│   ├── json_builder.py          # JSON 构建器
-│   └── validator.py             # 输出验证器
-└── data/
-    ├── input/                   # 输入目录（放 .md 文件）
-    ├── output/                  # 输出目录（生成的 JSON）
-    └── debug/                   # 调试文件（AI 提示词、响应等）
+exam-parser/                      # 本仓库只放代码/文档；数据在 EXAM_DATA_ROOT（默认仓库上级目录）
+├── paths.py                      # ★ 统一数据根：DATA_ROOT / GAOZHONG / OUTPUT_*
+├── PIPELINES.md                  # ★ 学科 × 链路总表 + 每条链路的完整命令
+├── config.py                     # 模型 / API / 英语题型配置（读 .env）
+├── .env.example
+│
+├── # —— 共用预处理 ——
+├── batch_convert_docx_to_md.py   # docx/doc → MD（w2m + LibreOffice）
+├── batch_convert_pdf_to_md.py    # PDF → MD（MinerU，历史存量用）
+├──
+├── # —— 英语（链路 ①）——
+├── main.py                       # 单目录模式入口
+├── batch_convert_md_to_json.py   # 批量（保持 类型/学科/卷 层级）
+├── validate_json.py              # 只校验结构，不调 AI
+├── backfill_re_stems.py          # 阅读表达题干回填
+├── prompts/                      # AI 提示词模板
+├── src/                          # ai_client / parser / loader / locator / json_builder / validator
+├──
+├── # —— 数学（②）· 物理（③）——
+├── convert_math_pdf.py           # 多模态底座：页面渲染 / 预筛 / chat_json
+├── fix_math_missing_options.py   # 数学：定向补缺失选项
+├── convert_physics_pdf.py        # 物理：PDF 页图 → 选择题 JSON
+├── repair_physics_wmf.py         # 物理：.wmf 公式让模型重转录
+├── postprocess_physics.py        # 物理：图片/占位符收尾
+├── attach_physics_images.py      # 物理：从 docx→MD 挂插图
+├── attach_physics_tables.py      # 物理：从 MD 挂回表格
+├── fill_physics_options_from_md.py / fill_physics_option_images.py
+├── apply_manual_tables.py + manual_tables/   # 手工补表格
+├──
+├── # —— 化学（④ 文本 · ⑤ 整卷 · ⑥ PDF · ⑦ 图片版）——
+├── convert_chemistry_md.py       # ④ docx→MD→JSON（选择题）
+├── convert_chemistry_full.py     # ⑤ 整卷（选择 + 非选择）
+├── convert_chemistry_pdf.py      # ⑥ PDF 页图 → JSON
+├── convert_emf_to_png.py         # .emf → PNG（走 LibreOffice）
+├── fix_images.py / sanitize_mdx.py / check_katex.py
+├── add_chem_choice_analysis.py   # ④ 选择题补文字解析
+├── split_chem_docx.py            # ⑦ 按题拆 docx
+├── reflow_docx.py / normalize_docx_spacing.py   # ⑦ 行距统一 + 浮动图内联
+├── crop_questions_pdf.py         # ⑦ 按题号裁图（pdftoppm + pdftotext -bbox）
+├── build_image_paper.py / batch_image_papers.py / build_image_questions.py
+├── add_image_choice_analysis.py  # ⑦ 每题截图 → 多模态解析
+├──
+├── # —— 语文（⑧）· 政治（⑨）——
+├── convert_chinese_md.py / docx_dots.py / merge_chinese_groups.py /
+│   normalize_chinese_scores.py / repair_chinese_tables.py / sanitize_chinese.py
+├── convert_politics_md.py
+├──
+├── # —— 通用工具 / 测试 ——
+├── attach_md_images.py / merge_answers_from_pdf.py / repair_missing.py
+├── test_ai_short.py / test_with_existing_response.py
+└── data/                         # 仅英语单目录模式（main.py）用
+    ├── input/
+    ├── output/
+    └── debug/
 ```
 
 ## 日常运维：增量爬取 / 更新题库 / 修复存量数据
@@ -436,3 +503,13 @@ npx tsx scripts/import-chinese-json.ts --file ... --force   # 覆盖：先删同
 前端约定：`category=名著` 的 `chinese-reading` 题组按单栏渲染（材料 + 每小题一个答题框，参考英语
 「阅读表达」的作答体验），其它阅读类（多文本/文言文/古诗/文学类）仍是左文章右题目的两栏；题组
 `content` 为空时不留空的阅读区。
+
+## 其它学科 / 其它链路
+
+README 上面几节是**英语**（链路 ①）的完整说明，以及数学 / 化学 / 语文的历史章节。物理、政治、
+化学图片版等链路的命令与产物，统一维护在 [PIPELINES.md](PIPELINES.md)：
+
+- **物理**（PDF 页图 → 选择题 JSON，`.wmf` 公式修复 + 图片/表格挂载）→ PIPELINES 第 4 节
+- **化学四条链路**（文本 / 整卷 / PDF / 图片版）→ PIPELINES 第 5 节
+- **政治**（docx→MD→JSON，按模块打标签）→ PIPELINES 第 7 节
+- **生物 / 历史 / 地理**：尚无链路，新增方式的检查清单在 PIPELINES 第 8～9 节

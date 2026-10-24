@@ -29,6 +29,7 @@ from config import (
     PROJECT_ROOT, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, API_TYPE, LOG_LEVEL, LOG_FILE
 )
 from src.parser import ExamParser
+from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON
 
 EXTENSIONS = {".md"}
 
@@ -292,7 +293,7 @@ def main():
     if args.dir:
         input_dir = os.path.abspath(args.dir)
     else:
-        input_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output_docx_to_md")
+        input_dir = str(OUTPUT_DOCX_TO_MD)
 
     if not os.path.isdir(input_dir):
         print(f"错误: 输入目录不存在 - {input_dir}")
@@ -301,7 +302,7 @@ def main():
     if args.output:
         output_dir = os.path.abspath(args.output)
     else:
-        output_dir = os.path.join(os.path.dirname(input_dir), "output_json")
+        output_dir = str(OUTPUT_JSON)
 
     all_types = {}
     for arg in args.types:

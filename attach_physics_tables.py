@@ -8,8 +8,9 @@ AI 逐页识别时会丢掉表格；docx→MD 里表格是 markdown 表格（| �
 """
 import argparse, json, re
 from pathlib import Path
+from paths import DATA_ROOT
 
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
 JSON_ROOT = ROOT / "output_json_math"
 

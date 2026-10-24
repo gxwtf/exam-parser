@@ -21,9 +21,10 @@ PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
 from convert_chinese_md import rewrite_images, split_paper, chat, log
 import convert_chinese_md as C
+from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON_POLITICS
 
-MD_ROOT = PROJECT_ROOT.parent / "output_docx_to_md"
-OUT_ROOT = PROJECT_ROOT.parent / "output_json_politics"
+MD_ROOT = OUTPUT_DOCX_TO_MD
+OUT_ROOT = OUTPUT_JSON_POLITICS
 OUT = {"root": OUT_ROOT}
 
 MODULES = ["中特", "经济社会", "政治法治", "哲学文化", "国政国经", "法律生活", "逻辑思维"]

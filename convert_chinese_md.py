@@ -23,6 +23,7 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+from paths import GAOZHONG, OUTPUT_DOCX_TO_MD, OUTPUT_JSON_CHINESE
 
 try:
     from docx_dots import DocxDots
@@ -32,8 +33,8 @@ except Exception:  # 读不了 docx 也不能影响主流程
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-MD_ROOT = PROJECT_ROOT.parent / "output_docx_to_md"
-OUT_ROOT = PROJECT_ROOT.parent / "output_json_chinese"
+MD_ROOT = OUTPUT_DOCX_TO_MD
+OUT_ROOT = OUTPUT_JSON_CHINESE
 
 BASE_URL = (os.getenv("MATH_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")).rstrip("/")
 API_KEY = os.getenv("MATH_VISION_API_KEY") or os.getenv("OPENAI_API_KEY", "")
@@ -963,7 +964,7 @@ def process(md: Path, type_dir: str, args) -> str:
     body, ans = split_paper(txt)
     dots = None
     if args.dots and DocxDots is not None:
-        src_dir = PROJECT_ROOT.parent / "gaozhong" / type_dir / "语文"
+        src_dir = GAOZHONG / type_dir / "语文"
         docxs = sorted(src_dir.glob(f"{title}*.docx"))
         if not docxs:
             docs = sorted(src_dir.glob(f"{title}*.doc"))

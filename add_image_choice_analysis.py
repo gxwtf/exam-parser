@@ -10,13 +10,14 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+from paths import OUTPUT_IMAGE_QUESTIONS
 
 PROJ = Path(__file__).parent
 load_dotenv(PROJ / ".env")
 BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1").rstrip("/")
 API_KEY = os.getenv("OPENAI_API_KEY", "")
 MODEL = os.getenv("OPENAI_MODEL", "deepseek-v4.1-flash")
-ROOT = PROJ.parent / "output_image_questions"
+ROOT = OUTPUT_IMAGE_QUESTIONS
 
 PROMPT = """这是北京高考化学二模的一道选择题截图。正确答案是 {ans}。
 请写一段 100-160 字的中文解析：

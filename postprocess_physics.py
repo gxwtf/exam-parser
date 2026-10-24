@@ -5,9 +5,10 @@
 """
 import argparse, json, re, shutil
 from pathlib import Path
+from paths import DATA_ROOT
 
 IMGREF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
-ROOT = Path(__file__).parent.parent
+ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
 JROOT = ROOT / "output_json_math"
 

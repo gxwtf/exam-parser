@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from convert_chinese_md import chat, log
+from paths import DATA_ROOT
 
 PROJ = Path(__file__).parent
 SYSTEM = "你是高中化学老师，只输出 JSON。"
@@ -71,7 +72,7 @@ def main():
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
 
-    files = sorted((PROJ.parent / "output_json_math" / args.type / args.subject).glob("*.json"))
+    files = sorted((DATA_ROOT / "output_json_math" / args.type / args.subject).glob("*.json"))
     if args.only:
         files = [f for f in files if args.only in f.stem]
     if args.limit:

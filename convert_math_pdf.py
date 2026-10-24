@@ -30,6 +30,7 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+from paths import GAOZHONG, OUTPUT_JSON_MATH
 
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
@@ -755,11 +756,11 @@ def main():
     global BASE_URL, API_KEY
     ap = argparse.ArgumentParser(description="数学试卷 PDF → JSON（多模态模型）")
     ap.add_argument("-p", "--path", help="单个 PDF 路径")
-    ap.add_argument("--dir", default=str(PROJECT_ROOT.parent / "gaozhong"), help="批量模式：素材根目录")
+    ap.add_argument("--dir", default=str(GAOZHONG), help="批量模式：素材根目录")
     ap.add_argument("-T", "--type", default="一模", help="试卷类型目录（一模/二模/真题…）")
     ap.add_argument("-s", "--subject", default="数学", help="学科（目前只支持数学）")
     ap.add_argument("-g", "--grade", default="高三", help="年级（用于 tag / paper.grade）")
-    ap.add_argument("-o", "--output", default=str(PROJECT_ROOT.parent / "output_json_math"), help="输出根目录")
+    ap.add_argument("-o", "--output", default=str(OUTPUT_JSON_MATH), help="输出根目录")
     ap.add_argument("-m", "--model", default=MODEL, help=f"多模态模型（默认 {MODEL}）")
     ap.add_argument("--base-url", default=BASE_URL, help=f"接口地址（默认 {BASE_URL}）")
     ap.add_argument("--api-key", default=None, help="接口密钥（默认取 MATH_VISION_API_KEY / OPENAI_API_KEY）")

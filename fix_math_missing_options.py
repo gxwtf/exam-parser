@@ -4,14 +4,15 @@ import json, glob, os, re, base64, subprocess, tempfile, pathlib, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from convert_math_pdf import (REPAIR_PROMPT, SYSTEM_PROMPT, coerce_options, chat_json,
                               BASE_URL, API_KEY, MODEL, log)
+from paths import DATA_ROOT
 
 BBOX_PROMPT = """这张图是一页数学试卷。请找到第 {no} 题的各选项（A/B/C/D，选项内容本身可能是图形或公式图片），
 给出每个选项内容在本页的归一化 bbox（左上角为原点，0~1，格式 [x0,y0,x1,y1]）。
 只输出 JSON：{{"options":[{{"id":"a","bbox":[..]}},{{"id":"b","bbox":[..]}}]}}
 注意：本页没有印出的选项就不要输出；bbox 要刚好框住该选项的内容（含图形）。"""
 
-PDF_DIR = str(pathlib.Path(__file__).parent.parent / "gaozhong/二模/数学")
-JSON_DIR = str(pathlib.Path(__file__).parent.parent / "output_json_math/二模/数学")
+PDF_DIR = str(DATA_ROOT / "gaozhong/二模/数学")
+JSON_DIR = str(DATA_ROOT / "output_json_math/二模/数学")
 MAX_PAGES = int(os.getenv("FIX_MAX_PAGES", "6"))
 
 def main():

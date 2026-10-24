@@ -14,9 +14,10 @@ import argparse, json, re, tempfile, time
 from pathlib import Path
 
 import convert_math_pdf as M
+from paths import GAOZHONG, OUTPUT_JSON_MATH
 
 PROJECT_ROOT = Path(__file__).parent
-JSON_ROOT = PROJECT_ROOT.parent / "output_json_math"
+JSON_ROOT = OUTPUT_JSON_MATH
 
 SYSTEM_PROMPT = (
     "你是化学试卷录入员，负责把试卷页面的图像精确转成结构化 JSON。"
@@ -198,7 +199,7 @@ def process(pdf: Path, out_root: Path, args):
 def main():
     ap = argparse.ArgumentParser(description="化学试卷 PDF → JSON（只处理选择题）")
     ap.add_argument("-p", "--path")
-    ap.add_argument("--dir", default=str(PROJECT_ROOT.parent / "gaozhong"))
+    ap.add_argument("--dir", default=str(GAOZHONG))
     ap.add_argument("-T", "--type", default="二模")
     ap.add_argument("-g", "--grade", default="高三")
     ap.add_argument("-o", "--output", default=str(JSON_ROOT))

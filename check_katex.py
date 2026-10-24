@@ -6,6 +6,7 @@
 """
 import argparse, json, os, re, subprocess, tempfile
 from pathlib import Path
+from paths import DATA_ROOT
 
 MATH = re.compile(r"(\$\$.*?\$\$|\$[^$]+\$)", re.S)
 
@@ -27,7 +28,7 @@ process.stdin.on('end', () => {
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=str(Path(__file__).parent.parent / "output_json_math" / "二模" / "化学"))
+    ap.add_argument("--dir", default=str(DATA_ROOT / "output_json_math" / "二模" / "化学"))
     ap.add_argument("--node-modules", default="/home/gxwtf/gxexercise")
     ap.add_argument("--show", type=int, default=20)
     args = ap.parse_args()
