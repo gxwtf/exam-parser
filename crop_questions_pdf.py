@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 
 LINE_Q = re.compile(r"^(\d{1,2})\s*[.．]")
 HEAD_RE = re.compile(r"^(第[一二]部分|本部分共|参考答案)")
-FOOT_RE = re.compile(r"^第\s*\d+\s*页\s*[/／]\s*共\s*\d+\s*页")
+FOOT_RE = re.compile(r"^\s*第\s*\d+\s*页")   # 可能被拆成「第 7 页」「共 14 页」两段
 
 
 def page_words(pdf: Path):
@@ -369,7 +369,7 @@ def main():
             foot = {}
             for p in range(pi, npi + 1):
                 for ln in build_lines(pages[p]):
-                    if FOOT_RE.match(ln["t"]):
+                    if FOOT_RE.match(ln["t"]) or (ln["y0"] > pages[p]["h"] - 60 and "页" in ln["t"]):
                         foot[p] = ln["y0"]
                         break
             # 左边界：题号右端（把题号完全裁掉，题干紧跟在前端题号之后）；
@@ -403,6 +403,8 @@ def main():
                 page_bottom = ny0 if p == npi else pages[p]["h"]
                 if p in foot and foot[p] < page_bottom:
                     page_bottom = foot[p]
+                # 页脚区域兜底：底部 45pt 内一律不要（页脚/页码）
+                page_bottom = min(page_bottom, pages[p]["h"] - 55)
                 im = imgs[p]
                 top = int(round((y0 if p == pi else starts.get(p, 0)) * scale))
                 bot = int(round(page_bottom * scale))
