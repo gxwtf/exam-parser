@@ -96,6 +96,62 @@ def find_heading_cut(pages, start_pi, start_y, end_pi, end_y):
     return end_pi, end_y
 
 
+def line_bands(png: Path, thresh: int = 200):
+    """返回 [(y0, y1)]：每一行文字/图形的纵向区间"""
+    from PIL import Image
+    im = Image.open(png).convert("L")
+    w, h = im.size
+    px = im.load()
+    rows = []
+    for y in range(h):
+        dark = any(px[x, y] < thresh for x in range(0, w, 2))
+        rows.append(dark)
+    bands, start = [], None
+    for y, d in enumerate(rows):
+        if d and start is None:
+            start = y
+        if not d and start is not None:
+            if y - start >= 3:
+                bands.append((start, y))
+            start = None
+    if start is not None and h - start >= 3:
+        bands.append((start, h))
+    # 把紧贴着的窄条（下划线/横线/上标）并回同一行，避免调行距时把它和文字拆开
+    merged = []
+    for a, b in bands:
+        if merged and a - merged[-1][1] < 12:
+            merged[-1] = (merged[-1][0], b)
+        else:
+            merged.append((a, b))
+    return merged
+
+
+def band_gaps(png: Path):
+    bands = line_bands(png)
+    return [round(bands[i + 1][0] - bands[i][1]) for i in range(len(bands) - 1)], bands
+
+
+def normalize_line_gaps(png: Path, target_gap: int):
+    """把行与行之间的空白统一成 target_gap（字形本身不动，只调行距）"""
+    import statistics
+    from PIL import Image
+    gaps, bands = band_gaps(png)
+    if len(bands) < 3 or not gaps:
+        return
+    med = statistics.median(gaps)
+    if abs(med - target_gap) < 6:
+        return
+    im = Image.open(png).convert("RGB")
+    w, h = im.size
+    total = sum(b - a for a, b in bands) + target_gap * (len(bands) - 1)
+    out = Image.new("RGB", (w, total), "white")
+    y = 0
+    for i, (a, b) in enumerate(bands):
+        out.paste(im.crop((0, a, w, b)), (0, y))
+        y += (b - a) + (target_gap if i < len(bands) - 1 else 0)
+    out.save(png)
+
+
 def trim_ink(png: Path, thresh: int = 235):
     """按像素把四周白边全部裁掉：图片边界 = 文字墨迹边界"""
     try:
@@ -252,6 +308,7 @@ def main():
         imgs = render_pages(pdf, args.dpi, Path(td))
         scale = args.dpi / 72.0
         mapping = {}
+        base_gap = None
         nos = sorted(marks)
         for i, no in enumerate(nos):
             pi, y0, wd, digits = marks[no]
@@ -340,6 +397,14 @@ def main():
             else:
                 subprocess.run(["convert"] + [str(o) for o in outs] + ["-append", str(png)], capture_output=True)
                 compact_blank(png, thresh=40, keep=12)
+            if no == nos[0]:
+                gaps, _bands = band_gaps(png)
+                if gaps:
+                    import statistics
+                    base_gap = int(statistics.median(gaps))
+                    print(f"  基准行距（第{no}题）：{base_gap}px")
+            elif base_gap:
+                normalize_line_gaps(png, base_gap)
             (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
             url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png?v={int(png.stat().st_mtime)}"
             (out_dir / f"q{no}.json").write_text(json.dumps({
