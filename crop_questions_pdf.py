@@ -61,22 +61,23 @@ def build_lines(pg):
 
 
 def find_markers(pages, max_q=25):
-    """题号行：「N．…」或单独一个数字（且靠左）。返回 {题号: (页码, y0, 行, 数字串)}"""
+    """题号行：「N．…」且靠左（x0 在页宽 30% 内）。题号可以不从 1 开始、也可以跳号
+    （老国标卷是 6,7,… 选择题 + 25,26… 非选择题）。"""
     marks = {}
-    expect = 1
+    prev = -1
     for pi, pg in enumerate(pages):
         for ln in build_lines(pg):
-            if ln["x0"] > pg["w"] * 0.2:
+            if ln["x0"] > pg["w"] * 0.3:
                 continue
-            m = re.match(r"^(\d{1,2})\s*[.．]?", ln["t"])
+            m = re.match(r"^(\d{1,2})\s*[.．、](?!\d)", ln["t"])
             if not m:
                 continue
             n = int(m.group(1))
-            if n != expect:
+            if n <= prev or n > 60:
                 continue
             marks[n] = (pi, ln["y0"], ln, m.group(1))
-            expect += 1
-            if expect > max_q:
+            prev = n
+            if len(marks) >= max_q:
                 return marks
     return marks
 
