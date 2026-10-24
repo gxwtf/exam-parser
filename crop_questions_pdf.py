@@ -119,7 +119,8 @@ def line_bands(png: Path, thresh: int = 200):
     # 把紧贴着的窄条（下划线/横线/上标）并回同一行，避免调行距时把它和文字拆开
     merged = []
     for a, b in bands:
-        if merged and a - merged[-1][1] < 12:
+        thin = (b - a) <= 8
+        if merged and ((a - merged[-1][1]) <= 2 or thin):   # 只并极窄的下划线/横线/上标
             merged[-1] = (merged[-1][0], b)
         else:
             merged.append((a, b))
@@ -131,15 +132,29 @@ def band_gaps(png: Path):
     return [round(bands[i + 1][0] - bands[i][1]) for i in range(len(bands) - 1)], bands
 
 
-def normalize_line_gaps(png: Path, target_gap: int):
+def normalize_line_gaps(png: Path, target_gap: int, splits=None):
     """把行与行之间的空白统一成 target_gap（字形本身不动，只调行距）"""
     import statistics
     from PIL import Image
     gaps, bands = band_gaps(png)
-    if len(bands) < 3 or not gaps:
+    if splits:
+        # 在指定的 y 处把行带切开（用于“选项行之间原本 0 间距”的情况）
+        cut = []
+        for a, b in bands:
+            inner = sorted(y for y in splits if a + 8 < y < b - 8)
+            if not inner:
+                cut.append((a, b))
+                continue
+            prev = a
+            for y in inner:
+                cut.append((prev, y))
+                prev = y
+            cut.append((prev, b))
+        bands = cut
+        gaps = [bands[i + 1][0] - bands[i][1] for i in range(len(bands) - 1)]
+    if len(bands) < 2:
         return
-    med = statistics.median(gaps)
-    if abs(med - target_gap) < 6:
+    if not gaps:
         return
     im = Image.open(png).convert("RGB")
     w, h = im.size
@@ -172,6 +187,7 @@ def trim_ink(png: Path, thresh: int = 235):
     l, r = max(0, min(xs)), min(w, max(xs) + 1)   # 贴墨迹（不加左右留白）
     t, b = max(0, min(ys)), min(h, max(ys) + 1)
     im.crop((l, t, r, b)).save(png)
+    return t
 
 
 def trim_vertical(png: Path, pad: int = 0, thresh: int = 235):
@@ -290,6 +306,7 @@ def main():
     ap.add_argument("-T", "--type", default="二模")
     ap.add_argument("-s", "--subject", default="化学")
     ap.add_argument("--dpi", type=int, default=300)
+    ap.add_argument("--normalize", action="store_true", help="统一行距（实验性，可能破坏跨页题）")
     ap.add_argument("--max-q", type=int, default=25)
     args = ap.parse_args()
 
@@ -365,12 +382,13 @@ def main():
                 im = imgs[p]
                 top = int(round((y0 if p == pi else starts.get(p, 0)) * scale))
                 bot = int(round(page_bottom * scale))
-                if bot - top < 8:
+                if bot - top < 20:
                     continue
                 pieces.append((im, top, bot))
             if not pieces:
                 print(f"  ✗ 第{no}题 区间为空"); continue
             outs = []
+            top_off = 0
             num_w = 5.8 * len(digits) + 7
             for k, (im, top, bot) in enumerate(pieces):
                 part = Path(td) / f"c{no}_{k}.png"
@@ -389,7 +407,9 @@ def main():
                     subprocess.run(["convert", str(part), "-fill", "white", "-draw",
                                     f"rectangle {int(bx0)},{int(by0)} {int(bx1)},{int(by1)}", str(part)],
                                    capture_output=True)
-                trim_ink(part)
+                _t = trim_ink(part)
+                if k == 0 and _t is not None:
+                    top_off = _t
                 outs.append(part)
             png = out_dir / f"q{no}.png"
             if len(outs) == 1:
@@ -403,8 +423,20 @@ def main():
                     import statistics
                     base_gap = int(statistics.median(gaps))
                     print(f"  基准行距（第{no}题）：{base_gap}px")
-            elif base_gap:
-                normalize_line_gaps(png, base_gap)
+            elif base_gap and args.normalize:
+                # 选项行（A-D）在 PDF 里可能和上一行 0 间距（像素上粘在一起），
+                # 用文本行坐标把这些位置切开，再统一按基准行距重排。
+                splits = []
+                for ln4 in build_lines(pages[pi]):
+                    if ln4["y0"] < y0 - 1:
+                        continue
+                    if pi == npi and ln4["y0"] >= ny0 - 1:
+                        continue
+                    if re.match(r"^[A-D]\s*[．.、]", ln4["t"]):
+                        yy = (ln4["y0"] - y0) * scale - top_off
+                        if 0 < yy < 100000:
+                            splits.append(int(round(yy)))
+                normalize_line_gaps(png, base_gap, splits)
             (serve_dir / f"q{no}.png").write_bytes(png.read_bytes())
             url = f"/exam-images/{args.type}/{args.subject}/{stem}/images/q{no}.png?v={int(png.stat().st_mtime)}"
             (out_dir / f"q{no}.json").write_text(json.dumps({
