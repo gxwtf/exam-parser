@@ -308,6 +308,8 @@ def main():
     ap.add_argument("--dpi", type=int, default=300)
     ap.add_argument("--normalize", action="store_true", help="统一行距（实验性，可能破坏跨页题）")
     ap.add_argument("--max-q", type=int, default=25)
+    ap.add_argument("--only", default=None, help="只出这些题号，如 1-14 或 3,5,7")
+    ap.add_argument("--except", dest="except_", default=None, help="排除这些题号，如 1-14")
     args = ap.parse_args()
 
     pdf = Path(args.path)
@@ -318,6 +320,28 @@ def main():
 
     pages = page_words(pdf)
     marks = find_markers(pages, args.max_q)
+    if args.only:
+        keep = set()
+        for part in args.only.split(","):
+            part = part.strip()
+            if "-" in part:
+                a, b = part.split("-", 1)
+                keep.update(range(int(a), int(b) + 1))
+            elif part:
+                keep.add(int(part))
+        marks = {k: v for k, v in marks.items() if k in keep}
+        print(f"只出题号：{sorted(marks)}")
+    if args.except_:
+        drop = set()
+        for part in args.except_.split(","):
+            part = part.strip()
+            if "-" in part:
+                a, b = part.split("-", 1)
+                drop.update(range(int(a), int(b) + 1))
+            elif part:
+                drop.add(int(part))
+        marks = {k: v for k, v in marks.items() if k not in drop}
+        print(f"排除后题号：{sorted(marks)}")
     x_left, x_right = text_column(pages, marks)
     print(f"正文区横向范围：{x_left:.1f} ~ {x_right:.1f} pt")
     print(f"识别题号 {len(marks)} 个：{sorted(marks)}")
@@ -444,7 +468,15 @@ def main():
             }, ensure_ascii=False, indent=1), encoding="utf-8")
             mapping[no] = {"image": url}
             print(f"  ✓ 第{no}题 → q{no}.png ({png.stat().st_size//1024} KB, {len(pieces)} 段)")
-    (out_dir / "manifest.json").write_text(json.dumps(mapping, ensure_ascii=False, indent=1), encoding="utf-8")
+    mf = out_dir / "manifest.json"
+    old = {}
+    if mf.exists():
+        try:
+            old = json.loads(mf.read_text(encoding="utf-8"))
+        except Exception:
+            old = {}
+    old.update(mapping)
+    mf.write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
     print("输出：", out_dir)
 
 
