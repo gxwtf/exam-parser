@@ -878,11 +878,15 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
     if need_split and qs:
         # 名著/语用：材料（判词、语段）单独作题面，多个「(1)(2)…」拆成多道小题
         # （语用的 (1) 带选项 → 选择题；(2) 是长主观题 → text）
-        material, sub_qs = split_named_book(qs[0]["content"], raw_answer(ans_raw, nos[0]),
+        # 注意：必须从原文片段里切（含材料），否则会丢掉材料那段文字
+        seg_raw = _question_segment(body, nos[0])
+        material, sub_qs = split_named_book(seg_raw, raw_answer(ans_raw, nos[0]),
                                             qs[0].get("score") or 0, nos[0], review,
                                             qs[0].get("answer") or "")
-        article = material
-        qs = sub_qs
+        if material:
+            article = material
+        if sub_qs:
+            qs = sub_qs
         if len(qs) > 1:
             review.append(f"{cat}：已拆成 {len(qs)} 道小题")
 
