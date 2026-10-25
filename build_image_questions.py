@@ -71,7 +71,7 @@ def main():
         }, ensure_ascii=False, indent=1), encoding="utf-8")
 
     paper = {
-        "title": f"{stem}（图片版）", "subject": "化学", "source": stem, "grade": "高三",
+        "title": stem, "subject": "化学", "source": stem, "grade": "高三",
         "year": int(re.search(r"(20\d{2})", stem).group(1)) if re.search(r"(20\d{2})", stem) else None,
         "tags": ["化学", "高三", "二模", "图片题"],
         "questions": questions,
