@@ -58,6 +58,8 @@ MD原文：`The World Health Day, ___35___ (celebrate) every year on April 7`
 
 ### 答案格式处理：
 - 选择题答案：`21. A` → answer = "A"
+- **选择题（完形填空、阅读、七选五）的答案与选项 id 一律用大写字母（A/B/C/D…）**：answer 写 `"C"`，不要写 `"c"`/`"C."`/`"选项C"`；options 里也写 `{"id": "C", "label": "..."}`，不要写小写 id
+- 非选择题（语法填空、选词填空、阅读表达、作文）的单词/句子答案**保留参考答案原文的大小写**，不要改成大写或小写（如 `faced`、`FACE`、`With` 都照抄）
 - 语法填空答案：`11. between` → answer = "between"
 - 阅读表达答案：如果答案跨多行，完整抄写，保留换行
 - 如果答案有备选（如 `42. which##that`），完整保留：answer = "which##that"

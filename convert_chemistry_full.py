@@ -12,6 +12,7 @@ from pathlib import Path
 from convert_chinese_md import split_paper, rewrite_images, chat, log
 import convert_politics_md as P
 from paths import DATA_ROOT, OUTPUT_JSON_CHEMISTRY_FULL
+from src.answer_case import normalize_choice_case_in_paper
 
 OUT_ROOT = OUTPUT_JSON_CHEMISTRY_FULL
 OUT = {"root": OUT_ROOT}
@@ -250,7 +251,9 @@ def process(md: Path, type_dir: str, args) -> str:
              "totalScore": sum(g["score"] for g in groups) or None, "duration": 90,
              "tags": ["化学", args.grade, "二模"] + ([year.group(1)] if year else [])}
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"paper": paper, "groups": groups}, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = {"paper": paper, "groups": groups}
+    normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写
+    dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if review:
         dst.with_suffix(".review.txt").write_text("\n".join(review), encoding="utf-8")
     return f"✓ {title}：{len(groups)} 组 / {len(qs)} 题（选择 {len(choice_qs)}，非选择 {len(qs)-len(choice_qs)}）"

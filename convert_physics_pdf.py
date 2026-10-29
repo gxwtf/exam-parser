@@ -14,6 +14,7 @@ from pathlib import Path
 
 import convert_math_pdf as M
 from paths import GAOZHONG, OUTPUT_JSON_MATH
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJECT_ROOT = Path(__file__).parent
 JSON_ROOT = OUTPUT_JSON_MATH
@@ -177,6 +178,7 @@ def process(pdf: Path, out_root: Path, args):
     n = sum(len(s["questions"]) for s in data["sections"])
     if n == 0:
         M.log("  ✗ 没识别到选择题"); return
+    normalize_choice_case_in_paper(data, log=M.log)  # 出口约定：选择题答案与选项 id 一律大写
     dst.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     M.log(f"  ✓ {dst.name}（{n} 题）")
     if review:

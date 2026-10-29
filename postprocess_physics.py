@@ -6,6 +6,8 @@
 import argparse, json, re, shutil
 from pathlib import Path
 from paths import DATA_ROOT
+from src.answer_case import (count_nonempty_labels, normalize_choice_case_in_paper,
+                             option_key)
 
 IMGREF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
 ROOT = DATA_ROOT
@@ -58,6 +60,7 @@ def main():
         served = mddir / "images"
         dst = MD_ROOT / args.type / "物理" / stem / "images"
         data = json.loads(jf.read_text(encoding="utf-8")); changed = False
+        labels_before = count_nonempty_labels(data)
 
         for sec in data["sections"]:
             for pos, q in enumerate(sec["questions"]):
@@ -66,7 +69,8 @@ def main():
                 seg = segs[pos]
                 mopt = md_options(seg)
                 for o in q["options"]:
-                    src = mopt.get(o["id"], "")
+                    # MD 侧 key 是小写；文件侧 id 可能大写（新出口）→ 统一过 option_key()
+                    src = mopt.get(option_key(o["id"]), "")
                     if "![" not in src:
                         continue
                     cur = str(o["label"]).strip()
@@ -112,6 +116,10 @@ def main():
                 if src.exists() and not (dst / name).exists():
                     shutil.copyfile(src, dst / name); copied += 1
         if changed and not args.dry_run:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
+            if count_nonempty_labels(data) < labels_before:
+                print(f"  ✗ {jf.stem}：选项 label 非空数减少，已跳过写盘")
+                continue
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{'[dry-run] ' if args.dry_run else ''}覆盖为含图选项 {overwritten} 处｜复制图片 {copied} 张")
 

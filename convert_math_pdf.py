@@ -31,6 +31,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from paths import GAOZHONG, OUTPUT_JSON_MATH
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
@@ -744,6 +745,7 @@ def process_pdf(pdf: Path, out_root: Path, args) -> None:
     if n_q == 0:
         log("  ✗ 没有识别到题目，跳过写入")
         return
+    normalize_choice_case_in_paper(data, log=log)  # 出口约定：选择题答案与选项 id 一律大写
     dst.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     log(f"  ✓ {dst}（{n_q} 题）")
     if review:

@@ -11,6 +11,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from paths import OUTPUT_IMAGE_QUESTIONS
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJ = Path(__file__).parent
 load_dotenv(PROJ / ".env")
@@ -74,10 +75,12 @@ def do_paper(d: Path, force=False) -> tuple[str, int]:
                 try:
                     qd = json.loads(qj.read_text(encoding="utf-8"))
                     qd["analysis"] = q["analysis"]
+                    normalize_choice_case_in_paper(qd)  # 出口约定：选择题答案与选项 id 一律大写
                     qj.write_text(json.dumps(qd, ensure_ascii=False, indent=1), encoding="utf-8")
                 except Exception:
                     pass
     if filled:
+        normalize_choice_case_in_paper(data)  # 出口约定：选择题答案与选项 id 一律大写
         pj.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return d.name, filled
 

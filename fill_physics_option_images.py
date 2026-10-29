@@ -10,6 +10,8 @@
 import argparse, json, re, shutil
 from pathlib import Path
 from paths import DATA_ROOT
+from src.answer_case import (count_nonempty_labels, normalize_choice_case_in_paper,
+                             option_key)
 
 ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
@@ -60,6 +62,7 @@ def main():
         segs = md_question_segments(md)
         seg_order = [segs[k] for k in sorted(segs)]
         data = json.loads(jf.read_text(encoding="utf-8"))
+        labels_before = count_nonempty_labels(data)
         dst_dir = MD_ROOT / args.type / "物理" / jf.stem / "images"
         changed = False
         for sec in data["sections"]:
@@ -80,13 +83,13 @@ def main():
                     dst_dir.mkdir(parents=True, exist_ok=True)
                     done = 0
                     for o in q["options"]:
-                        ref = per_opt.get(o["id"])
+                        ref = per_opt.get(option_key(o["id"]))
                         if not ref:
                             continue
                         src = md.parent / ref
                         if not src.exists():
                             continue
-                        name = f"{jf.stem}_q{q['id']}_{o['id']}{src.suffix}"
+                        name = f"{jf.stem}_q{q['id']}_{option_key(o['id'])}{src.suffix}"  # 文件名沿用旧的小写字母
                         if not args.dry_run:
                             shutil.copyfile(src, dst_dir / name)
                         o["label"] = f"![](images/{name})"
@@ -105,7 +108,7 @@ def main():
                         if not args.dry_run:
                             dst_dir.mkdir(parents=True, exist_ok=True)
                         for i, o in enumerate(miss):
-                            name = f"{jf.stem}_q{q['id']}_{o['id']}{src_img.suffix}"
+                            name = f"{jf.stem}_q{q['id']}_{option_key(o['id'])}{src_img.suffix}"
                             if not args.dry_run:
                                 import subprocess
                                 subprocess.run(["convert", str(src_img), "-crop", f"25%x100%+{i*25}%+0", "+repage",
@@ -120,7 +123,7 @@ def main():
                 if not args.dry_run:
                     dst_dir.mkdir(parents=True, exist_ok=True)
                     for o, src in zip(miss, picked):
-                        name = f"{jf.stem}_q{q['id']}_{o['id']}{src.suffix}"
+                        name = f"{jf.stem}_q{q['id']}_{option_key(o['id'])}{src.suffix}"  # 文件名沿用旧的小写字母
                         shutil.copyfile(src, dst_dir / name)
                         o["label"] = f"![](images/{name})"
                 else:
@@ -128,6 +131,10 @@ def main():
                         o["label"] = f"![]({src.name})"
                 filled_q += 1; filled_o += len(miss); changed = True
         if changed and not args.dry_run:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
+            if count_nonempty_labels(data) < labels_before:
+                print(f"  ✗ {jf.stem}：选项 label 非空数减少，已跳过写盘")
+                continue
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{'[dry-run] ' if args.dry_run else ''}用选项图补全 {filled_q} 题 / {filled_o} 个选项")
     if quarter_split:

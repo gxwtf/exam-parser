@@ -12,6 +12,7 @@ from PIL import Image
 
 from convert_chemistry_full import parse_essay_answers, QSPLIT
 from convert_chinese_md import split_paper
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJ = Path(__file__).parent
 
@@ -52,7 +53,7 @@ def main():
             "no": no,
             "type": "single" if is_choice else "text",
             "image": info["image"],
-            "options": [{"id": k, "label": k.upper()} for k in "abcd"] if is_choice else [],
+            "options": [{"id": k.upper(), "label": k.upper()} for k in "abcd"] if is_choice else [],
             "answer": choice_answers.get(no, "") if is_choice else essay_answers.get(no, ""),
             "score": 3 if is_choice else None,
         }
@@ -64,11 +65,13 @@ def main():
         q["px"] = wpx
         q["content"] = f'<QImg src="{q["image"]}" px="{wpx}" />' if wpx else f'![]({q["image"]})'
         questions.append(q)
-        (qdir / f"q{no}.json").write_text(json.dumps({
+        q_payload = {
             "paper": stem, "subject": "化学", "no": no, "type": q["type"],
             "image": q["image"], "answer": q["answer"], "score": q["score"],
             "options": q["options"], "px": q.get("px"), "content": q["content"],
-        }, ensure_ascii=False, indent=1), encoding="utf-8")
+        }
+        normalize_choice_case_in_paper(q_payload)  # 出口约定：选择题答案与选项 id 一律大写
+        (qdir / f"q{no}.json").write_text(json.dumps(q_payload, ensure_ascii=False, indent=1), encoding="utf-8")
 
     paper = {
         "title": stem, "subject": "化学", "source": stem, "grade": "高三",
@@ -77,6 +80,7 @@ def main():
         "questions": questions,
     }
     out = qdir / "paper.json"
+    normalize_choice_case_in_paper(paper, log=print)  # 出口约定：选择题答案与选项 id 一律大写
     out.write_text(json.dumps(paper, ensure_ascii=False, indent=1), encoding="utf-8")
     n_choice = sum(1 for q in questions if q["type"] == "single")
     print(f"生成 {out.name}：{len(questions)} 题（选择 {n_choice}，非选择 {len(questions)-n_choice}），缺答案 {sum(1 for q in questions if not q['answer'])}")
