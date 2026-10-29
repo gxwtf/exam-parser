@@ -7,6 +7,7 @@
 import argparse, json, re, subprocess, sys
 from pathlib import Path
 from paths import DATA_ROOT
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJECT_ROOT = Path(__file__).parent
 ROOT = DATA_ROOT
@@ -56,6 +57,7 @@ def main():
         left = [q["id"] for sec in data["sections"] for q in sec["questions"] if not str(q.get("answer") or "").strip()]
         print(f"    补齐后仍缺：{left if left else '无'}")
         if not args.dry_run:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"共补答案 {filled} 题")
 

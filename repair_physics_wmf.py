@@ -10,6 +10,8 @@ import argparse, base64, json, re, tempfile, time
 from pathlib import Path
 import convert_math_pdf as M
 from paths import DATA_ROOT
+from src.answer_case import (count_nonempty_labels, normalize_choice_case_in_paper,
+                             option_key)
 
 ROOT = DATA_ROOT
 JSON_ROOT = ROOT / "output_json_math"
@@ -48,6 +50,8 @@ def main():
     fixed = 0
     for jf in sorted((JSON_ROOT / args.type / "物理").glob("*.json")):
         data = json.loads(jf.read_text(encoding="utf-8"))
+        labels_before = count_nonempty_labels(data)
+        file_fixed = 0
         need = []
         for sec in data["sections"]:
             for q in sec["questions"]:
@@ -80,12 +84,20 @@ def main():
                         if k in "abcd": labels[k] = M.wrap_numbers_in_text(M.wrap_plain_math(M.strip_opt_prefix(M.normalize_latex(str(o.get("label", ""))))))
                 if len(labels) == 4 and all(labels.values()) and not args.dry_run:
                     for o in q["options"]:
-                        o["label"] = labels[o["id"]]
+                        # 文件侧 id 可能大写（新出口）→ 统一过 option_key() 再取
+                        lab = labels.get(option_key(o["id"]))
+                        if lab:
+                            o["label"] = lab
                     if got_stem:
                         q["content"] = M.space_before_input(M.split_tail_sentence(M.split_circled(M.strip_number_prefix(M.normalize_latex(got_stem)))))
                     fixed += 1
+                    file_fixed += 1
                     print(f"   第{no}题 ✓ 已用 AI 转录替换")
-        if not args.dry_run:
+        if not args.dry_run and file_fixed:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
+            if count_nonempty_labels(data) < labels_before:
+                print(f"  ✗ {jf.stem}：选项 label 非空数减少，已跳过写盘")
+                continue
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"完成：修复 {fixed} 题")
 

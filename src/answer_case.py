@@ -39,6 +39,10 @@ __all__ = [
     "iter_questions_with_options",
     "iter_choice_questions",
     "scan_choice_case_issues",
+    "option_key",
+    "options_by_letter",
+    "lower_option_ids",
+    "count_nonempty_labels",
 ]
 
 # 选项 id：单个 ASCII 字母（A-Za-z）
@@ -101,6 +105,61 @@ def iter_choice_questions(node: Any, path: str = "") -> Iterator[Tuple[str, Dict
     for qpath, q in iter_questions_with_options(node, path):
         if _all_single_letter_ids(q.get("options") or []):
             yield qpath, q
+
+
+# ──────────────────────────────────────────────────────────────────
+# 兼容 helper：给「按小写 key 做内部匹配」的补漏/收尾脚本用
+#
+# 出口改成大写后，读取处拿到的 option id 可能是大写（新文件）或小写（旧文件）。
+# 这些脚本内部继续用小写 key 匹配即可，只要读取时统一过 option_key()：
+#     cur = options_by_letter(q["options"])      # {小写字母: 原 option dict}
+#     label = md_opts.get(option_key(o["id"]))
+# 写盘前再调 normalize_choice_case_in_paper() 把 id / 答案转回大写。
+# ──────────────────────────────────────────────────────────────────
+
+def option_key(oid: Any) -> str:
+    """选项 id 归一成匹配用 key（小写、去空白）。"""
+    return str("" if oid is None else oid).strip().lower()
+
+
+def options_by_letter(options: Any) -> Dict[str, Dict[str, Any]]:
+    """{小写字母: 原 option dict}；保留原对象（原始 id 大小写与其它字段都不动）。"""
+    out: Dict[str, Dict[str, Any]] = {}
+    for opt in options or []:
+        if isinstance(opt, dict):
+            key = option_key(opt.get("id"))
+            if key and key not in out:
+                out[key] = opt
+    return out
+
+
+def lower_option_ids(data: Any) -> int:
+    """把 options[].id 就地改成小写，返回改动题数（仅供老逻辑临时匹配用）。
+
+    ⚠️ 写盘前必须再调用 normalize_choice_case_in_paper() 转回大写，否则出口又变回小写。
+    """
+    changed = 0
+    for _path, q in iter_questions_with_options(data):
+        dirty = False
+        for opt in q.get("options") or []:
+            if isinstance(opt, dict) and isinstance(opt.get("id"), str):
+                low = option_key(opt["id"])
+                if opt["id"] != low:
+                    opt["id"] = low
+                    dirty = True
+        if dirty:
+            changed += 1
+    return changed
+
+
+def count_nonempty_labels(data: Any) -> int:
+    """统计所有题目里 label 非空的选项数（补漏脚本用来断言「不丢内容」）。"""
+    n = 0
+    for _path, q in iter_questions_with_options(data):
+        for opt in q.get("options") or []:
+            if isinstance(opt, dict) and str(opt.get("label") or "").strip():
+                n += 1
+    return n
 
 
 # ──────────────────────────────────────────────────────────────────

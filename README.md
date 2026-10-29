@@ -34,6 +34,9 @@
   化学 / 图片版 / 英语批量兜底）；语法填空 / 选词填空 / 阅读表达 / 作文的单词答案**保留原文大小写**
   （`faced`、`FACE` 不改写），否则判题会坏。存量 JSON 用 `python3 normalize_json_case.py`（默认 dry-run，
   `--apply` 会先备份到 `DATA_ROOT/_backup_json_case_<时间戳>/`）迁移；`validate_json.py` 会以 warning 报不一致。
+  补漏/收尾脚本（`fix_math_missing_options` / `fill_physics_*` / `postprocess_physics` / `repair_physics_wmf` /
+  `repair_missing` 等）读取旧文件（小写 id）与新文件（大写 id）都要能跑：匹配时过 `option_key()` 统一小写，
+  写盘前再 `normalize_choice_case_in_paper()`，并用 `count_nonempty_labels()` 断言 label 不丢。
 - **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `scripts/import-chinese-json.ts`。
 
 ## 英语链路工作流程（链路 ①）

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import convert_math_pdf as M
 from paths import DATA_ROOT
+from src.answer_case import count_nonempty_labels, normalize_choice_case_in_paper
 
 PROJECT_ROOT = Path(__file__).parent
 ROOT = DATA_ROOT
@@ -88,6 +89,7 @@ def main():
             print(f"  ⚠ {jf.stem}: 缺 {missing}，无 PDF"); continue
         pdfs.sort(key=lambda p: ("教师版" not in p.name, p.name))
         data = json.loads(jf.read_text(encoding="utf-8"))
+        labels_before = count_nonempty_labels(data)
         qs = data["sections"][0]["questions"]
         have = {q["id"] for q in qs}
         need = [n for n in missing if n not in have]
@@ -117,6 +119,10 @@ def main():
                 qs.append(q); qs.sort(key=lambda x: x["id"]); total += 1
                 print(f"     第{no}题 ✓（答案 {q['answer'] or '缺'}）")
         if not args.dry_run:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
+            if count_nonempty_labels(data) < labels_before:
+                print(f"  ✗ {jf.stem}：选项 label 非空数减少，已跳过写盘")
+                continue
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         rev.unlink(missing_ok=True)
     print(f"补齐题目 {total} 道")

@@ -9,6 +9,8 @@ import argparse, json, re
 from pathlib import Path
 import convert_math_pdf as M
 from paths import DATA_ROOT
+from src.answer_case import (count_nonempty_labels, normalize_choice_case_in_paper,
+                             option_key)
 
 ROOT = DATA_ROOT
 MD_ROOT = ROOT / "output_docx_to_md"
@@ -74,6 +76,7 @@ def main():
         # MD 的题号可能和 PDF 不一致（PDF 13–20 vs MD 1–8）→ 按顺序对应
         md_order = [mdq[k] for k in sorted(mdq)]
         data = json.loads(jf.read_text(encoding="utf-8"))
+        labels_before = count_nonempty_labels(data)
         changed = False
         for sec in data["sections"]:
             for pos, q in enumerate(sec["questions"]):
@@ -84,7 +87,8 @@ def main():
                 src = by_no if len(by_no) >= len(miss) else (md_order[pos] if pos < len(md_order) else {}).get("options", {})
                 got = 0
                 for o in miss:
-                    raw = src.get(o["id"], "").strip()
+                    # MD 侧 key 是小写；文件侧 id 可能大写（新出口）→ 统一过 option_key()
+                    raw = src.get(option_key(o["id"]), "").strip()
                     if not raw:
                         continue
                     # wmf 已批量转成 png：把引用改指 png，图片保留
@@ -101,6 +105,10 @@ def main():
                 if left:
                     still_missing.append(f"{jf.stem} 第{q['id']}题 缺 {'/'.join(left)}")
         if changed and not args.dry_run:
+            normalize_choice_case_in_paper(data)  # 导出统一大写（answer 与 option id）
+            if count_nonempty_labels(data) < labels_before:
+                print(f"  ✗ {jf.stem}：选项 label 非空数减少，已跳过写盘")
+                continue
             jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"{'[dry-run] ' if args.dry_run else ''}补全选项 {filled} 个")
     if still_missing:
