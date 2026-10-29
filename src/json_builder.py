@@ -16,6 +16,16 @@ _UNDERLINE_INSTRUCTION = (
     " (**_Write the underlined part directly on the first line of the answer section_**)"
 )
 
+# 选择题题型：答案与选项 id 一律大写字母（A/B/C/D…）。
+# 只有这些题型的答案会被大写化；语法填空/选词填空/阅读表达/作文的答案可能是单词
+# （"faced"、"FACE"、"With"），必须原样保留大小写，否则判题会坏掉。
+_CHOICE_QUESTION_TYPES = frozenset(
+    {"cloze", "seven-choose-five", "seven-to-five", "reading", "en-reading"})
+
+# 选择题答案只可能是选项字母本身：单字母，或最多两个连续字母（如 "AB"），且限定 A-G。
+# 注意不要用 ^[A-FG]+$ 这类宽松正则——它会把语法填空答案 "FACE" 误判成选项字母。
+_CHOICE_ANSWER_RE = re.compile(r'^[A-Ga-g]{1,2}$')
+
 
 class JSONBuilder:
     """Build final exam parser JSON output"""
@@ -293,7 +303,8 @@ class JSONBuilder:
             if isinstance(options_data, list):
                 if options_data and isinstance(options_data[0], dict):
                     # AI provided options as [{"id": "A", "label": "..."}, ...]
-                    all_options = options_data
+                    # 七选五是选择题：id 统一大写，与 answer 的大小写保持一致
+                    all_options = self._normalize_ai_options(options_data, uppercase_id=True)
                 else:
                     # AI provided options as flat strings ["A. ...", "B. ..."], convert
                     all_options = self._extract_options("\n".join(options_data), uppercase_id=True)
@@ -302,7 +313,7 @@ class JSONBuilder:
         
         for i, ai_q in enumerate(ai_questions):
             q_id = i + 1  # Restart numbering from 1 within each section
-            answer = self._normalize_answer(ai_q.get("answer", ""))
+            answer = self._normalize_answer(ai_q.get("answer", ""), question_type)
             analysis = ai_q.get("analysis", "")
             per_q_score = ai_q.get("score", 0)  # AI provides per-question score
 
@@ -322,7 +333,8 @@ class JSONBuilder:
                 q_content = ai_q.get("content", "") if question_type != "cloze" else ""
                 ai_opts = ai_q.get("options", [])
                 if ai_opts:
-                    options = self._normalize_ai_options(ai_opts)
+                    options = self._normalize_ai_options(
+                        ai_opts, uppercase_id=question_type in _CHOICE_QUESTION_TYPES)
             
             # For writing, content is the question text (article == question)
             if question_type == "en-writing":
@@ -581,11 +593,14 @@ class JSONBuilder:
     # Options extraction
     # ──────────────────────────────────────────────────────────────────
 
-    def _extract_options(self, text: str, uppercase_id: bool = False) -> List[Dict[str, str]]:
+    def _extract_options(self, text: str, uppercase_id: bool = True) -> List[Dict[str, str]]:
         """
         Extract options from text.
         Input: "A. at hand B. on time C. in order D. in mind"
-        Output: [{"id": "a", "label": "at hand"}, ...]
+        Output: [{"id": "A", "label": "at hand"}, ...]
+
+        选项 id 默认大写（与题库/前端约定的 A/B/C/D 一致）；
+        只有确需小写的非选择题场景才传 uppercase_id=False。
         """
         options = []
         # Match A. xxx or A.xxx or A) xxx
@@ -727,8 +742,17 @@ class JSONBuilder:
 
         return article
 
-    def _normalize_answer(self, answer: str) -> str:
-        """Normalize answer: strip whitespace, preserve original case, collapse ## gaps"""
+    def _normalize_answer(self, answer: str, question_type: str = "") -> str:
+        """Normalize answer: strip whitespace, collapse ## gaps.
+
+        大小写规则（按题型限定，极其重要）：
+        - 选择题（cloze / seven-choose-five / reading / en-reading）：答案就是选项字母，
+          统一大写（"c" → "C"），与选项 id 大小写一致，否则题库前端无法把正确选项标绿；
+        - 其它题型（语法填空 / 选词填空 / 阅读表达 / 作文）：答案是单词或句子，
+          **原样保留大小写**（"faced"、"FACE"、"With" 都不能动）。
+
+        保留原有行为："/" → "##"（"replaced/had replaced" → "replaced##had replaced"）。
+        """
         if not answer:
             return ""
         answer = answer.strip()
@@ -736,19 +760,26 @@ class JSONBuilder:
         answer = re.sub(r'\s*/\s*', '##', answer)
         # Collapse "a ## b" → "a##b"
         answer = re.sub(r'\s*##\s*', '##', answer)
-        # Lowercase single-letter choice answers (A/B/C/D/E/F/G)
-        if re.match(r'^[A-FG]+$', answer):
-            answer = answer.lower()
+        # 选择题答案：只有纯选项字母（A-G，单字母或两个字母的组合）才大写，
+        # 避免把 "FACE" 之类的单词答案当成选项字母组合。
+        if question_type in _CHOICE_QUESTION_TYPES and _CHOICE_ANSWER_RE.match(answer):
+            answer = answer.upper()
         return answer
 
-    def _normalize_ai_options(self, options: list) -> list:
-        """Normalize AI-generated options: lowercase option IDs"""
+    def _normalize_ai_options(self, options: list, uppercase_id: bool = False) -> list:
+        """Normalize AI-generated options.
+
+        Args:
+            options: AI 给出的选项列表（[{"id": "A", "label": ...}, ...]）
+            uppercase_id: 选择题传 True —— 选项 id 统一大写（"a" → "A"），
+                          与 answer 的大写字母匹配；非选择题保持原样。
+        """
         result = []
         for opt in options:
             if isinstance(opt, dict):
                 opt_id = opt.get("id", "")
-                if isinstance(opt_id, str):
-                    opt["id"] = opt_id.lower()
+                if isinstance(opt_id, str) and opt_id.strip():
+                    opt["id"] = opt_id.strip().upper() if uppercase_id else opt_id.strip().lower()
             result.append(opt)
         return result
 
