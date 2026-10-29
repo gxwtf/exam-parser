@@ -844,6 +844,18 @@ def table_shape_ok(text: str) -> list[str]:
     return errs
 
 
+FIG_NUM = re.compile(r"图\s*([0-9一二三四五六七八九])")
+
+
+def note_missing_figures(content: str, review: list[str], label: str) -> None:
+    """题干引用了「图 N」但图片张数明显不够 → 原卷（docx）本身缺图，记一条待人工确认。"""
+    refs = sorted(set(FIG_NUM.findall(content or "")))
+    n_img = len(IMG_REF.findall(content or "")) + len(EXAM_REF.findall(content or ""))
+    if refs and n_img < len(refs):
+        review.append(f"{label}：题干引用了「图{'/'.join(refs)}」（{len(refs)} 处编号），"
+                      f"但只找到 {n_img} 张图 —— 原卷 docx 里可能本来就没有这几张图，需人工确认")
+
+
 def verify_answers(answers: list[str], atext: str, review: list[str], label: str) -> None:
     """逐空核对：答案是否真能在参考答案原文里找到（防止模型改写）。"""
     hay = _norm_cmp(atext)
@@ -1493,6 +1505,7 @@ def process(md: Path, type_dir: str, args) -> str:
         elif n_raw_tbl > n_ai_tbl:
             review.append(f"{label}：原题有 {n_raw_tbl} 张表，AI 只保留了 {n_ai_tbl} 张，需人工核对")
         content = normalize_md_tables(content)
+        note_missing_figures(content, review, label)
 
         # ---- 画图/补图题：docx 里没有的答案图，从教师版 PDF 截取 ----
         before = list(answers)
