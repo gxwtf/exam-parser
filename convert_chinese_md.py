@@ -24,6 +24,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from paths import GAOZHONG, OUTPUT_DOCX_TO_MD, OUTPUT_JSON_CHINESE
+from src.answer_case import normalize_choice_case_in_paper
 
 try:
     from docx_dots import DocxDots
@@ -1051,7 +1052,9 @@ def process(md: Path, type_dir: str, args) -> str:
         "tags": ["语文", args.grade, "二模"] + ([year.group(1)] if year else []),
     }
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"paper": paper, "groups": out_groups}, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = {"paper": paper, "groups": out_groups}
+    normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写
+    dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if review:
         dst.with_suffix(".review.txt").write_text("\n".join(review), encoding="utf-8")
     n = sum(len(g["questions"]) for g in out_groups)

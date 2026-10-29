@@ -29,6 +29,7 @@ from config import (
     PROJECT_ROOT, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, API_TYPE, LOG_LEVEL, LOG_FILE
 )
 from src.parser import ExamParser
+from src.answer_case import normalize_choice_case_in_paper
 from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON
 
 EXTENSIONS = {".md"}
@@ -112,6 +113,7 @@ def convert_one(rel_path, abs_path, output_dir, parser, force):
         md_dir = os.path.dirname(abs_path)
         result = parser.parse_from_file(raw_stem, Path(md_dir))
 
+        normalize_choice_case_in_paper(result, log=print)  # 出口约定：选择题答案与选项 id 一律大写
         with open(json_file, "w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
@@ -281,6 +283,7 @@ def main():
         try:
             result = exam_parser.parse_from_file(stem, Path(md_dir))
             os.makedirs(output_dir, exist_ok=True)
+            normalize_choice_case_in_paper(result, log=print)  # 出口约定：选择题答案与选项 id 一律大写
             with open(json_file, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
             print(f"转换成功: {json_file}")

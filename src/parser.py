@@ -13,6 +13,7 @@ from src.ai_client import AIClient
 from src.locator import ContentLocator
 from src.validator import FinalJSONValidator
 from src.json_builder import JSONBuilder
+from src.answer_case import normalize_choice_case_in_paper
 
 logger = logging.getLogger(__name__)
 
@@ -353,6 +354,8 @@ class ExamParser:
             output_path: Output file path
         """
         try:
+            # 出口兜底：选择题答案与选项 id 一律大写（json_builder 已按题型处理，这里再统一一次）
+            normalize_choice_case_in_paper(result, log=logger.info)
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
             logger.info(f"✓ Result saved to {output_path}")

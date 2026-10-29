@@ -9,6 +9,7 @@ from pathlib import Path
 
 from convert_chinese_md import chat, log
 from paths import DATA_ROOT
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJ = Path(__file__).parent
 SYSTEM = "你是高中化学老师，只输出 JSON。"
@@ -58,6 +59,7 @@ def do_paper(path: Path, force=False) -> tuple[str, int]:
                 q["analysis"] = v
                 filled += 1
     if filled:
+        normalize_choice_case_in_paper(d, log=log)  # 出口约定：选择题答案与选项 id 一律大写
         path.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
     return path.stem, filled
 

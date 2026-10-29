@@ -108,9 +108,11 @@ python3 validate_json.py <json 路径>
 
 - 题型：完形填空 / 语法填空 / 阅读 / 七选五 / 选词填空 / 阅读表达 / 作文（见 `config.py`）。
 - 阅读类用 `start` 锚点从 MD 抽原文；`backfill_re_stems.py` 可离线重算「阅读表达」题干。
-- **答案大小写约定**：选择题（完形填空 / 阅读 / 七选五）的 `answer` 与选项 `options[].id` 一律大写字母
-  （`"C"` / `{"id": "C"}`），由 `src/json_builder.py` 按 `questionType` 强制；语法填空 / 选词填空 / 阅读表达 /
-  作文的单词答案保留原文大小写（`faced`、`FACE` 不改写）。改这块逻辑前先读 `_normalize_answer` 的注释。
+- **答案大小写约定**：**所有学科**的选择题 `answer` 与选项 `options[].id` 一律大写字母（`"C"` / `{"id": "C"}`）。
+  英语由 `src/json_builder.py` 按 `questionType` 处理；数学 / 物理 / 语文 / 政治 / 化学 / 图片版 / 英语批量
+  都在写盘出口调 [`src/answer_case.py`](src/answer_case.py) 的 `normalize_choice_case_in_paper()`（一行，别改各脚本
+  内部的解析/合并逻辑）。语法填空 / 选词填空 / 阅读表达 / 作文的单词答案保留原文大小写（`faced`、`FACE` 不改写）。
+  存量 JSON 迁移：`python3 normalize_json_case.py`（默认 dry-run；`--apply` 先备份到 `_backup_json_case_<时间戳>/`）。
 
 ## 3. 数学（链路 ②）
 

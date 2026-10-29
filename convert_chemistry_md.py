@@ -23,6 +23,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from paths import OUTPUT_DOCX_TO_MD, OUTPUT_JSON_MATH
+from src.answer_case import normalize_choice_case_in_paper
 
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env")
@@ -681,7 +682,9 @@ def convert_one(md_file: Path, type_dir: str, subject: str, args) -> str:
         "category": "选择", "score": score * len(out_qs), "questions": out_qs,
     }]
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"paper": paper, "sections": sections}, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = {"paper": paper, "sections": sections}
+    normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写
+    dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if review:
         review_path.write_text("\n".join(review), encoding="utf-8")
     elif review_path.exists():

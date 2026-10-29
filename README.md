@@ -28,9 +28,12 @@
   由 [`paths.py`](paths.py) 统一定义；默认 = 仓库的上级目录（本机即 `/home/gxwtf/jingshibang`）。
 - **AI 网关**：默认本机 new-api（`127.0.0.1:8080` → vLLM，模型 `deepseek-v4.1-flash`，离线免费）。
 - **图片直出**：`https://gxwtf.cn/exam-images/<类型>/<学科>/<卷>/images/…`（nginx alias 到 `output_docx_to_md/…/images/`）。
-- **答案大小写**：选择题（完形填空 / 阅读 / 七选五）的 `answer` 与选项 `options[].id` **一律大写字母**
-  （`"C"`、`{"id": "C"}`），由 `src/json_builder.py` 的 `_normalize_answer` / `_normalize_ai_options` 强制；
-  语法填空 / 选词填空 / 阅读表达 / 作文的单词答案**保留原文大小写**（`faced`、`FACE` 不改写），否则判题会坏。
+- **答案大小写**：**所有学科**的选择题 `answer` 与选项 `options[].id` **一律大写字母**（`"C"`、`{"id": "C"}`）：
+  英语由 `src/json_builder.py` 的 `_normalize_answer` / `_normalize_ai_options` 按题型处理，
+  其余学科在各自写盘出口调用共享模块 [`src/answer_case.py`](src/answer_case.py)（数学 / 物理 / 语文 / 政治 /
+  化学 / 图片版 / 英语批量兜底）；语法填空 / 选词填空 / 阅读表达 / 作文的单词答案**保留原文大小写**
+  （`faced`、`FACE` 不改写），否则判题会坏。存量 JSON 用 `python3 normalize_json_case.py`（默认 dry-run，
+  `--apply` 会先备份到 `DATA_ROOT/_backup_json_case_<时间戳>/`）迁移；`validate_json.py` 会以 warning 报不一致。
 - **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `scripts/import-chinese-json.ts`。
 
 ## 英语链路工作流程（链路 ①）
@@ -216,6 +219,8 @@ exam-parser/                      # 本仓库只放代码/文档；数据在 EXA
 ├── convert_politics_md.py
 ├──
 ├── # —— 通用工具 / 测试 ——
+├── src/answer_case.py            # ★ 出口规范化：选择题 answer / options[].id 统一大写（各学科共用）
+├── normalize_json_case.py        # ★ 存量题库 JSON 大小写迁移（默认 dry-run，--apply 先备份）
 ├── attach_md_images.py / merge_answers_from_pdf.py / repair_missing.py
 ├── test_ai_short.py / test_with_existing_response.py
 └── data/                         # 仅英语单目录模式（main.py）用
