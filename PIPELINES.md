@@ -137,9 +137,14 @@ python3 attach_physics_tables.py -T 二模              # 从 MD 挂回表格
 python3 fill_physics_options_from_md.py -T 二模       # MD 文本兜底补跨页选项
 python3 fill_physics_option_images.py -T 二模         # 选项图补全
 python3 apply_manual_tables.py -T 二模                # 手工表格（manual_tables/*.md）
+python3 fix_images.py --type 二模 --subject 物理      # .tiff/.wmf/.emf → .png（nginx 只放行 web 图）
+python3 keep_choice_only.py --type 二模 --subject 物理 --apply   # 只留选择题（新单科 1-14 / 理综 13-20 / 旧单科 1-8），分值统一 3 分
+python3 fill_answers_from_pdf_text.py --type 二模 --subject 物理 # 用教师版 PDF 文字层补空答案（双跑一致才采纳）
 ```
 
 - 只处理**选择题**；非选择题尚未做。
+- docx 会把实验题的小问也拆成“选择题”混进 JSON（如 `2024海淀 q16` 其实是实验题 16 的（4）），
+  导入题库前务必跑一次 `keep_choice_only.py`。
 - `.wmf` 公式图：`wmf2gd`（免 root 解包 libwmf，见 `tools_wmf2png.sh`、`repair_physics_wmf.py`）。
 
 ## 5. 化学（链路 ④⑤⑥⑦，四条逻辑）
