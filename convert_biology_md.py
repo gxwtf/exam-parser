@@ -66,7 +66,8 @@ SUBJECT = "生物"
 OUT_ROOT = OUTPUT_JSON_BIO
 OUT = {"root": OUT_ROOT}
 
-N_CHOICE = 15          # 第一部分：15 道单选
+N_CHOICE = 15          # 第一部分：15 道单选（个别卷题号重复会多出 1 道，见 MAX_CHOICE）
+MAX_CHOICE = 20        # 选择题区允许的上限（题号重复/自动编号会导致 16 道）
 CHOICE_SCORE = 2       # 每题 2 分
 SHORT_MAX = 12         # 答案 ≤12 字 → <Input>，否则 <InputLong>
 
@@ -394,7 +395,9 @@ def rebalance_leads(items: list[dict]) -> list[dict]:
 def cut_tail(seg: str) -> str:
     """砍掉段尾混进来的「第二部分/参考答案/第X页」等噪声。"""
     cut = len(seg)
-    for pat in (re.compile(r"(?m)^[ \t]*第[二2]部分"), re.compile(r"(?m)^[ \t]*参考答案"),
+    for pat in (re.compile(r"(?m)^[ \t]*\**[ \t]*第[二2]部分"),
+                re.compile(r"(?m)^[ \t]*\**[ \t]*参考答案"),
+                re.compile(r"(?m)^[ \t]*\**[ \t]*本部分共\s*\d+\s*题"),
                 re.compile(r"(?m)^[ \t]*第\s*\d+\s*页")):
         m = pat.search(seg)
         if m and m.start() < cut:
@@ -442,9 +445,10 @@ def split_marks_by_score(text: str, ans_order: list[int]) -> list[dict] | None:
     return out
 
 
-def parse_choice_questions(body: str) -> list[dict]:
+def parse_choice_questions(body: str, table_opt: list[int] | None = None) -> list[dict]:
     """第一部分 15 道单选（选项可能一行一个，也可能一行多个 A.… B.…）"""
-    segs = rebalance_leads(split_marks(body, 1, N_CHOICE))
+    segs = rebalance_leads(split_marks(body, 1, MAX_CHOICE))
+    table_opt = table_opt if table_opt is not None else []
     out = []
     for s in segs:
         seg = cut_tail(s["text"]).strip()
@@ -456,10 +460,16 @@ def parse_choice_questions(body: str) -> list[dict]:
             if k not in found:
                 found[k] = m  # 每个字母取第一次出现
         opts, content = [], seg
-        tbl_opts, tbl_content = options_from_table(seg)
-        if len(tbl_opts) == 4:                       # 选项被排成表格（2×2 或首列 A–D）
+        tbl_opts, tbl_content, tbl_mode = options_from_table(seg)
+        if tbl_mode == "cell_prefix":                # 选项排成 2×2 表格（纯排版）→ 取文字做选项
             opts, content = tbl_opts, tbl_content
-            log(f"    第{s['no']}题选项是表格，已按单元格拆成 A–D")
+            log(f"    第{s['no']}题选项是 2×2 表格排版，已取文字做 A–D 选项")
+        elif tbl_mode == "first_col":                # 表格就是选项内容 → 表格留题干，选项只给字母
+            opts, content = tbl_opts, seg
+            # 有的卷子在表格后还多一行「A. A B. B C. C D. D」的字母占位，纯噪声，去掉
+            content = re.sub(r"(?m)^[ \t]*(?:[A-D]\s*[.．、]\s*[A-D]\s*)+\)?[ \t]*$", "", content)
+            table_opt.append(s["no"])
+            log(f"    第{s['no']}题选项是一张表（首列 A–D），表格留在题干，options 只给字母")
         elif all(k in found for k in "ABCD"):
             first = found["A"].start(1)          # 选项字母的位置（不是前导空格/右括号）
             content = seg[:first].strip()
@@ -472,7 +482,8 @@ def parse_choice_questions(body: str) -> list[dict]:
             log(f"    ⚠ 第{s['no']}题选项未取全：{sorted(found)}")
         content = strip_table_remnant(content)
         out.append({"id": s["no"], "questionType": "single", "content": content,
-                    "options": opts, "answer": "", "analysis": "", "score": CHOICE_SCORE})
+                    "options": opts, "answer": "", "analysis": "", "score": CHOICE_SCORE,
+                    "_printed": s["no"]})
     # 选择题题号一律按出现顺序重编 1..N：Word 自动编号常把个别题号写错（重复/跳号），
     # 而答案表（1–15）是按位置给的，按位置编才对应得上。
     nos = [q["id"] for q in out]
@@ -483,12 +494,14 @@ def parse_choice_questions(body: str) -> list[dict]:
     return out
 
 
-def options_from_table(seg: str) -> tuple[list[dict], str]:
-    """选项被排成表格的选择题。两种版式都认：
+def options_from_table(seg: str) -> tuple[list[dict], str, str]:
+    """选项被排成表格的选择题，两种版式分开处理（返回 (options, 新题干, 版式)）。
 
-    - 每个单元格自带字母前缀（`| A．xxx | B．yyy |` / `| C．zzz | D．www |`，2×2 排布常见）；
-    - 首列就是 A/B/C/D，其余列是内容（用表头拼成「研究结果：…；推测或推论：…」）。
-    返回 (options, 去掉该表的题干)。
+    - 版式 `cell_prefix`：每个单元格自带字母前缀（`| A．xxx | B．yyy |`，2×2 排布常见）——
+      这只是**排版**，选项是正常文字：取文字做 label，表格从题干里去掉；
+    - 版式 `first_col`：表头 + 首列 A/B/C/D、其余列是真正的内容（如「选项｜研究结果｜推测或推论」）——
+      **尊重原卷**：表格完整留在题干（markdown 表），options 只给字母 A–D，
+      因为选项内容就是表格里的行，拆成 label 会丢掉表头语义。
     """
     lines = seg.split("\n")
     blocks, cur = [], []
@@ -505,7 +518,7 @@ def options_from_table(seg: str) -> tuple[list[dict], str]:
         rows = [r for r in rows if not _is_sep_row(r)]
         if len(rows) < 2:
             continue
-        # 版式一：单元格自带「A．」前缀
+        # 版式一：单元格自带「A．」前缀（纯排版）
         cand: dict[str, str] = {}
         for r in rows:
             for c in r:
@@ -514,23 +527,13 @@ def options_from_table(seg: str) -> tuple[list[dict], str]:
                     cand[m.group(1)] = _clean_cell(m.group(2))
         if len(cand) == 4:
             keep = [l for i, l in enumerate(lines) if i not in set(idxs)]
-            return [{"id": k, "label": cand[k]} for k in "ABCD"], "\n".join(keep).strip()
-        # 版式二：首列是 A/B/C/D
-        head = rows[0]
-        got: dict[str, str] = {}
-        for r in rows[1:]:
-            key = re.sub(r"[^A-Da-d]", "", (r[0] or "").strip()).upper()
-            if key in ("A", "B", "C", "D") and key not in got:
-                cells = r[1:]
-                if len(head) == len(r):
-                    label = "；".join(f"{h}：{c}" for h, c in zip(head[1:], cells) if c.strip())
-                else:
-                    label = "；".join(c for c in cells if c.strip())
-                got[key] = _clean_cell(label)
-        if len(got) == 4:
-            keep = [l for i, l in enumerate(lines) if i not in set(idxs)]
-            return [{"id": k, "label": got[k]} for k in "ABCD"], "\n".join(keep).strip()
-    return [], seg
+            return [{"id": k, "label": cand[k]} for k in "ABCD"], "\n".join(keep).strip(), "cell_prefix"
+        # 版式二：首列是 A/B/C/D（表格就是选项内容）
+        got = {re.sub(r"[^A-Da-d]", "", (r[0] or "").strip()).upper() for r in rows[1:]}
+        if {"A", "B", "C", "D"} <= got:
+            # 表格留在题干（只做规范化，不删行）
+            return [{"id": k, "label": k} for k in "ABCD"], seg, "first_col"
+    return [], seg, ""
 
 
 def strip_table_remnant(text: str) -> str:
@@ -674,6 +677,93 @@ def strip_ph_spaces(content: str) -> str:
 
 def _norm_cmp(s: str) -> str:
     return re.sub(r"[\s\u3000，。；：、,.;:!?！？（）()【】\[\]\"'“”‘’…—\-－]", "", s or "")
+
+
+SOLVE_PROMPT = r"""下面是北京高中生物试卷的若干道单项选择题（每道给了题干和 A–D 四个选项）。请逐题独立作答。
+
+只输出 JSON：
+{"answers": [{"no": 1, "answer": "C", "reason": "一句话理由"}, ...]}
+
+要求：
+1. answer 只能是 A、B、C、D 之一；reason 不超过 45 字，说明选它的依据；
+2. 题目用【第 k 题】编号（k 从 1 开始，**与卷面题号无关**），answers 的 no 必须对应这个 k；
+3. 给出的每道题都要作答，一道都不能漏；
+4. 只输出 JSON，不要解释。
+
+题目：
+{ITEMS}
+"""
+
+
+def ai_solve_choice(qs: list[dict], batch: int = 8) -> dict[int, tuple[str, str]]:
+    """让模型逐题作答（用来给「答案表条数 ≠ 题干块数」的卷子做内容级对齐）。"""
+    out: dict[int, tuple[str, str]] = {}
+    for i in range(0, len(qs), batch):
+        part = qs[i:i + batch]
+        items = []
+        for k, q in enumerate(part, 1):
+            opts = "\n".join(f"{o['id']}．{o['label']}" for o in (q.get("options") or []))
+            items.append(f"【第{k}题】{q['content']}\n{opts}")
+        got = ai_json(SOLVE_PROMPT.replace("{ITEMS}", "\n\n".join(items)), max_tokens=3000)
+        for a in (got.get("answers") or []):
+            try:
+                n = int(re.sub(r"\D", "", str(a.get("no"))))
+            except Exception:
+                continue
+            v = str(a.get("answer") or "").strip().upper()[:1]
+            if 1 <= n <= len(part) and v in "ABCD":
+                out[part[n - 1]["id"]] = (v, str(a.get("reason") or "").strip()[:120])
+    return out
+
+
+def align_choice_answers(choice_qs: list[dict], key: dict[int, str],
+                         derived: dict[int, tuple[str, str]],
+                         review: list[str]) -> dict[int, str]:
+    """答案表的条数比题干块数少时（题号重复导致），按**内容**对齐，而不是按位置硬套。
+
+    做法：枚举「哪一块是没有答案表条目的那一块」（N 个假设），每个假设把答案表的
+    15 个字母依次对到其余 15 块上，用两把尺子打分：
+      - 主要：模型逐题推导的答案与答案表字母的吻合数；
+      - 次要：块上印的题号与答案表题号一致的个数（帮助在打平时做判断）。
+    得分最高的假设胜出；被打掉的那一块用模型推导的答案补，并标注「AI 推导，原卷答案表缺失」。
+    """
+    n = len(choice_qs)
+    kvals = [key[k] for k in sorted(key)]
+    if not kvals or n <= len(kvals):
+        return dict(key)
+    ids = [q["id"] for q in choice_qs]
+    printed = [q.get("_printed") or q["id"] for q in choice_qs]
+    best = None
+    for skip in range(n):
+        blocks = [i for i in range(n) if i != skip]
+        if len(blocks) != len(kvals):
+            continue
+        hit = sum(1 for b, kv in zip(blocks, kvals) if derived.get(ids[b], ("",))[0] == kv)
+        num_ok = sum(1 for b, num in zip(blocks, sorted(key)) if printed[b] == num)
+        cand = (hit, num_ok, -abs(skip - (n - 1)), -skip, skip)
+        if best is None or cand > best:
+            best = cand
+    if best is None:
+        return dict(key)
+    skip = best[4]
+    blocks = [i for i in range(n) if i != skip]
+    mapping: dict[int, str] = {}
+    for b, kv in zip(blocks, kvals):
+        mapping[ids[b]] = kv
+    dropped = choice_qs[skip]
+    d_ans, d_why = derived.get(ids[skip], ("", ""))
+    review.append(f"选择题对齐：答案表 {len(kvals)} 个、题干 {n} 块 → 按内容对齐"
+                  f"（模型推导与答案表吻合 {best[0]}/{len(kvals)}、题号一致 {best[1]}/{len(kvals)}），"
+                  f"跳过第 {skip + 1} 块（印的题号 {printed[skip]}：「{dropped['content'][:16]}…」）")
+    if d_ans:
+        mapping[ids[skip]] = d_ans
+        review.append(f"第{ids[skip]}题（原卷题号 {printed[skip]}）：原卷答案表缺失该题答案，"
+                      f"按模型推导填 {d_ans}（理由：{d_why or '—'}）——AI 推导，原卷答案表缺失")
+        dropped["analysis"] = f"AI 推导，原卷答案表缺失：{d_why}" if d_why else "AI 推导，原卷答案表缺失"
+    else:
+        review.append(f"第{ids[skip]}题（原卷题号 {printed[skip]}）：原卷答案表缺失且模型没给出推导，"
+                      f"答案留空，需人工补")
+    return mapping
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1340,18 +1430,35 @@ def process(md: Path, type_dir: str, args) -> str:
     if len(smarks) >= 3 and smarks[0].start() < cut:
         cut = smarks[0].start()
     choice_body, essay_body = body[:cut], body[cut:]
-    choice_qs = parse_choice_questions(choice_body)
+    table_opts: list[int] = []
+    choice_qs = parse_choice_questions(choice_body, table_opt=table_opts)
     if len(choice_qs) != N_CHOICE:
-        review.append(f"选择题切到 {len(choice_qs)} 道（应为 {N_CHOICE} 道）")
+        review.append(f"选择题切到 {len(choice_qs)} 道（卷面一般 {N_CHOICE} 道；"
+                      f"题号重复/自动编号会多出来，见下）")
+    for no_ in table_opts:
+        review.append(f"第{no_}题（选择题）：选项原卷就是一张表（首列 A–D），表格已完整留在题干，"
+                      f"options 只给字母 A–D")
+    cache_dir = OUT["root"] / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
     choice_ans = parse_choice_answers(ans)
-    # 题干切出的选择题比答案表多（Word 题号重复导致同一题号出现两次）：
-    # 按参考答案的条数保留前 N 道，多余的题干记进 review 供人工确认，保证 15 题 × 2 分 = 30 分。
-    if N_CHOICE < len(choice_qs) and 0 < len(choice_ans) < len(choice_qs):
-        dropped = choice_qs[len(choice_ans):]
-        review.append(f"选择题切到 {len(choice_qs)} 道、参考答案只有 {len(choice_ans)} 个："
-                      f"按答案表保留前 {len(choice_ans)} 道，多余的题干未入卷（需人工确认）："
-                      + "；".join(f"「{q['content'][:18]}…」" for q in dropped))
-        choice_qs = choice_qs[:len(choice_ans)]
+    # 答案表条数 ≠ 题干块数（Word 题号重复）→ 让模型逐题推导，再按**内容**对齐，
+    # 绝不用位置顺序硬套（重复题号会让后面的答案整体错位）。
+    if choice_ans and len(choice_ans) != len(choice_qs):
+        d_cache = cache_dir / f"{title}-choice.json"
+        derived: dict[int, tuple[str, str]] = {}
+        if d_cache.exists() and (not args.ai or not args.force):
+            raw = json.loads(d_cache.read_text(encoding="utf-8"))
+            derived = {int(k): (v[0], v[1]) for k, v in raw.items()}
+        elif args.ai:
+            derived = ai_solve_choice(choice_qs)
+            if derived:
+                d_cache.write_text(json.dumps({str(k): list(v) for k, v in derived.items()},
+                                              ensure_ascii=False, indent=1), encoding="utf-8")
+        if derived:
+            choice_ans = align_choice_answers(choice_qs, choice_ans, derived, review)
+        else:
+            review.append(f"选择题 {len(choice_qs)} 道、答案表 {len(choice_ans)} 个，需要对答案做内容对齐，"
+                          f"但 --no-ai 模式（或模型无输出）拿不到推导，临时按位置对齐，需人工核对")
     for q in choice_qs:
         q["answer"] = choice_ans.get(q["id"], "")
         if not q["answer"]:
@@ -1361,6 +1468,8 @@ def process(md: Path, type_dir: str, args) -> str:
         q["content"] = rewrite(normalize_md_tables(reflow_cjk(latexify(q["content"]))))
         for o in q["options"]:
             o["label"] = rewrite(normalize_md_tables(reflow_cjk(latexify(o["label"]))))
+    for q in choice_qs:                       # 内部字段不出口
+        q.pop("_printed", None)
     choice_section = {
         "type": "选择题", "questionType": "biology-choice", "title": "一、选择题",
         "category": "选择", "score": CHOICE_SCORE * len(choice_qs),
@@ -1376,8 +1485,6 @@ def process(md: Path, type_dir: str, args) -> str:
         review.append(f"题干里的大题编号不规整（Word 自动编号 → {[e['no'] for e in essays]}），"
                       f"已按「（N分）」标记切分、并对照参考答案区题号重编为 {ans_order}")
         essays = rebalance_leads(alt)
-    cache_dir = OUT["root"] / ".cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cat_cache = cache_dir / f"{title}-cats.json"
     if cat_cache.exists() and (not args.ai or not args.force):
         cat_map = {int(k): v for k, v in json.loads(cat_cache.read_text(encoding="utf-8")).items()}
@@ -1533,12 +1640,20 @@ def process(md: Path, type_dir: str, args) -> str:
 
     year = re.search(r"(20\d{2})", title)
     total_score = sum(s["score"] for s in sections)
+    paper_total = 100
     if total_score != 100:
-        review.append(f"全卷分值合计 {total_score} 分（卷面 100 分），请核对")
+        if total_score > 100 and len(choice_qs) > N_CHOICE:
+            paper_total = total_score
+            review.append(f"原卷选择题题号重复，选择题实为 {len(choice_qs)} 道"
+                          f"（{CHOICE_SCORE * len(choice_qs)} 分）+ 非选择题 "
+                          f"{total_score - CHOICE_SCORE * len(choice_qs)} 分 = {total_score} 分，"
+                          f"paper.totalScore 按 {paper_total} 写")
+        else:
+            review.append(f"全卷分值合计 {total_score} 分（卷面 100 分），请核对")
     paper = {
         "title": title, "subject": SUBJECT, "source": title, "grade": args.grade,
         "year": int(year.group(1)) if year else None,
-        "totalScore": 100, "duration": 90,
+        "totalScore": paper_total, "duration": 90,
         "tags": [SUBJECT, args.grade, type_dir] + ([year.group(1)] if year else []),
     }
     payload = {"paper": paper, "sections": sections}
@@ -1557,6 +1672,29 @@ def process(md: Path, type_dir: str, args) -> str:
 # 自查
 # ──────────────────────────────────────────────────────────────────
 
+def _source_md_of(jf: Path) -> Path | None:
+    """由 JSON 路径反查原始 MD（output_docx_to_md/<类型>/生物/<卷>（教师版）/….md）。"""
+    d = OUTPUT_DOCX_TO_MD / jf.parent.name / SUBJECT / f"{jf.stem}（教师版）"
+    md = d / f"{jf.stem}（教师版）.md"
+    return md if md.exists() else None
+
+
+ANS_BLOCK = re.compile(r"(?m)^\s*\**\s*(\d{1,2})\s*[.．、]\s*【答案】\s*([A-Da-d])\b")
+
+
+def choice_answer_blocks(ans_text: str) -> dict[int, tuple[str, str]]:
+    """参考答案区里「1．【答案】C …」这种逐题答案块（有解析的卷子才有）。"""
+    out: dict[int, tuple[str, str]] = {}
+    marks = list(ANS_BLOCK.finditer(ans_text or ""))
+    for i, m in enumerate(marks):
+        no = int(m.group(1))
+        if no > N_CHOICE:
+            continue
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(ans_text)
+        out[no] = (m.group(2).upper(), ans_text[m.end():end].strip())
+    return out
+
+
 def _exam_images_root() -> Path:
     """nginx: /exam-images/<类型>/<学科>/<卷>/images/x → output_docx_to_md/<类型>/<学科>/<卷>/images/x"""
     return OUTPUT_DOCX_TO_MD
@@ -1569,13 +1707,17 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
     data = json.loads(raw)                       # 1) 能 json.load
     paper, sections = data["paper"], data["sections"]
     stat = {"title": paper.get("title"), "choice": 0, "essay": 0, "blanks": 0,
-            "imgs": set(), "ans_imgs": set(), "tables": 0, "seqs": [], "sections": []}
+            "imgs": set(), "ans_imgs": set(), "tables": 0, "seqs": [], "sections": [],
+            "answer_src": "-"}
 
     if paper.get("subject") != SUBJECT:
         errs.append(f"paper.subject 不是生物：{paper.get('subject')}")
     for k in ("title", "source", "grade", "year", "totalScore", "duration", "tags"):
         if k not in paper:
             errs.append(f"paper 缺字段 {k}")
+    sec_sum = sum(s_.get("score") or 0 for s_ in sections)
+    if paper.get("totalScore") != sec_sum:
+        errs.append(f"paper.totalScore={paper.get('totalScore')} ≠ 各 section 分值合计 {sec_sum}")
 
     choice_secs = [s for s in sections if s.get("type") == "选择题"]
     essay_secs = [s for s in sections if s.get("type") != "选择题"]
@@ -1588,8 +1730,11 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
             errs.append(f"选择题 questionType = {s.get('questionType')}（应为 biology-choice）")
         if s.get("category") != "选择":
             errs.append("选择题 category 应为 选择")
-        if len(qs) != N_CHOICE:
-            errs.append(f"选择题 {len(qs)} 道（应为 {N_CHOICE}）")
+        if len(qs) < N_CHOICE:
+            errs.append(f"选择题 {len(qs)} 道（少于 {N_CHOICE} 道）")
+        elif len(qs) > N_CHOICE:
+            notes.append(f"选择题 {len(qs)} 道（卷面常规 {N_CHOICE} 道）：原卷题号重复，"
+                         f"多出来的块已按内容对齐并补答案，详见 .review.txt")
         if s.get("score") != CHOICE_SCORE * len(qs):
             errs.append(f"选择题 score={s.get('score')}，与 {CHOICE_SCORE}×{len(qs)} 不符")
         for q in qs:
@@ -1612,6 +1757,48 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
                 errs.append(f"选择题第{q.get('id')}题表格：{e}")
         stat["sections"].append(("选择题", None, len(qs), s.get("score"),
                                  sum(q.get("score") or 0 for q in qs)))
+
+    # ★ 断言四：选择题答案要能在「该题的参考答案/解析原文」里找到依据（兜答案错位）
+    src = _source_md_of(jf)
+    if src is None:
+        notes.append("找不到原始 MD，选择题答案依据校验跳过")
+    else:
+        try:
+            _body, atext = split_paper(src.read_text(encoding="utf-8"))
+        except Exception:
+            atext = ""
+        per_q = choice_answer_blocks(atext)
+        key = parse_choice_answers(atext) if atext else {}
+        ch_qs = (choice_secs[0].get("questions") or []) if choice_secs else []
+        if per_q and len(per_q) == len(ch_qs):
+            stat["answer_src"] = "逐题答案块"
+            for q in ch_qs:
+                want, detail = per_q.get(q.get("id"), ("", ""))
+                got = str(q.get("answer") or "")
+                if not want:
+                    errs.append(f"选择题第{q.get('id')}题：参考答案里没有该题的逐题答案块")
+                elif got != want:
+                    errs.append(f"选择题第{q.get('id')}题：answer={got!r} 与参考答案原文 {want!r} 不一致"
+                                f"（答案错位）")
+                elif want not in detail and detail:
+                    notes.append(f"选择题第{q.get('id')}题：答案 {want} 在该题解析里没出现（解析较短，可能正常）")
+        elif key and len(key) == len(ch_qs):
+            stat["answer_src"] = "答案表"
+            for q in ch_qs:
+                want = key.get(q.get("id"), "")
+                got = str(q.get("answer") or "")
+                if not want:
+                    errs.append(f"选择题第{q.get('id')}题：答案表里没有第 {q.get('id')} 题")
+                elif got != want:
+                    errs.append(f"选择题第{q.get('id')}题：answer={got!r} 与答案表 {want!r} 不一致（答案错位）")
+            notes.append("该卷参考答案只有答案表（无逐题解析），字母依据 = 答案表对应格")
+        elif key and len(key) != len(ch_qs):
+            stat["answer_src"] = "答案表（条数不符，按内容对齐）"
+            notes.append(f"选择题 {len(ch_qs)} 道 ≠ 答案表 {len(key)} 个：已按内容对齐（详见 .review.txt），"
+                         f"逐题字母比对跳过")
+        else:
+            stat["answer_src"] = "无"
+            notes.append("该卷参考答案里既没有答案表也没有逐题答案块，选择题答案依据无法校验")
 
     if not essay_secs:
         errs.append("没有非选择题 section")
@@ -1697,6 +1884,55 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
     return stat, errs, notes
 
 
+def run_cross_check(args) -> int:
+    """逐题让模型独立作答，与 JSON 里的答案表答案比对（只报告，不改 JSON）。
+
+    参考答案大多只有一张字母表、没有逐题解析，所以「答案能否在解析原文里找到字母依据」
+    这件事只能靠这个交叉校验来兜：模型与答案表不一致的题列出来，供人工判。
+    """
+    types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
+    if "all" in types:
+        types = ["二模", "一模", "上期末"]
+    root = Path(args.output)
+    cache_dir = root / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    lines, total_same, total_diff = [], 0, 0
+    for type_dir in types:
+        for jf in sorted((root / type_dir).glob("*.json")):
+            data = json.loads(jf.read_text(encoding="utf-8"))
+            ch = next((s for s in data["sections"] if s.get("type") == "选择题"), None)
+            if not ch:
+                continue
+            qs = ch.get("questions") or []
+            cc = cache_dir / f"{jf.stem}-cross.json"
+            if cc.exists() and not args.force:
+                raw = json.loads(cc.read_text(encoding="utf-8"))
+                derived = {int(k): (v[0], v[1]) for k, v in raw.items()}
+            else:
+                derived = ai_solve_choice(qs)
+                if derived:
+                    cc.write_text(json.dumps({str(k): list(v) for k, v in derived.items()},
+                                             ensure_ascii=False, indent=1), encoding="utf-8")
+            bad = [(q["id"], str(q.get("answer") or ""), derived[q["id"]][0], derived[q["id"]][1])
+                   for q in qs if q["id"] in derived and derived[q["id"]][0] != str(q.get("answer") or "")]
+            same = len(qs) - len(bad)
+            total_same += same
+            total_diff += len(bad)
+            print(f"[{type_dir}] {jf.stem}：一致 {same}/{len(qs)}"
+                  + (f"，不一致 {len(bad)} 题" if bad else "，全部一致"))
+            for no, got, want, why in bad:
+                print(f"    · 第{no}题 答案表 {got!r} / 模型推导 {want}（{why[:40]}）")
+                lines.append(f"| {type_dir} | {jf.stem} | {no} | {got or '—'} | {want} | {why[:50]} |")
+    print(f"\n合计：一致 {total_same} 题，不一致 {total_diff} 题")
+    if args.report:
+        Path(args.report).write_text(
+            "| 类型 | 卷 | 题号 | 答案表 | 模型推导 | 模型理由 |\n"
+            "| --- | --- | --- | --- | --- | --- |\n" + "\n".join(lines) + "\n",
+            encoding="utf-8")
+        print(f"清单已写入 {args.report}")
+    return 0
+
+
 def run_check(args) -> int:
     types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
     if "all" in types:
@@ -1727,13 +1963,14 @@ def run_check(args) -> int:
                     f"- markdown 表格：**{stat['tables']} 张**（分隔行唯一、行列数与表头一致）\n"
                     f"- 答案图片：**{len(stat['ans_imgs'])} 张**；全卷图片引用 **{len(stat['imgs'])} 张**，"
                     f"逐张 os.path.exists 校验\n"
-                    f"- PDF 截图：成功 {len(crops_ok)} 张，失败 {len(crops_fail)} 条\n\n"
+                    f"- PDF 截图：成功 {len(crops_ok)} 张，失败 {len(crops_fail)} 条\n"
+                    f"- 选择题答案依据：**{stat['answer_src']}**（逐题与参考答案原文/答案表比对）\n\n"
                     f"**每空分值序列（长/短）**\n\n{seqs}\n")
             tbl = ("\n| section | category | 空数 | section.score | Σquestions.score |\n"
                    "| --- | --- | --- | --- | --- |\n" + rows + "\n")
             verdict = ("\n**契约校验：✗ 有错误**\n\n" + "\n".join(f"- {e}" for e in errs) + "\n"
                        if errs else
-                       "\n**契约校验：✓ 通过**（json.load / 选择题 15 题 × 2 分 / options 恒 A–D / "
+                       f"\n**契约校验：✓ 通过**（json.load / 选择题 {stat['choice']} 题 × 2 分 / options 恒 A–D / "
                        "answer 单个大写字母 / Σquestions.score == section.score / `<Input` 次数 == 空数 / "
                        "占位符成对 / 每空 answer 非空 / 每空分值符合长句优先规则 / markdown 表格可解析 / "
                        "答案里的图片全部存在）\n")
@@ -1793,10 +2030,15 @@ def main():
                     help="只处理这几套（按地名/卷名片段匹配，如 海淀 西城 朝阳）")
     ap.add_argument("--force", action="store_true", help="忽略已有 JSON 与 AI 缓存，重跑")
     ap.add_argument("--no-ai", dest="ai", action="store_false", help="不调模型（只吃缓存）")
-    ap.add_argument("--check", action="store_true", help="只做自查")
+    ap.add_argument("--check", action="store_true",
+                    help="只做自查（含选择题答案与参考答案原文/答案表比对）")
+    ap.add_argument("--cross-check", action="store_true",
+                    help="逐题让模型独立作答并与答案表比对（只报告，改不了 JSON）")
     ap.add_argument("--report", default=None, help="自查报告输出路径（配合 --check）")
     args = ap.parse_args()
 
+    if args.cross_check:
+        raise SystemExit(run_cross_check(args))
     if args.check:
         raise SystemExit(run_check(args))
 
