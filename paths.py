@@ -39,6 +39,7 @@ OUTPUT_JSON_MATH = DATA_ROOT / "output_json_math"            # 数学 / 物理 /
 OUTPUT_JSON_CHINESE = DATA_ROOT / "output_json_chinese"      # 语文
 OUTPUT_JSON_POLITICS = DATA_ROOT / "output_json_politics"    # 政治
 OUTPUT_JSON_CHEMISTRY_FULL = DATA_ROOT / "output_json_chemistry_full"  # 化学整卷（选择+非选择）
+OUTPUT_JSON_BIO = DATA_ROOT / "output_json_bio"              # 生物整卷（选择+非选择，一题一个 section）
 OUTPUT_IMAGE_QUESTIONS = DATA_ROOT / "output_image_questions"          # 图片版（按题裁图）
 
 __all__ = [
@@ -52,5 +53,6 @@ __all__ = [
     "OUTPUT_JSON_CHINESE",
     "OUTPUT_JSON_POLITICS",
     "OUTPUT_JSON_CHEMISTRY_FULL",
+    "OUTPUT_JSON_BIO",
     "OUTPUT_IMAGE_QUESTIONS",
 ]
