@@ -2331,7 +2331,7 @@ def run_check(args) -> int:
         print(f"  [{s[0]}] {s[1]}：选择 {s[2]} / 大题 {s[3]} / 空 {s[4]} / 表格 {s[5]} / "
               f"答案图 {s[6]} / 错误 {s[7]} / 人工点 {s[8]} / 截图失败 {s[9]}")
     if args.report:
-        top = ("# 生物 29 套卷 · 解析自查报告\n\n"
+        top = (f"# 生物 {len(summary)} 套卷 · 解析自查报告（{'、'.join(types)}）\n\n"
                "生成方式：`venv/bin/python3 convert_biology_md.py --check -T all --report …`\n\n"
                "| 类型 | 卷 | 选择题 | 大题 | 空 | 表格 | 答案图 | 契约错误 | 人工点 | 截图失败 |\n"
                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
