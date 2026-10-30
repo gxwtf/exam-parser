@@ -1347,6 +1347,9 @@ def plan_letter_prefix_repairs(paper: Paper) -> list[Repair]:
             ans = str(q.get("answer") if q.get("answer") is not None else "")
             if not ans.strip() or norm_letters(ans) in ids:
                 continue
+            # 纯字母多答案（如 AD / ABC）是「多选」，不能按「取首字母」拆——否则会被截断成单选
+            if re.fullmatch(r"[A-Ha-hＡ-Ｈａ-ｈ]{2,}", ans.strip()):
+                continue
             m = LEAD_LETTER.match(ans)
             if not m:
                 continue
