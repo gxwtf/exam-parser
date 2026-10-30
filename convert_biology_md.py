@@ -71,11 +71,11 @@ MAX_CHOICE = 20        # 选择题区允许的上限（题号重复/自动编号
 CHOICE_SCORE = 2       # 每题 2 分
 SHORT_MAX = 12         # 答案 ≤12 字 → <Input>，否则 <InputLong>
 
-CATS = ["遗传与进化", "稳态与调节", "生物技术与工程", "实验探究"]
+CATS = ["遗传与进化", "稳态与调节", "生物与环境", "生物技术与工程", "实验探究"]
 
 # 题号行：可带前置图片、可带（N分）
 QMARK = re.compile(
-    r"(?m)^[ \t]*((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*(\d{1,2})\s*\**\s*\\?[．.、]\s*\**\s*"
+    r"(?m)^[ \t]*((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*(\d{1,2})\s*\**\s*\\?[．.、·・]\s*\**\s*"
     r"(?:[（(]\s*(\d+)\s*分\s*[）)])?\s*"
 )
 # 分节标题：一、选择题 / 第二部分 / 二、非选择题（解答题）——用来切「选择题区 / 大题区」
@@ -165,16 +165,26 @@ REPAIR_PROMPT = r"""下面是一道生物非选择题的【原题】、【参考
 {BLANKS}
 """
 
-CAT_PROMPT = r"""下面是北京高三生物二模试卷的若干道非选择题（题号 + 题干摘要）。请为每题判断所属模块，只能选一个：
-遗传与进化 / 稳态与调节 / 生物技术与工程 / 实验探究
+CAT_PROMPT = r"""下面是北京高三生物试卷的若干道非选择题（题号 + 题干摘要 + 参考答案摘要）。
+请为每题判断所属模块，**只能从下面 5 类里选一个**：遗传与进化 / 稳态与调节 / 生物与环境 / 生物技术与工程 / 实验探究
 
-判定要点：
-- 遗传与进化：遗传规律、基因表达与调控、变异与育种、生物进化；
-- 稳态与调节：内环境与稳态、神经/体液/免疫调节、植物激素、种群群落与生态系统（生态学内容归此类）；
-- 生物技术与工程：基因工程、细胞工程、发酵工程、微生物培养与菌株改造、载体/PCR/转基因、人工构建的生物系统；
-- 实验探究：细胞结构/代谢、生理机制一类的探究题（如线粒体功能、细胞增殖与衰老、自噬、光合呼吸机制），
-  以实验设计、变量控制、结果推断为主线，且题面没有基因工程/细胞工程操作。
-只输出 JSON：{{"16":"模块","17":"模块"}}
+判定要点（按题目**研究对象与主线**判，而不是按有没有实验）：
+- 遗传与进化：遗传规律、分子遗传（复制/转录/翻译/基因表达调控/表观遗传）、变异与育种、生物进化与物种形成；
+- 稳态与调节：**个体水平**的内环境与稳态、神经调节、体液调节（激素）、免疫调节、植物激素调节；
+- 生物与环境：**种群 / 群落 / 生态系统**层面的题——种群数量与结构、群落结构与演替、生态系统结构与功能
+  （能量流动、物质循环、信息传递、稳定性）、生态工程、人与环境、生物多样性、入侵种与生态修复、
+  生态农业/碳中和/湿地治理等；**这类题即使以实验设计、调查、建模的形式出现，也归「生物与环境」**；
+- 生物技术与工程：基因工程、细胞工程、发酵工程、胚胎工程、微生物培养与菌种改造、载体/PCR/转基因、
+  人工构建的生物系统（含工程菌、合成生物学）；
+- 实验探究：以实验设计/变量控制/结果推断为主线、且研究对象属于上述主题之外或主题不明确的题
+  （如细胞结构、细胞代谢与呼吸光合机制、细胞增殖/衰老/自噬/凋亡、物质运输等）。
+
+注意：
+1. 只有真正落在「种群-群落-生态系统」层面的题才归「生物与环境」，不要把个体水平的稳态/激素调节塞进去；
+2. 生态类实验（如调查某物种数量、探究某种生态因子影响）归「生物与环境」，不要丢进「实验探究」；
+3. 一句话写 why（不超过 20 字，指出判据关键词）。
+
+只输出 JSON：{{"16": {{"category": "生物与环境", "why": "种群数量与群落演替"}}}}
 题目：
 {ITEMS}
 """
@@ -422,7 +432,7 @@ def first_big_mark(body: str) -> int:
 
 
 # 大题题号 + 分值行（Word 自动编号会把「16.」写成「1.」，分值是最可靠的信号）
-BIGMARK = re.compile(r"(?m)^[ \t]*((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*(\d{1,2})\s*\\?[．.、]\s*"
+BIGMARK = re.compile(r"(?m)^[ \t]*((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*(\d{1,2})\s*\\?[．.、·・]\s*"
                      r"[（(]\s*(\d+)\s*分\s*[）)]")
 
 
@@ -635,7 +645,7 @@ def parse_choice_answers(ans: str) -> dict[int, str]:
         if not cells:
             continue
         head = re.sub(r"[\s*]", "", cells[0])
-        if head.startswith("题号"):
+        if head.startswith(("题号", "题目")):
             pending = [int(x) for x in (re.sub(r"\D", "", c) for c in cells[1:]) if x]
             continue
         if head.startswith("答案") and pending:
@@ -666,12 +676,19 @@ def parse_choice_answers(ans: str) -> dict[int, str]:
             pending = []
 
     # ② 区间行「1-5 DADCA 6-10 DABCC」
-    for m in re.finditer(r"(\d{1,2})\s*[-–—~至]\s*(\d{1,2})\s*[:：]?\s*([A-Da-d]{2,})", ans):
+    for m in re.finditer(r"(\d{1,2})\s*[-–—~至]{1,3}\s*(\d{1,2})\s*[:：]?\s*([A-Da-d]{2,})", ans):
         a, b, seq = int(m.group(1)), int(m.group(2)), m.group(3).upper()
         if b - a + 1 == len(seq):
             for i, ch in enumerate(seq):
                 out.setdefault(a + i, ch)
 
+    # ②B 「1C 2D 3C」：题号与字母之间没有分隔符（整行至少 5 组才认）
+    seq_pairs = [(int(m.group(1)), m.group(2).upper())
+                 for m in re.finditer(r"(\d{1,2})\s*([A-D])(?=[\s\u3000]|$)", ans)]
+    if len(seq_pairs) >= 5 and not out:
+        for n, v in seq_pairs:
+            if 1 <= n <= N_CHOICE:
+                out.setdefault(n, v)
     # ③ 行内「1.C 2.D」
     for m in re.finditer(r"(\d{1,2})\s*\\?[.．、]\s*([A-Da-d])(?![A-Za-z])", ans):
         out.setdefault(int(m.group(1)), m.group(2).upper())
@@ -681,7 +698,7 @@ def parse_choice_answers(ans: str) -> dict[int, str]:
         out.setdefault(int(m.group(1)), m.group(2).upper())
 
     # ⑤ 整行裸字母串（如「ACDAD CDBCC BDDBA」）→ 按顺序对应 1..N
-    for m in re.finditer(r"(?m)^[ \t]*([A-D](?:[ \t]*[A-D]){9,})[ \t]*$", ans):
+    for m in re.finditer(r"(?m)^[^A-D\n]{0,12}([A-D](?:[ \t]*[A-D]){9,})[ \t]*$", ans):
         seq = re.sub(r"[^A-D]", "", m.group(1))
         if len(seq) >= 10 and not out:
             for i, ch in enumerate(seq, 1):
@@ -739,6 +756,28 @@ def fix_placeholders(content: str, answers: list[str], review: list[str], label:
     return "".join(pieces)
 
 
+def strip_embedded_answers(content: str, review: list[str], label: str) -> str:
+    """模型偶尔把答案写进空里：`<Input></Input>答案</Input>`。
+
+    规则：如果「完整的空」后面紧跟一段短文本再跟一个孤立的闭合标签，就把这段文本和
+    闭合标签一起去掉（答案已经在 blanks 里）；最后再清掉剩下的孤立闭合标签。
+    """
+    pat = re.compile(r"(<Input(?:Long)?></Input(?:Long)?>)([^<>]{1,60}?)(</Input(?:Long)?>)")
+    for _ in range(8):
+        m = pat.search(content or "")
+        if not m:
+            break
+        content = content[:m.start()] + m.group(1) + content[m.end():]
+        review.append(f"{label}：题干里有一处把答案写进了空里（…{m.group(2)[:14]}…），已去掉")
+    opens = len(re.findall(r"<Input(?:Long)?>", content or ""))
+    closes = re.findall(r"</Input(?:Long)?>", content or "")
+    if len(closes) > opens:                        # 还有孤立闭合标签 → 直接删多余的
+        extra = len(closes) - opens
+        content = re.sub(r"</Input(?:Long)?>", "", content, count=extra)
+        review.append(f"{label}：题干里有 {extra} 个孤立占位符闭合标签，已删")
+    return content
+
+
 def drop_empty_blanks(content: str, answers: list[str], review: list[str],
                       label: str) -> tuple[str, list[str]]:
     """兜底：仍然没有参考答案的空，直接去掉这个占位（该处按无需作答处理），保证「每空都有答案」。
@@ -788,7 +827,7 @@ def _norm_cmp(s: str) -> str:
 ZONGHE_CHOICE_SCORE = 6
 ZONGHE_ESSAY_TOTAL = 50
 
-ANSWER_MARK = re.compile(r"(?m)^[ \t]*(\d{1,2})\s*\\?\s*[．.]\s*\**\s*")
+ANSWER_MARK = re.compile(r"(?m)^[ \t]*(\d{1,2})\s*\\?\s*[．.·・]\s*\**\s*")
 ANS_LETTER = re.compile(
     r"(?:故选|故答案为|答案为|选择|答案)\s*[:：】\]]?\s*\**\s*([A-D])(?![A-Za-z])")
 
@@ -844,6 +883,19 @@ def pdf_of(md: Path, type_dir: str, title: str) -> Path | None:
     return None
 
 
+def _clean_pdf_option(label: str) -> str:
+    """PDF 文字层会把下一题的题号粘在选项末尾（如「…提供了证据 15．2022 年…」），去掉尾巴。"""
+    t = (label or "").strip()
+    if not CJK_CH.search(t):
+        return t
+    t = re.sub(r"\s*\d{1,2}\s*[．.·・]\s*[0-9]{0,4}\s*$", "", t).strip()
+    # 选项中间粘了下一题的题号+题干（「…提供了证据15．2022年4月，国家…」）→ 从题号处截断
+    m = re.search(r"\d{1,2}\s*[．.·・]\s*[\u4e00-\u9fff0-9，。、]{8,}", t)
+    if m and m.start() > 0:
+        t = t[:m.start()].rstrip()
+    return t
+
+
 def transcribe_choices_from_pdf(pdf: Path, nos: list[int], review: list[str],
                                 label: str) -> dict[int, dict]:
     """从教师版 PDF 的题干页转写指定的几道选择题（docx 转丢/串题时补救）。
@@ -856,7 +908,7 @@ def transcribe_choices_from_pdf(pdf: Path, nos: list[int], review: list[str],
     stop = next((i for i, p in enumerate(pages) if "参考答案" in p), len(pages))
     page_of: dict[int, int] = {}
     for no in nos:
-        pat = re.compile(rf"(?<![\d.]){no}\s*[．.]")
+        pat = re.compile(rf"(?<![\d.]){no}\s*[．.·・]")
         page = next((i for i in range(stop) if pat.search(pages[i])), None)
         if page is not None:
             page_of[no] = page
@@ -892,7 +944,7 @@ def transcribe_choices_from_pdf(pdf: Path, nos: list[int], review: list[str],
                 except Exception:
                     continue
                 opts = [{"id": str(o.get("id") or "ABCD"[k]).upper()[:1],
-                         "label": str(o.get("label") or "").strip()}
+                         "label": _clean_pdf_option(str(o.get("label") or ""))}
                         for k, o in enumerate(q.get("options") or [])]
                 stem = str(q.get("stem") or "").strip()
                 if n in wants and stem and len(opts) == 4:
@@ -1206,24 +1258,38 @@ def attach_answer_images(answers: list[str], atext: str, review: list[str], labe
     return out
 
 
-def classify(body: str, essays: list[dict], ans_blocks: dict) -> dict[int, str]:
-    """一次 AI 批量判断每道大题所属模块（带参考答案摘要，判断更稳）。"""
+def _cat_items_from_essays(essays: list[dict], ans_blocks: dict) -> list[str]:
     items = []
     for e in essays:
         ab = ans_blocks.get(e["no"])
         tail = _strip_ws(re.sub(r"[!\[\]()]", " ", ab["text"]))[:70] if ab else ""
         items.append(f"- {e['no']}｜{_strip_ws(re.sub(r'[!\[\]()]', ' ', e['text']))[:110]}"
                      + (f"｜参考答案：{tail}" if tail else ""))
-    got = ai_json(CAT_PROMPT.replace("{ITEMS}", "\n".join(items)), max_tokens=2000)
-    out = {}
+    return items
+
+
+def classify_items(items: list[str]) -> dict[int, tuple[str, str]]:
+    """批量分类：返回 {题号: (模块, 判据一句话)}。"""
+    got = ai_json(CAT_PROMPT.replace("{ITEMS}", "\n".join(items)), max_tokens=3000)
+    out: dict[int, tuple[str, str]] = {}
     for k, v in (got or {}).items():
         try:
             n = int(re.sub(r"\D", "", str(k)))
         except Exception:
             continue
-        v = str(v).strip()
-        out[n] = v if v in CATS else "实验探究"
+        if isinstance(v, dict):
+            cat = str(v.get("category") or "").strip()
+            why = str(v.get("why") or "").strip()[:40]
+        else:
+            cat, why = str(v).strip(), ""
+        out[n] = (cat if cat in CATS else "实验探究", why)
     return out
+
+
+def classify(body: str, essays: list[dict], ans_blocks: dict) -> dict[int, str]:
+    """一次 AI 批量判断每道大题所属模块（带参考答案摘要，判断更稳）。"""
+    got = classify_items(_cat_items_from_essays(essays, ans_blocks))
+    return {n: c for n, (c, _w) in got.items()}
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1334,7 +1400,7 @@ def _answer_pages_text(pdf: Path) -> list[str]:
 def _answer_page_of(pages: list[str], no: int, sub: int | None) -> int | None:
     """在「参考答案」区里定位第 no 题（第 sub 小问）所在页，1-based。"""
     start = next((i for i, p in enumerate(pages) if "参考答案" in p), 0)
-    qre = re.compile(rf"(?m)^\s*{no}\s*[.．、]")
+    qre = re.compile(rf"(?m)^\s*{no}\s*[.．、·・]")
     qpage = next((i for i in range(start, len(pages)) if qre.search(pages[i])), None)
     if qpage is None:
         return None
@@ -1643,8 +1709,20 @@ def process(md: Path, type_dir: str, args) -> str:
     review: list[str] = []
     txt = md.read_text(encoding="utf-8")
     body, ans = split_paper(txt)
+    if ans and len(ans.strip()) < 50:              # 只有「参考答案」一个标题 → 等同于没有
+        ans = ""
+    if not ans:                                    # docx 转换把答案区丢了 → 退回 PDF 文字层
+        pdf0 = pdf_of(md, type_dir, title)
+        if pdf0 is not None:
+            whole = "\n".join(_answer_pages_text(pdf0))
+            k = whole.find("参考答案")
+            if k < 0:
+                k = whole.find("答案与解析")
+            if k > 0:
+                ans = whole[k:]
+                review.append("该卷 docx 里没有参考答案（转换时丢了），答案区改从教师版 PDF 文字层取")
     if not ans:
-        raise RuntimeError("没找到「参考答案」分界")
+        raise RuntimeError("该卷 docx 与教师版 PDF 里都没有参考答案，无法解析（需人工提供答案版）")
     ensure_web_images(md, review)
 
     def rewrite(t: str) -> str:
@@ -1658,7 +1736,10 @@ def process(md: Path, type_dir: str, args) -> str:
         cut = h.start()
     elif len(smarks) >= 3 and smarks[0].start() < cut:
         cut = smarks[0].start()
-    choice_body, essay_body = body[:cut], body[cut:]
+    # 选择题区从「第一部分 / 一、选择题」标题之后开始（卷首「考生须知 1./2./3.」会冒充题号）
+    hc = re.search(r"(?m)^[ \t]*\**[ \t]*(?:第[一1]部分|一\s*[、.]\s*选择题)[^\n]*", body[:cut])
+    choice_body = body[hc.end():cut] if hc else body[:cut]
+    essay_body = body[cut:]
     # 卷面声明的题数只从「选择题标题区」里找（题号行之前），别把大题标题的「共3小题」当成选择题数
     _first_q = QMARK.search(choice_body)
     head_area = choice_body[:_first_q.start()] if _first_q else choice_body[:300]
@@ -1683,12 +1764,11 @@ def process(md: Path, type_dir: str, args) -> str:
                       f"非选择题合计 {ZONGHE_ESSAY_TOTAL} 分，生物部分满分 "
                       f"{q_unit * len(choice_qs) + ZONGHE_ESSAY_TOTAL} 分")
 
-    # docx 把某道选择题转丢了（卷面声明 N 道、实际切到 M 道）→ 从教师版 PDF 转写补齐
+    # docx 把选择题转丢/串题（卷面声明 N 道、实际切到 M 道）→ 从教师版 PDF 整卷转写补齐：
+    # docx 里完整的题（通常带图）保留，缺题或选项不足的用 PDF 转写补。
+    pdf = pdf_of(md, type_dir, title)
     if declared and len(choice_qs) < declared:
-        pdf = pdf_of(md, type_dir, title)
-        have = {q.get("_printed") for q in choice_qs}
-        missing = [n for n in range(1, declared + 1) if n not in have]
-        ask = sorted(set(missing) | {n - 1 for n in missing if (n - 1) in have})
+        want = list(range(1, declared + 1))
         pcache = cache_dir / f"{title}-pdfchoice.json"
         rec: dict[int, dict] = {}
         if pcache.exists() and (not args.ai or not args.force):
@@ -1697,31 +1777,73 @@ def process(md: Path, type_dir: str, args) -> str:
             if rec:
                 review.append(f"{title}：复用已从 PDF 转写好的题目 "
                               f"{'、'.join(f'第{n}题' for n in sorted(rec))}")
-        elif args.ai and pdf is not None and ask:
-            rec = transcribe_choices_from_pdf(pdf, ask, review, title)
+        elif args.ai and pdf is not None:
+            rec = transcribe_choices_from_pdf(pdf, want, review, title)
             if rec:
                 pcache.write_text(json.dumps({str(k): v for k, v in rec.items()},
                                              ensure_ascii=False, indent=1), encoding="utf-8")
         if rec:
-            for n, r in rec.items():
-                hit = next((q for q in choice_qs if q.get("_printed") == n), None)
-                if hit:
-                    hit["content"], hit["options"] = r["content"], r["options"]
-                else:
-                    choice_qs.append({"id": n, "questionType": "single", "content": r["content"],
-                                      "options": r["options"], "answer": "", "analysis": "",
-                                      "score": q_unit, "_printed": n, "_qscore": q_unit})
-            choice_qs.sort(key=lambda q: q.get("_printed") or q["id"])
-            for i, q in enumerate(choice_qs, 1):
-                q["id"] = i
+            by_num = {q.get("_printed"): q for q in choice_qs}
+            merged: list[dict] = []
+            from_pdf = []
+            for n in want:
+                q, r = by_num.get(n), rec.get(n)
+                if q is not None and len(q.get("options") or []) == 4:
+                    merged.append(q)                       # docx 完整 → 保留（题干带图）
+                elif r is not None:
+                    if q is not None:
+                        q["options"] = r["options"]        # 只补选项，题干仍用 docx（带图）
+                        merged.append(q)
+                    else:
+                        merged.append({"id": n, "questionType": "single",
+                                       "content": r["content"], "options": r["options"],
+                                       "answer": "", "analysis": "", "score": q_unit,
+                                       "_printed": n, "_qscore": q_unit})
+                        from_pdf.append(n)
+            choice_qs = merged
+            for k, q in enumerate(choice_qs, 1):
+                q["id"] = k
             if len(choice_qs) == declared:
                 review.append(f"选择题已从教师版 PDF 补齐到卷面声明的 {declared} 道")
+            if from_pdf:
+                review.append("以下题的题干来自 PDF 转写（docx 里没有），图可能缺失，需人工核对："
+                              + "、".join(f"第{n}题" for n in from_pdf))
         elif not args.ai:
             review.append(f"选择题只有 {len(choice_qs)} 道（卷面声明 {declared} 道）："
                           f"--no-ai 模式不调模型补题，需 --force 重跑")
         else:
             review.append(f"选择题只有 {len(choice_qs)} 道（卷面声明 {declared} 道），"
                           f"PDF 补题没成功，需人工核对")
+    # 选项不足 4 个 / 题干里混进了别的选项（docx 转换把选项粘到别处）→ 这几道从 PDF 重转
+    broken = []
+    for q in choice_qs:
+        n_opt_marks = len(re.findall(r"(?:^|[\s>)\u4e00-\u9fff])([A-D])\s*[．.、]", q.get("content") or ""))
+        if len(q.get("options") or []) != 4 or n_opt_marks >= 3:
+            broken.append(q)
+    broken_nos = sorted({q.get("_printed") for q in broken if q.get("_printed")})
+    if broken_nos:
+        pc2 = cache_dir / f"{title}-pdfchoice.json"
+        cached: dict[int, dict] = {}
+        if pc2.exists():
+            cached = {int(k): v for k, v in json.loads(pc2.read_text(encoding="utf-8")).items()}
+        need = [n for n in broken_nos if n not in cached]
+        if need and args.ai and pdf is not None:
+            got2 = transcribe_choices_from_pdf(pdf, need, review, title)
+            if got2:
+                cached.update(got2)
+                pc2.write_text(json.dumps({str(k): v for k, v in cached.items()},
+                                          ensure_ascii=False, indent=1), encoding="utf-8")
+        for q in broken:
+            r = cached.get(q.get("_printed"))
+            if not r:
+                continue
+            q["content"], q["options"] = r["content"], r["options"]
+            review.append(f"第{q.get('_printed')}题（选择题）：docx 把题干/选项转坏了，"
+                          f"题干+选项改从教师版 PDF 转写（图可能缺失，需人工核对）")
+        if not args.ai and need:
+            review.append(f"第{'、'.join(map(str, need))}题（选择题）需要从 PDF 补转，"
+                          f"--no-ai 模式不调模型，需 --force 重跑")
+
     if declared and len(choice_qs) != declared:
         review.append(f"选择题切到 {len(choice_qs)} 道（卷面声明 {declared} 道）")
     elif not declared and not zonghe and len(choice_qs) != N_CHOICE:
@@ -1771,7 +1893,8 @@ def process(md: Path, type_dir: str, args) -> str:
             review.append(f"第{q['id']}题（选择题）选项不足 4 个（{len(q['options'])}）")
         q["content"] = rewrite(normalize_md_tables(reflow_cjk(latexify(q["content"]))))
         for o in q["options"]:
-            o["label"] = rewrite(normalize_md_tables(reflow_cjk(latexify(o["label"]))))
+            o["label"] = rewrite(normalize_md_tables(reflow_cjk(latexify(
+                _clean_pdf_option(o["label"])))))
     for q in choice_qs:                       # 内部字段不出口
         q.pop("_printed", None)
         q.pop("_qscore", None)
@@ -1800,14 +1923,26 @@ def process(md: Path, type_dir: str, args) -> str:
             review.append(f"题干里的大题编号不规整（Word 自动编号 → {[e['no'] for e in essays]}），"
                           f"已按「（N分）」标记切分、并对照参考答案区题号重编为 {ans_order}")
             essays = rebalance_leads(alt)
-    cat_cache = cache_dir / f"{title}-cats.json"
+    cat_cache = cache_dir / f"{title}-cats2.json"
+    cat_why: dict[int, str] = {}
+    cat_map: dict[int, str] = {}
     if cat_cache.exists() and (not args.ai or not args.force):
-        cat_map = {int(k): v for k, v in json.loads(cat_cache.read_text(encoding="utf-8")).items()}
+        raw = json.loads(cat_cache.read_text(encoding="utf-8"))
+        for k, v in raw.items():
+            no_ = int(k)
+            if isinstance(v, list) and v:
+                cat_map[no_] = v[0] if v[0] in CATS else "实验探究"
+                cat_why[no_] = v[1] if len(v) > 1 else ""
+            else:
+                cat_map[no_] = str(v) if str(v) in CATS else "实验探究"
     elif args.ai:
-        cat_map = classify(essay_body, essays, ans_blocks)
-        cat_cache.write_text(json.dumps(cat_map, ensure_ascii=False), encoding="utf-8")
-    else:
-        cat_map = {}
+        got = classify_items(_cat_items_from_essays(essays, ans_blocks))
+        cat_map = {n: c for n, (c, _w) in got.items()}
+        cat_why = {n: w for n, (_c, w) in got.items()}
+        if got:
+            cat_cache.write_text(json.dumps({str(k): [c, cat_why.get(k, "")]
+                                             for k, c in cat_map.items()},
+                                            ensure_ascii=False, indent=1), encoding="utf-8")
 
     # 大题满分：题干/参考答案都没写分值时倒推
     #   理综 → 非选择题合计 50 分；普通北京卷 → 全卷 100 分（16 题 10 分、其余 12 分）
@@ -1914,6 +2049,7 @@ def process(md: Path, type_dir: str, args) -> str:
         content = reflow_cjk(strip_stem_prefix(latexify(content), no))
         answers = attach_answer_images(answers, atext, review, label)
         content = fix_placeholders(content, answers, review, label)
+        content = strip_embedded_answers(content, review, label)
         content = strip_ph_spaces(content)
         n_blank = len(PH.findall(content))
         if len(answers) > n_blank:
@@ -1954,10 +2090,13 @@ def process(md: Path, type_dir: str, args) -> str:
             qs.append({"id": no * 100 + i, "questionType": "input", "content": "",
                        "answer": ans_text, "analysis": "",
                        "score": scores[i - 1] if i - 1 < len(scores) else 0})
+        cat_now = cat_map.get(no) or "实验探究"
+        review.append(f"分类：第{no}题={cat_now}"
+                      + (f"（{cat_why[no]}）" if cat_why.get(no) else ""))
         sections.append({
             "type": "非选择题", "questionType": "biology-fill",
             "title": f"二、非选择题（第{no}题）",
-            "category": cat_map.get(no) or "实验探究",
+            "category": cat_now,
             "score": sum(q["score"] for q in qs),
             "content": rewrite(content),
             "questions": qs,
@@ -2268,6 +2407,84 @@ def run_cross_check(args) -> int:
     return 0
 
 
+def reclassify(args) -> int:
+    """只重分类、不重解析：读现有 JSON，重新跑分类 prompt，只改 category 与 review 的分类行。"""
+    types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
+    if "all" in types:
+        types = ["二模", "一模", "上期末", "真题"]
+    root = Path(args.output)
+    cache_dir = root / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    before, after = {}, {}
+    changes, files = [], 0
+    import collections
+    dist_b, dist_a = collections.Counter(), collections.Counter()
+    for type_dir in types:
+        for jf in sorted((root / type_dir).glob("*.json")):
+            data = json.loads(jf.read_text(encoding="utf-8"))
+            secs = [x for x in data["sections"] if x.get("type") != "选择题"]
+            items, nos = [], []
+            for sec in secs:
+                m = re.search(r"第\s*(\d{1,2})\s*题", sec.get("title") or "")
+                if not m:
+                    continue
+                no = int(m.group(1))
+                nos.append(no)
+                text = _strip_ws(re.sub(r"[!\[\]()]", " ", sec.get("content") or ""))[:110]
+                ans = _strip_ws(" ".join((q.get("answer") or "") for q in (sec.get("questions") or [])))[:70]
+                items.append(f"- {no}｜{text}" + (f"｜参考答案：{ans}" if ans else ""))
+            if not items:
+                continue
+            got = classify_items(items)
+            if not got:
+                print(f"  ✗ {jf.name}：分类模型没返回结果，跳过")
+                continue
+            changed = []
+            for sec in secs:
+                m = re.search(r"第\s*(\d{1,2})\s*题", sec.get("title") or "")
+                if not m:
+                    continue
+                no = int(m.group(1))
+                old = sec.get("category")
+                new, why = got.get(no, ("实验探究", ""))
+                dist_b[old] += 1
+                dist_a[new] += 1
+                if new != old:
+                    changed.append(f"第{no}题：{old} → {new}" + (f"（{why}）" if why else ""))
+                    changes.append((type_dir, jf.stem, no, old, new, why))
+                    sec["category"] = new
+                elif why:
+                    changed.append(f"第{no}题：{new}（{why}）")
+            # 分类行写进 review（先删旧的「分类：」行，保证幂等）
+            rev = jf.with_suffix(".review.txt")
+            old_lines = [x for x in rev.read_text(encoding="utf-8").splitlines()
+                         if x.strip()] if rev.exists() else []
+            kept = [x for x in old_lines if not x.startswith("分类：")]
+            kept += [f"分类：{c}" for c in changed]
+            if changed:
+                rev.write_text("\n".join(kept), encoding="utf-8")
+            jf.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            # 同步 cats2 缓存，保证后续 --no-ai 复跑拿到同样的分类
+            cache_dir.joinpath(f"{jf.stem}-cats2.json").write_text(
+                json.dumps({str(no): [c, w] for no, (c, w) in got.items()},
+                           ensure_ascii=False, indent=1), encoding="utf-8")
+            files += 1
+            print(f"  ✓ {type_dir}/{jf.name}：{len(secs)} 个大题组，改动 {sum(1 for x in changed if '→' in x)} 个")
+    print(f"\n重分类完成：{files} 套")
+    print("重分类前：" + "，".join(f"{k} {v}" for k, v in dist_b.most_common()))
+    print("重分类后：" + "，".join(f"{k} {v}" for k, v in dist_a.most_common()))
+    if args.report:
+        lines = ["| 类型 | 卷 | 题号 | 旧分类 | 新分类 | 判据 |", "| --- | --- | --- | --- | --- | --- |"]
+        lines += [f"| {t} | {ti} | {no} | {o} | {n} | {w[:40]} |" for t, ti, no, o, n, w in changes]
+        Path(args.report).write_text(
+            "# 生物大题分类调整清单（5 类口径）\n\n"
+            f"重分类前：{'，'.join(f'{k} {v}' for k, v in dist_b.most_common())}\n\n"
+            f"重分类后：{'，'.join(f'{k} {v}' for k, v in dist_a.most_common())}\n\n"
+            "## 变更明细\n\n" + "\n".join(lines) + "\n", encoding="utf-8")
+        print(f"清单已写入 {args.report}")
+    return 0
+
+
 def run_check(args) -> int:
     types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
     if "all" in types:
@@ -2284,7 +2501,8 @@ def run_check(args) -> int:
             rev = jf.with_suffix(".review.txt")
             review = [x for x in rev.read_text(encoding="utf-8").splitlines() if x.strip()] if rev.exists() else []
             manual = [x for x in review
-                      if not re.match(r"第\d+题：\d+ 分 / \d+ 空（长句", x)]   # 分值分配只是说明，不算人工点
+                      if not re.match(r"第\d+题：\d+ 分 / \d+ 空（长句", x)    # 分值分配只是说明
+                      and not x.startswith("分类：")]                          # 分类说明也不算
             crops_fail = [x for x in review
                           if x.startswith("PDF 截图失败") or x.startswith("PDF 截图跳过")]
             crops_ok = [x for x in review if x.startswith("PDF 截图：")]
@@ -2369,11 +2587,15 @@ def main():
     ap.add_argument("--no-ai", dest="ai", action="store_false", help="不调模型（只吃缓存）")
     ap.add_argument("--check", action="store_true",
                     help="只做自查（含选择题答案与参考答案原文/答案表比对）")
+    ap.add_argument("--reclassify", action="store_true",
+                    help="只重跑大题分类（只改 category 与 review 的分类行，其余字段不变）")
     ap.add_argument("--cross-check", action="store_true",
                     help="逐题让模型独立作答并与答案表比对（只报告，改不了 JSON）")
     ap.add_argument("--report", default=None, help="自查报告输出路径（配合 --check）")
     args = ap.parse_args()
 
+    if args.reclassify:
+        raise SystemExit(reclassify(args))
     if args.cross_check:
         raise SystemExit(run_cross_check(args))
     if args.check:
