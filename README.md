@@ -20,7 +20,8 @@
 | 化学 | ④ MD→JSON　⑤ 整卷　⑥ PDF 页图→JSON　⑦ 图片版 | `convert_chemistry_md.py`、`convert_chemistry_full.py`、`convert_chemistry_pdf.py`、`batch_image_papers.py` |
 | 语文 | ⑧ MD→JSON | `convert_chinese_md.py` |
 | 政治 | ⑨ MD→JSON | `convert_politics_md.py` |
-| 生物 / 历史 / 地理 | 暂无 | — |
+| 生物 | ⑩ docx→MD→整卷 JSON（选择 + 非选择） | `convert_biology_md.py` |
+| 历史 / 地理 | 暂无 | — |
 
 ## 通用约定
 
@@ -38,6 +39,24 @@
   `repair_missing` 等）读取旧文件（小写 id）与新文件（大写 id）都要能跑：匹配时过 `option_key()` 统一小写，
   写盘前再 `normalize_choice_case_in_paper()`，并用 `count_nonempty_labels()` 断言 label 不丢。
 - **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `scripts/import-chinese-json.ts`。
+
+## 质量检查与兜底（生物以外 6 科通用）
+
+每科解析完都要过一遍 [`qa_scaffold.py`](qa_scaffold.py)：**确定性检查 → AI 抽查 → 兜底修复**，
+入口与生物链路的 `--check / --cross-check` 同构，但适配器把 `groups` / `sections` / 图片版
+三种结构归一后统一检查（英语 / 语文 / 数学 / 物理 / 化学 / 政治；生物用自己那套）。
+
+```bash
+python3 qa_scaffold.py --subject 英语 --type 二模 --check            # 确定性检查，不调模型，可全量跑
+python3 qa_scaffold.py --subject 语文 --type 二模 --cross-check 10   # 模型独立作答，每卷最多 10 题
+python3 qa_scaffold.py --subject 数学 --type 二模 --ai-audit 10      # 题干-选项-答案自洽性抽查
+python3 qa_scaffold.py --subject 物理 --type 二模 --repair           # 兜底修复，默认 dry-run
+python3 qa_scaffold.py --subject 物理 --type 二模 --repair --apply   # 真正写盘，逐卷 <卷>.review.txt 留痕
+```
+
+报告落在 `<数据根>/qa/<学科>.md`，汇总表是 `qa/README.md`；**检查项清单、AI 抽查口径、
+修复边界（哪些能动、哪些绝不许动，例如教师已给的合法答案与开放题答案）以及抽样成本，
+见 [PIPELINES.md](PIPELINES.md) 第 10 节。**
 
 ## 英语链路工作流程（链路 ①）
 
@@ -523,4 +542,6 @@ README 上面几节是**英语**（链路 ①）的完整说明，以及数学 /
 - **物理**（PDF 页图 → 选择题 JSON，`.wmf` 公式修复 + 图片/表格挂载）→ PIPELINES 第 4 节
 - **化学四条链路**（文本 / 整卷 / PDF / 图片版）→ PIPELINES 第 5 节
 - **政治**（docx→MD→JSON，按模块打标签）→ PIPELINES 第 7 节
-- **生物 / 历史 / 地理**：尚无链路，新增方式的检查清单在 PIPELINES 第 8～9 节
+- **生物**（docx→MD→整卷 JSON，自带 `--check/--cross-check/--reclassify`）→ PIPELINES 第 1 节矩阵（链路 ⑩）
+- **质量脚手架**（6 科 `--check / --cross-check / --ai-audit / --repair`）→ PIPELINES 第 10 节
+- **历史 / 地理**：仍无链路，新增方式的检查清单在 PIPELINES 第 8～9 节
