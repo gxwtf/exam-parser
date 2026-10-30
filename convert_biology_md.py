@@ -789,7 +789,8 @@ ZONGHE_CHOICE_SCORE = 6
 ZONGHE_ESSAY_TOTAL = 50
 
 ANSWER_MARK = re.compile(r"(?m)^[ \t]*(\d{1,2})\s*\\?\s*[．.]\s*\**\s*")
-ANS_LETTER = re.compile(r"(?:故选|故答案为|答案为|选择|答案)\s*[:：]?\s*\**\s*([A-D])(?![A-Za-z])")
+ANS_LETTER = re.compile(
+    r"(?:故选|故答案为|答案为|选择|答案)\s*[:：】\]]?\s*\**\s*([A-D])(?![A-Za-z])")
 
 
 def declared_count(text: str) -> int | None:
@@ -1726,11 +1727,17 @@ def process(md: Path, type_dir: str, args) -> str:
     elif not declared and not zonghe and len(choice_qs) != N_CHOICE:
         review.append(f"选择题切到 {len(choice_qs)} 道（卷面一般 {N_CHOICE} 道）")
 
-    blocks = explained_answer_blocks(ans, max_no=max(12, declared or 0))
+    blocks = explained_answer_blocks(ans, max_no=max(12, declared or 0, len(choice_qs)))
     # 参考答案是「解析版」（每题带「故选：X」）时，直接按题号逐题取答案，最不容易串题
     if all(n in blocks and blocks[n][0] for n in range(1, len(choice_qs) + 1)):
         choice_ans = {n: blocks[n][0] for n in range(1, len(choice_qs) + 1)}
-        review.append("选择题答案取自参考答案的逐题解析（「故选：X」），逐题对齐")
+        review.append("选择题答案取自参考答案的逐题解析（「故选/【答案】：X」），逐题对齐")
+        tbl_ans = parse_choice_answers(ans)
+        diff = [(n, tbl_ans[n], choice_ans[n]) for n in sorted(choice_ans)
+                if tbl_ans.get(n) and tbl_ans[n] != choice_ans[n]]
+        if diff:
+            review.append("答案表与逐题解析不一致（已按逐题解析取）："
+                          + "；".join(f"第{n}题 表{tbl}/解析{e}" for n, tbl, e in diff))
     elif len(blocks) >= len(choice_qs) and sum(1 for n in blocks if blocks[n][0]) >= len(choice_qs):
         choice_ans = {q["id"]: blocks[q["id"]][0] for q in choice_qs
                       if q["id"] in blocks and blocks[q["id"]][0]}
@@ -2220,7 +2227,7 @@ def run_cross_check(args) -> int:
     """
     types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
     if "all" in types:
-        types = ["二模", "一模", "上期末"]
+        types = ["二模", "一模", "上期末", "真题"]
     root = Path(args.output)
     cache_dir = root / ".cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -2264,7 +2271,7 @@ def run_cross_check(args) -> int:
 def run_check(args) -> int:
     types = [t for t in (args.type or "二模").replace("，", ",").split(",") if t]
     if "all" in types:
-        types = ["二模", "一模", "上期末"]
+        types = ["二模", "一模", "上期末", "真题"]
     root = Path(args.output)
     bad, blocks, summary = 0, [], []
     for type_dir in types:
