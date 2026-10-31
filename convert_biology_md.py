@@ -661,8 +661,9 @@ def parse_choice_answers(ans: str) -> dict[int, str]:
             pending = []
             continue
         vals = [c.replace("*", "").strip() for c in cells]
-        if all(v == "" or v.isdigit() for v in vals):
-            nums = [int(v) for v in vals if v.isdigit()]
+        # 只认 ASCII 数字：str.isdigit() 对「①」「²」也为 True，int() 会炸
+        if all(v == "" or re.fullmatch(r"\d{1,2}", v) for v in vals):
+            nums = [int(v) for v in vals if re.fullmatch(r"\d{1,2}", v)]
             if len(nums) >= 3:
                 pending = nums
             continue
@@ -881,6 +882,139 @@ def pdf_of(md: Path, type_dir: str, title: str) -> Path | None:
         if cand.exists():
             return cand
     return None
+
+
+CHOICE_PDF_ALL_PROMPT = """这是一张北京高中生物试卷的页面图像（第一部分 选择题）。
+
+请**自上而下按顺序**转写本页出现的所有单项选择题，只输出 JSON：
+{{"questions": [{{"stem": "题干", "options": [{{"id": "A", "label": "…"}}, {{"id": "B", "label": "…"}}, {{"id": "C", "label": "…"}}, {{"id": "D", "label": "…"}}]}}]}}
+
+要求：
+1. **不要写题号**（题号由程序按顺序编）；
+2. stem 只放题干，不要把选项写进题干；填空下划线/空格照抄；公式用 $…$；有图写 <图片>；
+3. 四个选项必须齐全、逐字照抄，不要改写、不要合并；
+4. 若某题题干在本页、选项在下一页，本页只输出题干并把 options 写成空数组；
+5. 本页没有选择题就返回空数组；只输出 JSON，不要解释。
+"""
+
+
+def transcribe_choices_by_order(pdf: Path, declared: int, review: list[str],
+                                label: str) -> list[dict]:
+    """整卷按顺序转写选择题（题号写乱/缺题的卷子兜底）。返回 [{stem, options}]。"""
+    pages = _answer_pages_text(pdf)
+    if not pages:
+        return []
+    stop = next((i for i, x in enumerate(pages) if "参考答案" in x), len(pages))
+    out: list[dict] = []
+    tmp = Path(tempfile.mkdtemp(prefix="biopdf_" ))
+    try:
+        for pg in range(1, stop + 1):
+            shot = _render_page(pdf, pg, tmp)
+            if shot is None:
+                continue
+            b64 = base64.b64encode(shot.read_bytes()).decode()
+            res = _vision_bbox([
+                {"role": "system", "content": "你是试卷录入助手，只输出 JSON。"},
+                {"role": "user", "content": [
+                    {"type": "text", "text": CHOICE_PDF_ALL_PROMPT},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                ]},
+            ], VISION_MODEL, 3000)
+            for q in (res.get("questions") or []):
+                stem = str(q.get("stem") or "").strip()
+                opts = [{"id": str(o.get("id") or "ABCD"[k]).upper()[:1],
+                         "label": _clean_pdf_option(str(o.get("label") or ""))}
+                        for k, o in enumerate(q.get("options") or [])]
+                if stem:
+                    out.append({"stem": stem, "options": opts, "_page": pg})
+            if len(out) >= declared:
+                break
+        review.append(f"{label}：按顺序从 PDF 第 1–{min(stop, pg)} 页转写选择题，共 {len(out)} 道")
+    except Exception as e:
+        review.append(f"{label}：按顺序转写选择题失败（{str(e)[:60]}）")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+OPT_FILL_PROMPT = """图 1 是试卷第 {p} 页{maybe2}。
+
+要找的是这道题的四个选项（A–D），题干如下：
+{stem}
+
+请只输出这道题的四个选项（逐字照抄，不要改写、不要合并），JSON 格式：
+{{"options": [{{"id": "A", "label": "…"}}, {{"id": "B", "label": "…"}}, {{"id": "C", "label": "…"}}, {{"id": "D", "label": "…"}}]}}
+只输出 JSON。
+"""
+
+
+def fill_options_from_page(pdf: Path, item: dict, stop: int, review: list[str],
+                           label: str) -> list[dict]:
+    """某道题的选项跨页/没转全 → 用该页和下一页再要一次。"""
+    pg = int(item.get("_page") or 0)
+    if pg <= 0:
+        return []
+    tmp = Path(tempfile.mkdtemp(prefix="bioopt_"))
+    try:
+        shots = [s for s in (_render_page(pdf, pg, tmp),
+                             _render_page(pdf, pg + 1, tmp) if pg + 1 <= stop else None) if s]
+        if not shots:
+            return []
+        content = [{"type": "text", "text": OPT_FILL_PROMPT.format(
+            p=pg, maybe2="，图 2 是紧随其后的第 %d 页" % (pg + 1) if len(shots) > 1 else "",
+            stem=(item.get("stem") or "")[:120])}]
+        for sh in shots:
+            content.append({"type": "image_url", "image_url": {
+                "url": "data:image/png;base64," + base64.b64encode(sh.read_bytes()).decode()}})
+        res = _vision_bbox([
+            {"role": "system", "content": "你是试卷录入助手，只输出 JSON。"},
+            {"role": "user", "content": content},
+        ], VISION_MODEL, 1200)
+        opts = [{"id": str(o.get("id") or "ABCD"[k]).upper()[:1],
+                 "label": _clean_pdf_option(str(o.get("label") or ""))}
+                for k, o in enumerate(res.get("options") or [])]
+        if len(opts) == 4:
+            review.append(f"{label}：第 {pg} 页有一道题选项没转全，已补第（{opts[0]['label'][:8]}…）等 4 项")
+            return opts
+        return []
+    except Exception:
+        return []
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def merge_pdf_ordered_choices(choice_qs: list[dict], pdf_list: list[dict], declared: int,
+                              q_unit: int, review: list[str], label: str) -> list[dict]:
+    """把「按顺序转写」的 PDF 题按内容并回 docx 解析结果：能对上就保留 docx 的题干（带图）。"""
+    def sig(t: str) -> str:
+        t = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", t or "")
+        return re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]", "", t)[:10]
+
+    pool = list(choice_qs)
+    out: list[dict] = []
+    added: list[str] = []
+    for item in pdf_list[:declared]:
+        s = sig(item["stem"])
+        hit = None
+        if s:
+            hit = next((q for q in pool
+                        if s[:8] and (sig(q["content"])[:8] == s[:8] or s[:8] in sig(q["content"]))), None)
+        if hit is not None:
+            pool.remove(hit)
+            if len(hit.get("options") or []) != 4 and len(item["options"]) == 4:
+                hit["options"] = item["options"]
+            out.append(hit)
+        else:
+            out.append({"id": 0, "questionType": "single", "content": item["stem"],
+                        "options": item["options"], "answer": "", "analysis": "", "score": q_unit})
+            added.append(item["stem"][:14])
+    for i, q in enumerate(out, 1):
+        q["id"] = i
+        q["_printed"] = i
+    if added:
+        review.append(f"{label}：选择题从 PDF 按顺序补进 {len(added)} 道（docx 里没有）："
+                      + "、".join(added))
+    return out
 
 
 def _clean_pdf_option(label: str) -> str:
@@ -1711,16 +1845,33 @@ def process(md: Path, type_dir: str, args) -> str:
     body, ans = split_paper(txt)
     if ans and len(ans.strip()) < 50:              # 只有「参考答案」一个标题 → 等同于没有
         ans = ""
+    if not ans:
+        # docx 里没有「参考答案」字样，但答案直接接在卷末（如「1.C 2.C …」）→ 按这一行切开
+        for mm in re.finditer(r"(?m)^[^\n]*$", body):
+            line = mm.group(0)
+            if len(re.findall(r"(?<![\d.])\d{1,2}\s*[.．]\s*[A-D](?![A-Za-z])", line)) >= 5:
+                body, ans = body[:mm.start()], body[mm.start():]
+                review.append("该卷 docx 里没有「参考答案」字样，答案区按「1.C 2.C …」答案行切出")
+                break
     if not ans:                                    # docx 转换把答案区丢了 → 退回 PDF 文字层
         pdf0 = pdf_of(md, type_dir, title)
         if pdf0 is not None:
-            whole = "\n".join(_answer_pages_text(pdf0))
+            pages0 = _answer_pages_text(pdf0)
+            whole = "\n".join(pages0)
             k = whole.find("参考答案")
             if k < 0:
                 k = whole.find("答案与解析")
             if k > 0:
                 ans = whole[k:]
                 review.append("该卷 docx 里没有参考答案（转换时丢了），答案区改从教师版 PDF 文字层取")
+            else:
+                # 有些教师版没有「参考答案」字样，答案是「1.C 2.C …」直接接在卷末
+                for i, pg in enumerate(pages0):
+                    if len(re.findall(r"(?<![\d.])\d{1,2}\s*[.．]\s*[A-D](?![A-Za-z])", pg)) >= 5:
+                        ans = "\n".join(pages0[i:])
+                        review.append(f"该卷答案区没有「参考答案」字样，按 PDF 第 {i + 1} 页起的"
+                                      f"「1.C 2.C …」答案行定位")
+                        break
     if not ans:
         raise RuntimeError("该卷 docx 与教师版 PDF 里都没有参考答案，无法解析（需人工提供答案版）")
     ensure_web_images(md, review)
@@ -1843,6 +1994,32 @@ def process(md: Path, type_dir: str, args) -> str:
         if not args.ai and need:
             review.append(f"第{'、'.join(map(str, need))}题（选择题）需要从 PDF 补转，"
                           f"--no-ai 模式不调模型，需 --force 重跑")
+
+    # 还是不够：整卷按顺序从 PDF 转写，再按内容并回（题号写乱/重复的卷子只能这么补）
+    if declared and len(choice_qs) < declared and pdf is not None:
+        ocache = cache_dir / f"{title}-pdforder.json"
+        ordered: list[dict] = []
+        if ocache.exists() and (not args.ai or not args.force):
+            ordered = json.loads(ocache.read_text(encoding="utf-8"))
+            if ordered:
+                review.append(f"{title}：复用已按顺序转写好的 {len(ordered)} 道选择题")
+        elif args.ai:
+            ordered = transcribe_choices_by_order(pdf, declared, review, title)
+            if ordered:
+                ocache.write_text(json.dumps(ordered, ensure_ascii=False, indent=1), encoding="utf-8")
+        if ordered and args.ai:                     # 选项没转全的题，用原页再补一次
+            stop_pg = len(_answer_pages_text(pdf)) if pdf else 0
+            for it in ordered:
+                if pdf is not None and len(it.get("options") or []) != 4:
+                    got_o = fill_options_from_page(pdf, it, stop_pg, review, title)
+                    if got_o:
+                        it["options"] = got_o
+            if ocache.exists() or ordered:
+                ocache.write_text(json.dumps(ordered, ensure_ascii=False, indent=1), encoding="utf-8")
+        if ordered:
+            choice_qs = merge_pdf_ordered_choices(choice_qs, ordered, declared, q_unit, review, title)
+            if len(choice_qs) == declared:
+                review.append(f"选择题已补齐到卷面声明的 {declared} 道")
 
     if declared and len(choice_qs) != declared:
         review.append(f"选择题切到 {len(choice_qs)} 道（卷面声明 {declared} 道）")
