@@ -757,6 +757,73 @@ def fix_placeholders(content: str, answers: list[str], review: list[str], label:
     return "".join(pieces)
 
 
+ADJ_DOLLAR = re.compile(r"(?<=[^$\n])\$\$(?=[^$\n])")
+
+
+def merge_adjacent_inline_math(text: str) -> str:
+    r"""把相邻的行内公式合并成一段：`$A$$B$` → `$AB$`。
+
+    Markdown/KaTeX 里 `$$` 会被当成块级公式起止符，`$\mathrm{H_{2}}$$\mathrm{O_{2}}$`
+    就会渲染成红色原文。只合并「夹在两段内容之间」的 `$$`（两侧都不是换行/`$`），
+    整行 `$$ … $$` 的块级公式一律不动。
+    """
+    if not text or "$$" not in text:
+        return text
+    stash: list[str] = []
+
+    def _st(m):
+        stash.append(m.group(0))
+        return f"\x01{len(stash) - 1}\x01"
+
+    # 独占一行的块级公式（$$ … $$ 单行或跨行）先抽出来占位，避免被当成相邻行内公式
+    body = re.sub(r"(?m)^[ \t]*\$\$[^\n]*\$\$[ \t]*$", _st, text)
+    body = re.sub(r"(?m)^[ \t]*\$\$[\s\S]*?^[ \t]*\$\$[ \t]*$", _st, body)
+    body = ADJ_DOLLAR.sub("", body)
+    for i, v in enumerate(stash):
+        body = body.replace(f"\x01{i}\x01", v)
+    return body
+
+
+def split_material_title(content: str, seg: str, review: list[str], label: str) -> str:
+    """科普文材料：「引导句 / 标题 / 正文」要各自成段（模型常把标题和第一段粘在一起）。
+
+    标题以【原题】里独立成段的那一行为准（AI 输出丢了这个分段）。
+    """
+    if not content or ("学习以下材料" not in content and "阅读以下材料" not in content):
+        return content
+    c = content
+    # 1) 引导句（学习以下材料，回答（1）～（4）题。）单独成段
+    m = re.match(r"^\s*(?:学习以下材料|阅读以下材料|阅读下面材料)[^\n]{0,80}?(?:题|问题|小题)[。.：:]?\s*", c)
+    if m and not c[m.end():].startswith("\n"):
+        c = c[:m.end()].rstrip() + "\n\n" + c[m.end():].lstrip()
+    # 2) 从原题里找「独立成段的标题」
+    lines = [re.sub(r"!\[[^\]]*\]\([^)]*\)", "", l).strip() for l in (seg or "").split("\n")]
+    lines = [l for l in lines if l]
+    title = None
+    for i, l in enumerate(lines):
+        if ("学习以下材料" in l or "阅读以下材料" in l) and i + 1 < len(lines):
+            cand = lines[i + 1]
+            if cand and len(cand) <= 40 and not re.search(r"[。！？；：]$", cand):
+                title = cand
+            break
+    if not title:
+        return c
+    plain = title.replace("*", "").strip()
+    idx = c.find(plain)
+    if idx < 0:
+        return c
+    after = c[idx + len(plain):]
+    if not after.strip():                             # 已经是独立一段
+        return c
+    if after.startswith("\n\n") or after.startswith("\n"):  # 已分段
+        return c
+    if c[max(0, idx - 2):idx] == "**":                 # 已经加粗
+        return c
+    c = c[:idx] + f"**{plain}**" + "\n\n" + after.lstrip()
+    review.append(f"{label}：科普材料标题「{plain[:16]}」已单独成段（原与正文粘连）")
+    return c
+
+
 def strip_embedded_answers(content: str, review: list[str], label: str) -> str:
     """模型偶尔把答案写进空里：`<Input></Input>答案</Input>`。
 
@@ -2068,10 +2135,12 @@ def process(md: Path, type_dir: str, args) -> str:
             review.append(f"第{q['id']}题（选择题）缺答案")
         if len(q["options"]) != 4:
             review.append(f"第{q['id']}题（选择题）选项不足 4 个（{len(q['options'])}）")
-        q["content"] = rewrite(normalize_md_tables(reflow_cjk(latexify(q["content"]))))
+        q["content"] = merge_adjacent_inline_math(
+            rewrite(normalize_md_tables(reflow_cjk(latexify(q["content"])))))
         for o in q["options"]:
-            o["label"] = rewrite(normalize_md_tables(reflow_cjk(latexify(
-                _clean_pdf_option(o["label"])))))
+            o["label"] = merge_adjacent_inline_math(
+                rewrite(normalize_md_tables(reflow_cjk(latexify(
+                    _clean_pdf_option(o["label"]))))))
     for q in choice_qs:                       # 内部字段不出口
         q.pop("_printed", None)
         q.pop("_qscore", None)
@@ -2263,10 +2332,13 @@ def process(md: Path, type_dir: str, args) -> str:
         scores = split_scores(total, tags, atext, review, label)
         qs = []
         for i, a in enumerate(answers, 1):
-            ans_text = drop_missing_answer_images(rewrite(latexify(a)), review, label, i)
+            ans_text = merge_adjacent_inline_math(
+                drop_missing_answer_images(rewrite(latexify(a)), review, label, i))
             qs.append({"id": no * 100 + i, "questionType": "input", "content": "",
                        "answer": ans_text, "analysis": "",
                        "score": scores[i - 1] if i - 1 < len(scores) else 0})
+        content = split_material_title(content, seg, review, label)
+        content = merge_adjacent_inline_math(content)
         cat_now = cat_map.get(no) or "实验探究"
         review.append(f"分类：第{no}题={cat_now}"
                       + (f"（{cat_why[no]}）" if cat_why.get(no) else ""))
@@ -2402,6 +2474,9 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
                 errs.append(f"选择题第{q.get('id')}题缺 analysis")
             if not (q.get("content") or "").strip():
                 errs.append(f"选择题第{q.get('id')}题 content 为空")
+            for m in re.finditer(r"(?<!\$)\$[^$\n]{1,120}\$\$[^$\n]{1,120}\$(?!\$)",
+                                 (q.get("content") or "")):
+                errs.append(f"选择题第{q.get('id')}题：content 有相邻行内公式（{m.group(0)[:40]}…）")
             # ★ 断言二（选择题题干里的表格也要能解析）
             stat["tables"] += count_md_tables(q.get("content") or "")
             for e in table_shape_ok(q.get("content") or ""):
@@ -2502,6 +2577,12 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
         else:
             stat["seqs"].append((s.get("title"), total, "空数/占位符不一致，无法核对"))
 
+        # ★ 断言五：content / answer 里不得出现相邻行内公式（$…$$…$，会被当成块级起止符）
+        for where, txt in [("content", content)] + [
+                (f"id={q.get('id')} 的 answer", q.get("answer") or "") for q in qs]:
+            for m in re.finditer(r"(?<!\$)\$[^$\n]{1,120}\$\$[^$\n]{1,120}\$(?!\$)", txt):
+                errs.append(f"{s.get('title')}：{where} 有相邻行内公式（{m.group(0)[:40]}…），"
+                            f"`$$` 会被当成块级公式起止符")
         # ★ 断言二：markdown 表格可被简单解析（分隔行唯一、行列数与表头一致）
         stat["tables"] += count_md_tables(content)
         for e in table_shape_ok(content):
