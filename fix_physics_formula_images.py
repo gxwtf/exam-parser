@@ -54,7 +54,7 @@ def ask(img: Path) -> str:
         return ""
 
 
-CUR = {"stem": ""}
+CUR = {"stem": "", "subject": "物理", "type": "二模"}
 
 
 def local_path(url: str) -> Path:
@@ -62,7 +62,7 @@ def local_path(url: str) -> Path:
         return MD_ROOT / url[len("/exam-images/"):]
     # 相对路径 images/x.png → 到该卷的 MD 图片目录找
     stem = CUR["stem"]
-    for d in (MD_ROOT / "二模" / "物理").glob(f"{stem}*"):
+    for d in (MD_ROOT / CUR["type"] / CUR["subject"]).glob(f"{stem}*"):
         cand = d / "images" / url.split("/")[-1]
         if cand.exists():
             return cand
@@ -90,6 +90,7 @@ def fix_text(txt: str, cache: dict) -> tuple[str, int]:
 
 def do_paper(path: Path, dry: bool) -> tuple[str, int, int]:
     CUR["stem"] = path.stem
+    CUR["type"] = path.parent.parent.name if path.parent.parent.name else CUR["type"]
     d = json.loads(path.read_text(encoding="utf-8"))
     cache, total = {}, 0
     for sec in d.get("sections", []):
@@ -120,6 +121,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
+    CUR["subject"] = args.subject
+    CUR["type"] = args.type
     files = sorted((PROJ.parent / "output_json_math" / args.type / args.subject).glob("*.json"))
     if args.only:
         files = [f for f in files if args.only in f.stem]
