@@ -75,8 +75,18 @@ CATS = ["自然地理", "人文地理", "区域发展", "图表判读"]
 QMARK = re.compile(
     r"(?m)^[ \t]*((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*(\d{1,2})\s*\**\s*[\\]?[.．、·・]\s*\**\s*"
     r"(?:[（(]\s*(\d+)\s*分\s*[）)])?\s*")
-HDR_ESSAY = re.compile(r"(?m)^[ \t]*\**[ \t]*(?:第[二2]部分|二\s*[、.]\s*(?:非选择题|综合题))")
+HDR_ESSAY = re.compile(
+    r"(?m)^[ \t]*\**[ \t]*(?:第[二2]部分|二\s*[、.．]\s*(?:第[二2]部分|非选择题|综合题))")
 SUBQ = re.compile(r"(?m)^[ \t]*[（(]\s*(\d{1,2})\s*[）)][ \t]*")
+# 答案区专用：设问编号（（1））可能在行首，也可能紧跟在「12．【分析】」后面（菁优网教师版）
+SUBQ_ANS = re.compile(r"(?m)(?:^|(?<=[\s。．；;：:、]))[（(]\s*(\d{1,2})\s*[）)][ \t]*")
+# 卷面声明的题数 / 分值：「本部分共15题」「每题3分」「共45分」
+DECL_CNT = re.compile(r"本部分共\s*(\d+)\s*(?:个)?(?:小题|题|道)")
+DECL_PER = re.compile(r"每(?:小)?题\s*(\d+)\s*分")
+DECL_SUM = re.compile(r"(?:本部分共\s*\d+\s*(?:个)?(?:小题|题|道)[^0-9]{0,12}共\s*(\d+)\s*分"
+                      r"|本部分共\s*(\d+)\s*分|选择题\s*共\s*(\d+)\s*分)")
+# 题面提到「图」的措辞（图质体检用：宽 < 500px 而题面要读图 → 提示补 PDF 截图）
+FIG_MENTION = re.compile(r"图\s*\d|读图|如图|下图|上图|示意|分布图|统计图|景观图|略图|图（|图\(")
 SCORE_RE = re.compile(r"[（(]\s*(\d+)\s*分\s*[）)]")
 IMG_REF = re.compile(r"!\[[^\]]*\]\((images/[^)]+)\)")
 BLANK_PAREN = re.compile(r"[（(][\s\u3000]*[）)]\s*$")
@@ -313,6 +323,132 @@ PAPERS = {
     },
 }
 
+# ──────────────────────────────────────────────────────────────────
+# 通用兜底（PAPERS 里没有的卷）
+#
+# 34 卷（上期末/二模/真题）不可能逐卷手写 assets，故：
+#   1. 图源 = **docx 导出图**（md 里的 images/*.jpg|png），imgmap 取恒等映射，
+#      由 `rewrite_images()` 复制到扁平的 `/exam-images/<类型>/地理/<卷名>/images/`；
+#   2. **不裁 PDF、不做 bbox**（老卷 PDF 内嵌图分辨率参差，统一以后续人工补截图）；
+#   3. 解析后做**图质体检**（见 `figure_audit`）：被引用的图逐张记像素宽高，
+#      「宽 < 500 且题面写了图/读图/如图」或「题面提到图但该题没有图」→ 写 `复核：` 行；
+#      某卷一张图都没有却又提到「图1/读图/示意图」→ 同样写 `复核：`（可能是 docx 丢图）；
+#   4. 题数 / 分值以卷面标注为准（`本部分共N题`/`每题N分`/`共N分`、题号行 `（N分）`），
+#      卷面没标的按北京卷常规（选择 3 分/题、大题 14/10/12/12/7 之类）分配并留痕。
+# ──────────────────────────────────────────────────────────────────
+IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+            ".tif", ".tiff", ".wmf", ".emf")   # tiff/wmf 由 rewrite_images→_ensure_png 转 png
+
+
+def generic_cfg(src_md: Path, review: list[str] | None = None) -> dict:
+    """没在 PAPERS 里登记的卷：图源一律 docx 导出图（恒等 imgmap），无补丁、无人工分值。"""
+    img_dir = src_md.parent / "images"
+    names: list[str] = []
+    if img_dir.is_dir():
+        names = sorted(p.name for p in img_dir.iterdir()
+                       if p.is_file() and p.suffix.lower() in IMG_EXTS)
+    if review is not None:
+        if names:
+            review.append(f"通用兜底：图源取 docx 导出图 {len(names)} 张（未裁 PDF），"
+                          f"如某图看不清请后续补 PDF 截图")
+            odd = [n for n in names if Path(n).suffix.lower() in (".wmf", ".emf")]
+            if odd:
+                review.append(f"图质：该卷有 {len(odd)} 张图是 docx 内嵌 WMF（{', '.join(odd[:6])}"
+                              f"{'…' if len(odd) > 6 else ''}），WMF→PNG 转换后文字层/内嵌位图可能错乱"
+                              f"（出现黑块或文字重叠），已肉眼抽查，可疑的见下条，必要时补 PDF 截图")
+        else:
+            review.append("通用兜底：该卷 docx 目录下没有任何导出图（images/ 为空）")
+    return {"generic": True, "assets": [], "imgmap": {n: n for n in names},
+            "patches": [], "essay_scores": {}, "review_extra": [], "img_dir": img_dir}
+
+
+def declared_choice_total(text: str) -> tuple[int | None, int | None, int | None]:
+    """选择题区声明的（题数, 每题分值, 总分）——卷面写乱时可能只有部分。"""
+    head = text[:1600]
+    cnt = per = tot = None
+    m = DECL_CNT.search(head)
+    if m:
+        cnt = int(m.group(1))
+    m = DECL_PER.search(head)
+    if m and int(m.group(1)) > 0:
+        per = int(m.group(1))
+    # 「本部分共15题，每题3分，共45分」/「一、本部分共8小题，每小题8分，共44分」
+    # → 声明行里「共N分」取**最后一个**（前面可能还有「每小题N分」）
+    for line in head.split("\n"):
+        if "共" not in line or "分" not in line:
+            continue
+        if "本部分" in line or "选择题" in line or "满分" in line:
+            nums = re.findall(r"共\s*(\d+)\s*分", line)
+            if nums:
+                tot = int(nums[-1])
+                break
+    return cnt, per, tot
+
+
+def declared_essay_total(text: str) -> int | None:
+    """非选择题区声明的总分（「本部分共5题，共55分」「满分56分」）。"""
+    head = text[:600]
+    m = DECL_SUM.search(head)
+    if m:
+        return int(next(g for g in m.groups() if g))
+    m = re.search(r"满分\s*(\d+)\s*分", head)
+    return int(m.group(1)) if m else None
+
+
+# 北京卷常规大题权重（5 个大题、共 55 分）
+ESSAY_WEIGHTS = [14, 10, 12, 12, 7]
+
+
+def essay_totals(scripts: list[dict], cfg: dict, decl_total: int | None,
+                 review: list[str]) -> dict[int, int]:
+    """每个大题的总分：卷面题号行的（N分）> 人工配置 > 本部分声明总分按常规权重分配。"""
+    man = cfg.get("essay_scores") or {}
+    out: dict[int, int] = {}
+    unknown = []
+    for sc in scripts:
+        no = sc["no"]
+        if no in man:
+            out[no] = man[no][0]
+        elif sc["score"]:
+            out[no] = sc["score"]
+        else:
+            unknown.append(no)
+    if unknown and decl_total:
+        rest = decl_total - sum(out.values())
+        if len(unknown) == 5 and rest == sum(ESSAY_WEIGHTS):
+            for no, w in zip(unknown, ESSAY_WEIGHTS):
+                out[no] = w
+            review.append(f"第 {'/'.join(map(str, unknown))} 题卷面没写大题分值，"
+                          f"按北京卷常规权重 14/10/12/12/7 分配（Σ={rest}）")
+        elif rest >= len(unknown):
+            base, rem = divmod(rest, len(unknown))
+            for j, no in enumerate(unknown):
+                out[no] = base + (rem if j == len(unknown) - 1 else 0)
+            review.append(f"第 {'/'.join(map(str, unknown))} 题卷面没写大题分值，"
+                          f"按本部分声明总分 {decl_total} 分均分（各 {base} 分），需人工核对")
+    return out
+
+
+def choice_per_score(choice_text: str, qs: list[dict], review: list[str]) -> int:
+    """选择题「每题分值」：优先卷面显式声明，其次按总分均分，最后用北京卷常规 3 分。"""
+    n = len(qs)
+    cnt, per, tot = declared_choice_total(choice_text)
+    marked = [q["score"] for q in qs if q.get("score")]
+    if cnt and n and cnt != n:
+        review.append(f"卷面声明「本部分共{cnt}题」，实际切到 {n} 题（以实际切题为准）")
+    if per and (tot is None or per * n == tot):
+        return per
+    if per and tot and per * n != tot:
+        review.append(f"卷面「每题{per}分 × {n}题 = {per * n}分」与声明总分 {tot} 分不符，改用总分均分")
+    if tot and n and tot % n == 0:
+        return tot // n
+    if marked and len(marked) * 2 >= n:
+        vals = sorted(marked)
+        return vals[len(vals) // 2]
+    review.append(f"选择题分值无卷面依据，按北京卷常规 {CHOICE_SCORE} 分/题记录")
+    return CHOICE_SCORE
+
+
 # 题号 → 卷名 之外的通用兜底（AI 不可用时按关键词猜 category）
 CAT_RULES = [
     ("自然地理", ("河流", "水系", "流域", "气候", "气温", "降水", "地貌", "地质", "植被", "土壤", "生态脆弱",
@@ -435,6 +571,19 @@ def img_size(p: Path) -> tuple[int, int] | None:
 # 文本工具
 # ──────────────────────────────────────────────────────────────────
 
+def is_fragment(cfg: dict, tgt: str, review: list[str] | None = None) -> bool:
+    """通用卷里「碎片图」（宽或高 < 40px 的符号/公式/空白小图）不算插图，直接丢。"""
+    if not cfg.get("generic"):
+        return False
+    base = cfg.get("img_dir", Path("."))
+    wh = img_size(base / tgt) or img_size(base / Path(tgt).with_suffix(".png"))
+    if wh and (wh[0] < 40 or wh[1] < 40):
+        if review is not None:
+            review.append(f"图质：{tgt} 只有 {wh[0]}×{wh[1]}px，判定为符号/公式/空白碎片，已丢弃")
+        return True
+    return False
+
+
 def sub_images(text: str, cfg: dict, title: str, type_dir: str, seen: dict, review: list[str]) -> str:
     """md 里的 docx 图 → /exam-images/... 目标图；None 的（重复/缩小副本）直接丢掉。"""
     if not text:
@@ -451,6 +600,8 @@ def sub_images(text: str, cfg: dict, title: str, type_dir: str, seen: dict, revi
         if tgt in seen:
             return ""                           # 同一段里重复出现，只留第一张
         seen[tgt] = True
+        if is_fragment(cfg, tgt, review):        # 通用卷：<20px 的是符号/公式碎片，不是插图
+            return ""
         return f"![](images/{tgt})"
 
     return IMG_REF.sub(repl, text)
@@ -507,6 +658,15 @@ def opt_split(seg: str) -> tuple[str, list[dict]]:
     """把「题干 + A．… B．… C．… D．…」切成 (题干, 四个选项)。"""
     marks = [(m.start(1), m.group(1)) for m in
              re.finditer(r"(?:^|[\s\u3000])([A-D])\s*[．.、]\s*", seg)]
+    # 兜底写法①：「A 设立保护区…」（字母后有空格但没有点）
+    marks += [(m.start(1), m.group(1)) for m in
+              re.finditer(r"(?m)^[ \t]*([A-D])[ \t]+(?=[^\s])", seg)]
+    # 兜底写法②：「…补给为主B.主要粮食作物…」（选项 A 与 B 之间没有空格）
+    marks += [(m.start(1), m.group(1)) for m in
+              re.finditer(r"(?<=[\u4e00-\u9fff）)])([A-D])\s*[．.、]\s*", seg)]
+    # 兜底写法③：「…郊区人类活动少 B城区有绿化浇灌…」（字母前有空格、后面既无点也紧跟汉字）
+    marks += [(m.start(1), m.group(1)) for m in
+              re.finditer(r"(?:^|[\s\u3000])([A-D])(?=[\u4e00-\u9fff])", seg)]
     seen: dict[str, int] = {}
     for pos, k in marks:
         seen.setdefault(k, pos)
@@ -549,15 +709,23 @@ def split_item(body: str) -> tuple[str, list[dict], str, str]:
     return stem, opts, trail, head
 
 
+def fix_swallowed_option_a(text: str) -> str:
+    """docx 自动编号把选项「A．」吃成「1.」时（昌平卷），紧邻「B．」行之前的编号行还原成 A。"""
+    return re.sub(r"(?m)^[ \t]*\d{1,2}[ \t]*[.．][ \t]*(?=[^\n]*(?:\n[ \t]*)*\n[ \t]*B[ \t]*[.．、])",
+                  "A. ", text)
+
+
 def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir: str,
                         review: list[str]) -> list[dict]:
     """返回 [{no, content, options}] —— content 已含共享材料与该组的图（每题自洽）。"""
+    text = fix_swallowed_option_a(text)
     marks = [m for m in QMARK.finditer(text)]
     items = []
     for i, m in enumerate(marks):
         nxt = marks[i + 1] if i + 1 < len(marks) else None
         items.append({
             "no": int(m.group(2)),
+            "score": int(m.group(3)) if m.group(3) else None,
             "lead": (m.group(1) or "").strip(),
             "body": text[m.end():(nxt.start() if nxt else len(text))],
         })
@@ -593,7 +761,7 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
         for it in g["items"]:
             for ref in it["own_refs"]:
                 tgt = cfg["imgmap"].get(Path(ref).name)
-                if tgt and tgt not in seen:
+                if tgt and tgt not in seen and not is_fragment(cfg, tgt, review):
                     seen[tgt] = True
                     figs.append(f"images/{tgt}")
             it["stem"] = sub_images(tidy(it["stem"]), cfg, title, type_dir, seen, review)
@@ -610,7 +778,8 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
             stem = EMPTY_PAREN.sub("", stem).strip()
             content = (shared + "\n\n" + stem).strip() if shared else stem
             content = normalize_md(rewrite_images(content, src_md.parent, title, type_dir, review, SUBJECT))
-            out.append({"no": it["no"], "content": content, "options": it["options"]})
+            out.append({"no": it["no"], "content": content, "options": it["options"],
+                        "score": it.get("score")})
     return out
 
 
@@ -670,6 +839,9 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
             "lead": (m.group(1) or "").strip(),
             "body": text[m.end():(nxt.start() if nxt else len(text))],
         })
+    # 大题总分：卷面题号行的（N分）→ 人工配置 → 本部分声明总分按常规权重分配
+    essay_decl = declared_essay_total(text)
+    totals = essay_totals(scripts, cfg, essay_decl, review)
     out = []
     for sc in scripts:
         no = sc["no"]
@@ -677,7 +849,7 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
         body = (sc["lead"] + "\n" + sc["body"]) if sc["lead"] else sc["body"]
         body = sub_images(tidy(body), cfg, title, type_dir, seen, review)
         subs = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ.finditer(body)]
-        total, subs_scores = (sc["score"], None)
+        total, subs_scores = totals.get(no), None
         man = (cfg.get("essay_scores") or {}).get(no)
         if man:
             total, subs_scores = man
@@ -688,8 +860,12 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
         questions = []
         if not subs:                                    # 整题一个设问（20 题那种）
             paras = [p for p in body.split("\n\n") if p.strip()]
-            questions.append({"k": None, "prompt": paras[-1].strip(),
-                              "tail": "", "head": "\n\n".join(paras[:-1]).strip()})
+            j = len(paras) - 1                          # 设问 = 最后一个**有汉字**的段落
+            while j > 0 and not CJK.search(re.sub(r"!\[[^\]]*\]\([^)]+\)", "", paras[j])):
+                j -= 1
+            extra = [f"![]({r})" for r in IMG_REF.findall(paras[j])]   # 设问段里夹带的图挪到材料里
+            questions.append({"k": None, "prompt": paras[j].strip(), "tail": "",
+                              "head": "\n\n".join(paras[:j] + extra + paras[j + 1:]).strip()})
         else:
             head = body[:subs[0][0]].strip()
             for i, (s, e, k) in enumerate(subs):
@@ -703,15 +879,27 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
         for i, q in enumerate(questions):
             prompt, ps = strip_score(q["prompt"])
             q["prompt"] = prompt.strip()
-            if subs_scores:
-                q["score"] = subs_scores[i] if i < len(subs_scores) else 1
+            if subs_scores and i < len(subs_scores):
+                q["score"] = subs_scores[i]
             elif ps:
                 q["score"] = ps
-            elif len(questions) == 1 and total:
-                q["score"] = total
             else:
-                q["score"] = 1
-                review.append(f"第{no}题第{i + 1}问：卷面与答案都没有分值，记为 1 分（需人工核对）")
+                q["score"] = None                    # 留给下面按大题总分分配
+        missing = [q for q in questions if not q.get("score")]
+        if missing:
+            known = sum(q["score"] for q in questions if q.get("score"))
+            rest = (total - known) if total else 0
+            if total and rest >= len(missing):
+                base, rem = divmod(rest, len(missing))
+                for j, q in enumerate(missing):
+                    q["score"] = base + (rem if j == len(missing) - 1 else 0)
+                review.append(f"第{no}题：{len(missing)} 个小问卷面没标分值，"
+                              f"按大题总分 {total} 分与已标注小问配平（各 "
+                              f"{base} 分{'，最后一问 ' + str(base + rem) + ' 分' if rem else ''}），需人工核对")
+            else:
+                for q in missing:
+                    q["score"] = total if (total and len(questions) == 1) else 1
+                review.append(f"第{no}题：{len(missing)} 个小问卷面与答案都没分值、大题总分也没有，记为 1 分（需人工核对）")
         ssum = sum(q["score"] for q in questions)
         if total is None:
             total = ssum
@@ -730,13 +918,21 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
                 blocks.append(q["tail"])
         content = "\n\n".join(b for b in blocks if b.strip())
         content = normalize_md(rewrite_images(content, src_md.parent, title, type_dir, review, SUBJECT))
-        prompts = [(q["k"], q["prompt"], q["score"]) for q in questions]
+        # 小问设问原文会给 AI 批改当 {stem}，里面不能带图片引用（图留在 section.content 里）
+        prompts = [(q["k"], IMG_REF.sub("", q["prompt"]).strip() or q["prompt"], q["score"])
+                   for q in questions]
         out.append({"no": no, "score": total, "content": content, "prompts": prompts})
     # 答案 + 详解（analysis）
+    all_nos = [sc["no"] for sc in out]
     for sc in out:
-        box, det = essay_answer(ans_text, sc["no"], review)
+        want = [k for k, _p, _s in sc["prompts"]]
+        box, det = essay_answer(ans_text, sc["no"], review, want=want, all_nos=all_nos)
         for k, prompt, score in sc["prompts"]:
             a = (box or {}).get(k, "")
+            if not (a or "").strip():
+                review.append(f"第{sc['no']}题{'第' + str(k) + '问' if k else ''}："
+                              f"原卷参考答案区里没有该问答案，answer 置占位说明，需人工补")
+                a = "（原卷未提供该小问的参考答案）"
             a = sub_images(tidy(a), cfg, title, type_dir, {}, review) if "![" in (a or "") else a
             if "![" in (a or ""):
                 a = rewrite_images(a, src_md.parent, title, type_dir, review, SUBJECT)
@@ -753,7 +949,11 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
 
 DETAIL = re.compile(r"(?m)^[ \t]*【(?:(\d{1,2})题|小问(\d{1,2}))?详解】[ \t]*")
 ANY_MARK = re.compile(r"(?m)^[ \t]*【[^】]{0,8}】[ \t]*")
+# 菁优网教师版把 【分析】/【解答】/【点评】 写在行中间（「12．【分析】（1）…」）
+MARK_ANY = re.compile(r"【(?:分析|解答|点评|答案|详解|解析)】")
 PRE_ANS = re.compile(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*【答案】")
+# 菁优网答案：「…故选：C。」（每题解析固定以「故选」收尾）
+SELECTED = re.compile(r"故(?:选|选择)\s*[:：]?\s*([A-D])(?![A-Za-z])")
 
 
 def squeeze(text: str) -> str:
@@ -762,7 +962,7 @@ def squeeze(text: str) -> str:
     return "\n\n".join(p for p in paras if p).strip()
 
 
-def parse_choice_details(ans_text: str) -> dict[int, str]:
+def parse_choice_details(ans_text: str, max_no: int = N_CHOICE) -> dict[int, str]:
     """选择题的 【N题详解】 / 单题后面的 【详解】 → {题号: 解析正文}。
 
     丰台这种「详解卷」里，多题连排的用 `【1题详解】`，单题的写成
@@ -780,12 +980,30 @@ def parse_choice_details(ans_text: str) -> dict[int, str]:
         if num is None:
             prev = list(PRE_ANS.finditer(ans_text[:m.start()]))
             num = prev[-1].group(1) if prev else None
-        if num and seg.strip() and int(num) <= N_CHOICE:
+        if num and seg.strip() and int(num) <= max_no:
             out.setdefault(int(num), squeeze(seg))
+    if not out and "【分析】" in ans_text:
+        # 菁优网教师版（老卷常见）：每题一段「N．【分析】…【解答】…故选：X。【点评】…」
+        qs = [m for m in QMARK.finditer(ans_text)]
+        for i, m in enumerate(qs):
+            no = int(m.group(2))
+            if no > max_no:
+                continue
+            end = qs[i + 1].start() if i + 1 < len(qs) else len(ans_text)
+            seg = ans_text[m.end():end]
+            j = seg.find("【分析】")
+            if j < 0:
+                j = seg.find("【解答】")
+            if j < 0:
+                continue
+            body = MARK_ANY.sub("", seg[j:])
+            if body.strip():
+                out.setdefault(no, squeeze(body))
     return out
 
 
-def essay_answer(ans_text: str, no: int, review: list[str]) -> tuple[dict, dict]:
+def essay_answer(ans_text: str, no: int, review: list[str],
+                 want=None, all_nos=None) -> tuple[dict, dict]:
     """在参考答案区里切出第 no 大题 → (各小问答案, 各小问详解)。
 
     答案按 (1)(2)(3) 切；丰台这种详解卷把首问写在「16. 【答案】（1）…」同一行，
@@ -793,11 +1011,33 @@ def essay_answer(ans_text: str, no: int, review: list[str]) -> tuple[dict, dict]
     """
     marks = [m for m in QMARK.finditer(ans_text) if int(m.group(2)) == no]
     if not marks:
-        review.append(f"第{no}题：参考答案区里没找到该大题")
-        return {}, {}
-    start = marks[0].end()
-    later = [m.start() for m in QMARK.finditer(ans_text) if int(m.group(2)) > no]
-    raw = ans_text[start:(later[0] if later else len(ans_text))]
+        # 老卷常见：最后一个大题的答案开头被 docx 自动编号吃成「1.」/「一、」，
+        # 找不到题号时把它当「该大题答案 = 答案区末尾剩余部分」（只有当它是最后一题时才这么干）
+        others = [m.start() for m in QMARK.finditer(ans_text)]
+        tail = None
+        if all_nos and no == max(all_nos) and others:
+            m3 = re.search(r"(?m)^[ \t]*\d{1,2}[ \t]*[.．][ \t]*$", ans_text[others[-1]:])
+            if m3:
+                tail = ans_text[others[-1] + m3.start():]
+        if tail:
+            raw = tail
+            review.append(f"第{no}题：答案区里没有「{no}．」题号（疑似 docx 自动编号丢失），"
+                          f"已从「1.」那一行起取答案区末尾作该题答案，需人工核对")
+        else:
+            review.append(f"第{no}题：参考答案区里没找到该大题")
+            return {}, {}
+    else:
+        start = marks[0].end()
+        later = [m.start() for m in QMARK.finditer(ans_text) if int(m.group(2)) > no]
+        raw = ans_text[start:(later[0] if later else len(ans_text))]
+    # 大题答案区被「下一题」截断：答案区里后面的大题题号被 docx 自动编号吃成「1.」时，
+    # 本题的 raw 会一路吞到卷末（把下一大题的答案也吃进来）。看到**只有编号的一行**就截断。
+    if all_nos and no < max(all_nos):
+        m2 = re.search(r"(?m)^[ \t]*\d{1,2}[ \t]*[.．][ \t]*$", raw)
+        if m2 and m2.start() > 0:
+            raw = raw[:m2.start()]
+            review.append(f"第{no}题：答案区在「{m2.group(0).strip()}」处截断"
+                          f"（后续大题题号被 docx 自动编号吃掉），需人工核对")
     dmarks = list(DETAIL.finditer(raw))
     details: dict = {}
     for i, m in enumerate(dmarks):
@@ -808,23 +1048,92 @@ def essay_answer(ans_text: str, no: int, review: list[str]) -> tuple[dict, dict]
             continue
         details[key] = (details.get(key, "") + "\n\n" + squeeze(seg)).strip()
     block = raw[:dmarks[0].start()] if dmarks else raw
-    block = block.replace("【答案】", "\n\n")       # 丰台卷「16. 【答案】（1）…」写成同一行
-    block = ANY_MARK.sub("", block)
-    block = re.sub(r"^[\s*]+", "", block)            # 「**20.（7分）**」收尾的星号
-    subs = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ.finditer(block)]
-    if not subs:
-        return {None: block.strip()}, details
+    # 菁优网教师版（老卷/真题常见）每题三段：【分析】…【解答】…【点评】…。
+    # 答案只取【解答】（没有【解答】时退回【分析】），【分析】/【点评】归 analysis，
+    # 否则「本题难度较低…」这类点评会混进答案尾巴里。
+    ans_block, ana_block = _split_marks(block)
+    ans_block = re.sub(r"^[\s*]+", "", ans_block)    # 「**20.（7分）**」收尾的星号
+    # docx 自动编号残留：答案开头单独一行的「1.」（原本是「20.」，导出时被重排成 1.）
+    ans_block = re.sub(r"^(?:\d{1,2}\s*[.．]\s*\n+)+", "", ans_block).strip()
+    ans_block = re.sub(r"^解[：:]\s*", "", ans_block)   # 菁优网「【解答】解：…」
+    subs = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ_ANS.finditer(ans_block)]
+    head = ans_block[:subs[0][0]].strip() if subs else ""
     out = {}
-    for i, (s, e, k) in enumerate(subs):
-        end = subs[i + 1][0] if i + 1 < len(subs) else len(block)
-        seg = block[e:end]
-        seg = re.sub(r"^[ \t]*[（(]\s*\d+\s*分\s*[）)]", "", seg.strip()).strip()
-        out[k] = seg
+    if subs:
+        for i, (s, e, k) in enumerate(subs):
+            end = subs[i + 1][0] if i + 1 < len(subs) else len(ans_block)
+            seg = ans_block[e:end]
+            seg = re.sub(r"^[ \t]*[（(]\s*\d+\s*分\s*[）)]", "", seg.strip()).strip()
+            seg = re.sub(r"^解[：:]\s*", "", seg)
+            out[k] = seg
+        out = _fill_missing_answers(out, head, want, no, review)
+    else:
+        out = {None: ans_block.strip()}
+    # 分析：按同样的（N）切；切不出同号小问就不塞（避免把整段点评重复贴到每一问）
+    if ana_block.strip():
+        asubs = [(m.start(), m.end(), int(m.group(1))) for m in SUBQ_ANS.finditer(ana_block)]
+        if asubs and want:
+            for i, (s, e, k) in enumerate(asubs):
+                if k in want:
+                    end = asubs[i + 1][0] if i + 1 < len(asubs) else len(ana_block)
+                    details.setdefault(k, squeeze(ana_block[e:end]))
     return out, details
 
 
-def parse_choice_answers(ans_text: str) -> dict[int, str]:
-    """选择题答案：答案表 / 【答案】锚点 / 「1．A」罗列 三种写法都吃。"""
+MARK_ITER = re.compile(r"【(分析|解答|点评|答案|详解|解析)】")
+
+
+def _split_marks(block: str) -> tuple[str, str]:
+    """把大题答案区按【分析】/【解答】/【点评】/【答案】拆成（答案正文, 解析正文）。"""
+    pos = [(m.start(), m.group(0), m.group(1)) for m in MARK_ITER.finditer(block)]
+    if not pos:
+        return block, ""
+    parts: dict[str, list[str]] = {}
+    head = block[:pos[0][0]]
+    for i, (p, tag, name) in enumerate(pos):
+        end = pos[i + 1][0] if i + 1 < len(pos) else len(block)
+        parts.setdefault(name, []).append(block[p + len(tag):end])
+    ans = "\n\n".join(parts.get("解答") or []) or "\n\n".join(parts.get("答案") or [])
+    if not ans.strip():
+        ans = "\n\n".join(parts.get("分析") or [])
+    ana = "\n\n".join((parts.get("分析") or []) + (parts.get("点评") or []))
+    if head.strip() and not head.strip().startswith(("【", "!")):
+        ans = head.strip() + "\n\n" + ans
+    return ans, ana
+
+
+def _fill_missing_answers(out: dict, head: str, want, no: int,
+                          review: list[str]) -> dict:
+    """答案区少切了小问时尽量找补：小问首答被写在题号行（head）、或最后一问的答案是一张图。"""
+    if not want:
+        return out
+    missing = [k for k in want if k is not None and not (out.get(k) or "").strip()]
+    if not missing:
+        return out
+    if head and head.strip():
+        k = missing.pop(0)
+        out[k] = head.strip()
+        review.append(f"第{no}题第{k}问：答案区把该问答案写在题号同一行（无「（{k}）」编号），已回收，需人工核对")
+    # 答案是一张图（绘图题）：最后一问的答案里多出来的图挪给缺答案的那问
+    keys = [k for k in want if k is not None]
+    for k in keys:
+        seg = out.get(k) or ""
+        imgs = re.findall(r"!\[[^\]]*\]\([^)]+\)", seg)
+        if not imgs or not missing:
+            continue
+        later = [x for x in missing if keys.index(x) > keys.index(k)]
+        if not later:
+            continue
+        tgt = later[0]
+        out[tgt] = (out.get(tgt) or "").strip() or imgs[-1]
+        out[k] = seg.replace(imgs[-1], "").strip()
+        missing.remove(tgt)
+        review.append(f"第{no}题第{tgt}问：参考答案是一张图（绘图题），已从上一问尾部挪过来，需人工核对")
+    return out
+
+
+def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str]:
+    """选择题答案：答案表 / 【答案】锚点 / 「1．A」罗列 / 菁优网「故选：C」四种写法都吃。"""
     got: dict[int, str] = {}
     # 1) 答案表：| 题号 | 1 | 2 | … | / | 答案 | D | B | … |
     for m in re.finditer(r"(?m)^\|\s*题号\s*\|(.+)$", ans_text):
@@ -837,7 +1146,28 @@ def parse_choice_answers(ans_text: str) -> dict[int, str]:
         for n, v in zip(nums, vals):
             if n.isdigit() and re.fullmatch(r"[A-D]", v or ""):
                 got.setdefault(int(n), v)
-    if len(got) >= N_CHOICE:
+    if len(got) >= expect:
+        return got
+    # 1b) 无表头的答案表：某行是 1 2 3 … N，紧跟的一行是 A B C …（朝阳二模 / 2024 真题 / 丰台二模）
+    lines = ans_text.split("\n")
+
+    def cells_of(ln: str) -> list[str]:
+        if not ln.strip().startswith("|"):
+            return []
+        return [c.strip() for c in ln.strip().strip("|").split("|")]
+
+    for i, ln in enumerate(lines):
+        nums = [c for c in cells_of(ln) if c]
+        if len(nums) < 2 or not all(c.isdigit() for c in nums):
+            continue
+        for j in range(i + 1, min(i + 4, len(lines))):
+            vals = [c for c in cells_of(lines[j]) if c]
+            if len(vals) != len(nums) or not all(re.fullmatch(r"[A-D]", v) for v in vals):
+                continue
+            for n, v in zip(nums, vals):
+                got.setdefault(int(n), v)
+            break
+    if len(got) >= expect:
         return got
     # 2) 【答案】锚点：`【答案】1. B 2. C` / `3. 【答案】D`
     for m in re.finditer(r"【答案】([^\n【]*)", ans_text):
@@ -845,12 +1175,25 @@ def parse_choice_answers(ans_text: str) -> dict[int, str]:
             got.setdefault(int(k), v)
     for m in re.finditer(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*【答案】\s*([A-D])", ans_text):
         got.setdefault(int(m.group(1)), m.group(2))
-    if len(got) >= N_CHOICE:
+    if len(got) >= expect:
         return got
     # 3) 纯答案罗列（西城那种「1．C 2. C 3. B …」），只看「答案」开头那几行，避开解析正文
     head = ans_text[:2400]
     for k, v in re.findall(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*([A-D])(?![A-Za-z\u4e00-\u9fff])", head):
         got.setdefault(int(k), v)
+    if len(got) >= expect:
+        return got
+    # 4) 菁优网教师版：每题一段「N．【分析】…【解答】…故选：C。」→ 按题号段找「故选」
+    qs = [m for m in QMARK.finditer(ans_text)]
+    for i, m in enumerate(qs):
+        no = int(m.group(2))
+        if no > expect:
+            continue
+        end = qs[i + 1].start() if i + 1 < len(qs) else len(ans_text)
+        seg = ans_text[m.end():end]
+        picked = SELECTED.findall(seg)
+        if picked:
+            got.setdefault(no, picked[-1])
     return got
 
 
@@ -930,34 +1273,79 @@ def paper_title(md: Path) -> str:
     return re.sub(r"\s+", "", t).strip()
 
 
+def split_regions(body: str, review: list[str]) -> tuple[str, str]:
+    """切「选择题区 / 非选择题区」：分节标题 → 第二个「本部分共N题」声明 → 按声明题数数题号。"""
+    cut = HDR_ESSAY.search(body)
+    if cut:
+        return body[:cut.start()], body[cut.end():]
+    decl = [(m.start(), int(m.group(1))) for m in DECL_CNT.finditer(body)]
+    if len(decl) >= 2:
+        review.append("没找到「第二部分」标题，按第二个「本部分共N题」声明切分选择题/非选择题区")
+        i = decl[1][0]
+        return body[:i], body[i:]
+    marks = [m for m in QMARK.finditer(body)]
+    if decl and len(marks) > decl[0][1]:
+        n = decl[0][1]
+        review.append(f"没找到「第二部分」标题，按卷面声明的 {n} 道选择题切分（第 {marks[n].group(2)} 题起为非选择题）")
+        return body[:marks[n].start()], body[marks[n].start():]
+    # 最后一招：选择题每题都有 A–D 四个选项，大题没有 → 第一道「凑不齐 A–D」的题即非选择题起点
+    for i, m in enumerate(marks):
+        seg = body[m.end():(marks[i + 1].start() if i + 1 < len(marks) else len(body))]
+        if len(set(re.findall(r"(?:^|[\s\u3000])([A-D])\s*[.．、]", seg))) < 4:
+            if i > 0:
+                review.append(f"没找到「第二部分」标题、也没有题数声明，按「有没有 A–D 选项」切分："
+                              f"第 {m.group(2)} 题起为非选择题")
+                return body[:m.start()], body[m.start():]
+            break
+    review.append("⚠ 没找到选择题/非选择题的分界（既无「第二部分」标题也无题数声明），按标题切分失败")
+    return body, ""
+
+
+def grade_of(title: str, default: str = "高三") -> str:
+    m = re.search(r"高([一二三])", title)
+    if m:
+        return "高" + m.group(1)
+    if "高考真题" in title or "高考" in title:
+        return "高三"
+    return default
+
+
 def process(md: Path, type_dir: str, args) -> str:
     title = paper_title(md)
-    cfg = PAPERS.get(title)
-    if cfg is None:
-        raise RuntimeError(f"没有为「{title}」配置图片清单（PAPERS 里没有这一卷）")
     dst = OUT["root"] / type_dir / f"{title}.json"
     if dst.exists() and not args.force:
         return f"跳过（已存在）：{title}"
     review: list[str] = []
+    cfg = PAPERS.get(title)
+    if cfg is None:                                  # 通用兜底：docx 导出图 + 卷面分值
+        cfg = generic_cfg(md, review)
     txt = md.read_text(encoding="utf-8")
     txt = NAME_LINE.sub("", txt)
     txt = BOILER.sub("", txt)
     body, ans = split_paper(txt)
+    # 答案区里「16【答案】（1）…」这种题号后没有点号的写法（2024 真题等）→ 补一个点
+    ans = re.sub(r"(?m)^[ \t]*\**\s*(\d{1,2})\s*\**\s*(?=【)", r"\1．", ans)
+    # 大题题号夹在上一问答案末尾（通州卷「…减少碳排放。18.（8分）」）→ 换到行首，否则整题会漏切
+    ans = re.sub(r"(?<=[\s。．；;）)])[ \t]*(\d{1,2})[ \t]*[.．][ \t]*(?=[（(]\s*\d+\s*分)", r"\n\1．", ans)
 
-    cut = HDR_ESSAY.search(body)
-    choice_text = body[:cut.start()] if cut else body
-    essay_text = body[cut.end():] if cut else ""
+    choice_text, essay_text = split_regions(body, review)
+    if not essay_text:
+        raise RuntimeError("没切到非选择题区（找不到分界）")
 
-    # 图片资产
+    # 图片资产（PAPERS 里的卷走显式清单；通用卷 assets 为空，图源就是 docx 导出图）
     info = build_assets(title, cfg, md, getattr(args, "refig", False), review)
 
     choices = parse_choice_region(choice_text, cfg, md, title, type_dir, review)
     if not choices:
         raise RuntimeError("没切到选择题")
-    answers = parse_choice_answers(ans)
-    details = parse_choice_details(ans)
+    answers = parse_choice_answers(ans, expect=len(choices))
+    details = parse_choice_details(ans, max_no=max(q["no"] for q in choices))
     if details:
         review.append(f"选择题详解 {len(details)} 题收进 analysis（{sorted(details)[:3]}…）")
+    miss_ans = [q["no"] for q in choices if not (answers.get(q["no"]) or "").strip()]
+    if miss_ans:
+        review.append(f"选择题答案缺失：{miss_ans}（answer 置空占位，需人工补）")
+    per = choice_per_score(choice_text, choices, review)
     essays = parse_essay_region(essay_text, ans, cfg, md, title, type_dir, review)
     if not essays:
         raise RuntimeError("没切到非选择题")
@@ -965,12 +1353,12 @@ def process(md: Path, type_dir: str, args) -> str:
 
     sec_choice = {
         "type": "选择题", "questionType": "geography-choice", "title": "一、选择题",
-        "category": "选择", "score": CHOICE_SCORE * len(choices),
+        "category": "选择", "score": per * len(choices),
         "questions": [
             {"id": q["no"], "questionType": "single", "content": q["content"],
              "options": [{"id": o["id"], "label": o["label"]} for o in q["options"]],
              "answer": answers.get(q["no"], ""), "analysis": details.get(q["no"], ""),
-             "score": CHOICE_SCORE}
+             "score": per}
             for q in choices],
     }
     sections = [sec_choice]
@@ -987,19 +1375,23 @@ def process(md: Path, type_dir: str, args) -> str:
         })
 
     year = re.search(r"(20\d{2})", title)
+    grade = grade_of(title, args.grade)
     paper = {
-        "title": title, "subject": SUBJECT, "source": title, "grade": args.grade,
+        "title": title, "subject": SUBJECT, "source": title, "grade": grade,
         "year": int(year.group(1)) if year else None,
         "totalScore": sum(s["score"] for s in sections), "duration": 90,
-        "tags": [SUBJECT, args.grade, type_dir] + ([year.group(1)] if year else []),
+        "tags": [SUBJECT, grade, type_dir] + ([year.group(1)] if year else []),
     }
     payload = {"paper": paper, "sections": sections}
     normalize_choice_case_in_paper(payload, log=log)
 
-    # 图质复核提示
+    # 图质复核提示（PAPERS 里的显式清单）
     for name, (w, h) in sorted(info.items()):
         if w < 400:
             review.append(f"图质：{name} 只有 {w}×{h}（卷面原生就这么小，标注可能吃力），已肉眼复核并保留")
+    # 图质体检（通用兜底：宽 < 500 且题面要读图 → 提示后续补 PDF 截图）
+    if cfg.get("generic"):
+        figure_audit(payload, md, title, review)
     review += cfg.get("review_extra", [])
 
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -1029,6 +1421,79 @@ def img_path_of(ref: str) -> Path | None:
     return None
 
 
+def figure_audit(payload: dict, src_md: Path, title: str, review: list[str]) -> None:
+    """通用兜底卷的图质体检（不裁图，只**量尺寸 + 看题面是否要读图**，可疑的写 `复核：`）。
+
+    判定规则：
+      1. 被引用的图逐张量宽高；**宽 < 500px 且该题/该大题的题面提到「图/读图/如图/示意图」**
+         → 记一条（提示后续补 PDF 截图）；
+      2. 某题题面提到「图N/读图/如图」但**这道题一张图都没有** → 记一条（可能是 docx 丢图）；
+      3. 整卷一张图都没有、但题面出现「图1/读图/示意图」→ 记一条（docx 可能整体丢图）；
+      4. 同一张图被两个不同的大题共用 → 记一条（图注与实际题号可能不符）。
+    """
+    MIN_W = 500
+    cache: dict[str, tuple[int, int] | None] = {}
+
+    def size_of(ref: str) -> tuple[int, int] | None:
+        if ref not in cache:
+            p = img_path_of(ref)
+            cache[ref] = img_size(p) if p and p.exists() else None
+        return cache[ref]
+
+    items: list[tuple[str, str]] = []          # (标签, 文本)
+    for sec in payload["sections"]:
+        if sec.get("type") == "选择题":
+            for q in sec.get("questions") or []:
+                items.append((f"第{q.get('id')}题", q.get("content") or ""))
+        else:
+            items.append((sec.get("title") or "?", sec.get("content") or ""))
+            for q in sec.get("questions") or []:
+                items.append((f"{sec.get('title') or '?'}小问{q.get('id')}",
+                              (q.get("content") or "") + " " + (q.get("answer") or "")))
+
+    all_refs: list[str] = []
+    owners: dict[str, list[str]] = {}
+    for label, text in items:
+        refs = re.findall(r"!\[[^\]]*\]\((/exam-images/[^)]+)\)", text)
+        for r in refs:
+            if r not in all_refs:
+                all_refs.append(r)
+            owners.setdefault(r, []).append(label)
+        if refs and FIG_MENTION.search(re.sub(r"!\[[^\]]*\]\([^)]+\)", "", text)):
+            for r in dict.fromkeys(refs):
+                wh = size_of(r)
+                if wh and wh[0] < MIN_W:
+                    review.append(f"图质：{label} 的图 {Path(r).name} 只有 {wh[0]}×{wh[1]}px，"
+                                  f"题面要求读图，标注可能看不清 → 建议后续补 PDF 截图")
+        elif not refs and FIG_MENTION.search(text) and len(text) > 40:
+            review.append(f"图质：{label} 题面提到图，但该题没有图片（docx 可能丢图）→ 建议核对 PDF 原卷")
+
+    if not all_refs:
+        joined = " ".join(t for _l, t in items)
+        if FIG_MENTION.search(joined):
+            review.append("图质：整卷一张图都没有，但题面出现「图N/读图/示意图」字样"
+                          "（docx 可能整体丢图）→ 必须核对 PDF 原卷并补截图")
+        else:
+            review.append("图质：该卷确实没有图（题面也没有读图要求）")
+
+    # 错图形态：高 < 120px 或宽 < 200px（海淀一模 fig-3/fig-5 那种「横条/一小条文字」）
+    for r in all_refs:
+        wh = size_of(r)
+        if wh and (wh[1] < 120 or wh[0] < 200):
+            review.append(f"图质：{Path(r).name} 尺寸 {wh[0]}×{wh[1]}px 形态异常（高<120 或宽<200）"
+                          f"→ 复核：疑似错图，请对照 PDF 原卷确认是不是这一题的图")
+
+    for r, labs in owners.items():
+        big = {l.split("小问")[0] for l in labs if l.startswith("二、")}
+        if len(big) > 1:
+            review.append(f"图质：{Path(r).name} 被 {sorted(big)} 共用，图注与实际题号可能不符 → 建议核对")
+
+    if all_refs:
+        okw = [(Path(r).name, size_of(r)) for r in all_refs if size_of(r) and size_of(r)[0] >= MIN_W]
+        review.append(f"图质体检：引用图片 {len(all_refs)} 张，其中宽 ≥{MIN_W}px 的 {len(okw)} 张"
+                      f"（docx 导出原图，未裁 PDF）")
+
+
 def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
     errs, notes = [], []
     data = json.loads(jf.read_text(encoding="utf-8"))
@@ -1056,16 +1521,26 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
             errs.append(f"选择题 questionType={s.get('questionType')}")
         if s.get("category") != "选择":
             errs.append("选择题 category 应为 选择")
-        if len(qs) != N_CHOICE:
-            errs.append(f"选择题 {len(qs)} 道（应为 {N_CHOICE} 道）")
-        if [q.get("id") for q in qs] != list(range(1, len(qs) + 1)):
-            errs.append(f"选择题题号不连续：{[q.get('id') for q in qs]}")
-        if s.get("score") != CHOICE_SCORE * len(qs):
-            errs.append(f"选择题 score={s.get('score')} ≠ {CHOICE_SCORE}×{len(qs)}")
+        if not qs:
+            errs.append("选择题 section 里没有题目")
+        ids = [q.get("id") for q in qs]
+        if ids and ids != list(range(ids[0], ids[0] + len(ids))):
+            errs.append(f"选择题题号不连续：{ids}")
+        # 题数 / 每题分值以卷面为准（一模 15×3；高一高二 20/25/30×2、文综 11×4 都是合法形态），
+        # 这里只查**自洽**：每题分值一致且为正、section.score == 题数×每题分值。
+        per = qs[0].get("score") if qs else None
+        if not isinstance(per, int) or per <= 0:
+            errs.append(f"选择题每题 score={per!r}（应为正整数）")
+        elif any(q.get("score") != per for q in qs):
+            errs.append(f"选择题每题分值不一致：{[q.get('score') for q in qs]}")
+        elif s.get("score") != per * len(qs):
+            errs.append(f"选择题 score={s.get('score')} ≠ {per}×{len(qs)}")
+        if len(qs) != N_CHOICE or per != CHOICE_SCORE:
+            notes.append(f"选择题 {len(qs)} 题 × {per} 分（非北京高三常规 {N_CHOICE}×{CHOICE_SCORE}，按卷面实际）")
         for q in qs:
             no = q.get("id")
-            if q.get("score") != CHOICE_SCORE:
-                errs.append(f"第{no}题 score={q.get('score')}（应为 {CHOICE_SCORE}）")
+            if q.get("score") != per:
+                errs.append(f"第{no}题 score={q.get('score')}（应为 {per}）")
             if q.get("questionType") != "single":
                 errs.append(f"第{no}题 questionType={q.get('questionType')}")
             opts = q.get("options") or []
@@ -1077,6 +1552,8 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
             a = str(q.get("answer") or "")
             if not re.fullmatch(r"[A-D]", a):
                 errs.append(f"第{no}题 answer={a!r}（应为单个大写字母）")
+            elif a not in [o.get("id") for o in opts]:
+                errs.append(f"第{no}题 answer={a!r} 不在选项 id 里")
             if not (q.get("content") or "").strip():
                 errs.append(f"第{no}题 content 为空")
             if "analysis" not in q:
@@ -1154,6 +1631,10 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
                 stat["imgs"].add(p)
     if ids != sorted(ids) or len(set(ids)) != len(ids):
         errs.append(f"非选择题题号不连续/重复：{ids}")
+    for p in sorted(stat["imgs"]):
+        wh = img_size(p)
+        if wh and (wh[1] < 120 or wh[0] < 200):
+            notes.append(f"图片 {p.name} 尺寸 {wh[0]}×{wh[1]}px 形态异常 → 复核：疑似错图（请对照 PDF 原卷）")
     return stat, errs, notes
 
 
