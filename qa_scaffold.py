@@ -18,7 +18,7 @@
     python3 qa_scaffold.py --subject 物理 --type 二模 --repair --apply    # 真正写盘
     python3 qa_scaffold.py --subject 化学 --type 二模 --check --image     # 只查图片版（确定性）
 
-学科：英语 / 语文 / 数学 / 物理 / 化学 / 政治。类型：`--type 二模`、`--type 二模,一模`、`--type all`。
+学科：英语 / 语文 / 数学 / 物理 / 化学 / 生物 / 政治 / 历史 / 地理。类型：`--type 二模`、`--type 二模,一模`、`--type all`。
 
 产物
 ----
@@ -61,13 +61,16 @@ from paths import (
     OUTPUT_JSON_CHINESE,
     OUTPUT_JSON_POLITICS,
     OUTPUT_JSON_MATH,
+    OUTPUT_JSON_BIO,
+    OUTPUT_JSON_HISTORY,
+    OUTPUT_JSON_GEOGRAPHY,
 )
 
 # ──────────────────────────────────────────────────────────────────
 # 常量
 # ──────────────────────────────────────────────────────────────────
 
-SUBJECTS = ("英语", "语文", "数学", "物理", "化学", "政治")
+SUBJECTS = ("英语", "语文", "数学", "物理", "化学", "生物", "政治", "历史", "地理")
 ALL_TYPES = ("一模", "二模", "上期末", "下期末", "真题")
 QA_DIR = DATA_ROOT / "qa"
 CACHE_DIR = QA_DIR / ".cache"
@@ -75,7 +78,7 @@ REVIEW_PREFIX = "qa修复："
 
 WEB_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 # 填空题占位符：完形 / 七选五 / 语法填空 / 数理填空
-BLANK_TAGS = ("InputLong", "Input2", "Input", "Blank2", "Blank", "ClozeBlank")
+BLANK_TAGS = ("AnswerBox", "InputLong", "Input2", "Input", "Blank2", "Blank", "ClozeBlank")
 BLANK_RE = re.compile(r"<(?:" + "|".join(BLANK_TAGS) + r")\b")
 MD_IMG_RE = re.compile(r"!\[[^\]]*\]\(\s*([^)\s\"']+)")
 TAG_IMG_RE = re.compile(r"<(?:QImg|img)\b[^>]*?\bsrc\s*=\s*[\"']([^\"']+)")
@@ -233,6 +236,12 @@ class Layout:
             d = OUTPUT_JSON_CHINESE / type_name
         elif s == "政治":
             d = OUTPUT_JSON_POLITICS / type_name
+        elif s == "生物":
+            d = OUTPUT_JSON_BIO / type_name
+        elif s == "历史":
+            d = OUTPUT_JSON_HISTORY / type_name
+        elif s == "地理":
+            d = OUTPUT_JSON_GEOGRAPHY / type_name
         else:
             d = OUTPUT_JSON_MATH / type_name / s
         return sorted(d.glob("*.json")) if d.exists() else []

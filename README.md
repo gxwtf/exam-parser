@@ -6,7 +6,7 @@
 
 | 链路类型 | 做法 | 典型学科 |
 | --- | --- | --- |
-| 文本链路 | docx → MD（w2m）→ 脚本确定性切题 + AI 只做排版转换 | 英语、语文、政治、化学（选择题） |
+| 文本链路 | docx → MD（w2m）→ 脚本确定性切题 + AI 只做排版转换 | 英语、语文、政治、历史、地理、化学（选择题） |
 | PDF 页图链路 | 每页渲染成图 → 多模态模型逐页读成 JSON | 数学、物理、化学（PDF 版） |
 | 图片版链路 | 按题裁图 + 多模态逐题写解析，保留原版式 | 化学（当前主线） |
 
@@ -19,9 +19,10 @@
 | 物理 | ③ PDF 页图→JSON（选择题） | `convert_physics_pdf.py` |
 | 化学 | ④ MD→JSON　⑤ 整卷　⑥ PDF 页图→JSON　⑦ 图片版 | `convert_chemistry_md.py`、`convert_chemistry_full.py`、`convert_chemistry_pdf.py`、`batch_image_papers.py` |
 | 语文 | ⑧ MD→JSON | `convert_chinese_md.py` |
-| 政治 | ⑨ MD→JSON | `convert_politics_md.py` |
+| 政治 | ⑨ docx→MD→整卷 JSON（生物同构，2026-11 重写） | `convert_politics_md.py` |
 | 生物 | ⑩ docx→MD→整卷 JSON（选择 + 非选择） | `convert_biology_md.py` |
-| 历史 / 地理 | 暂无 | — |
+| 历史 | ⑪ docx→MD→整卷 JSON（生物同构） | `convert_history_md.py` |
+| 地理 | ⑫ docx→MD→整卷 JSON（生物同构，图表走 PDF 裁图） | `convert_geography_md.py` |
 
 ## 通用约定
 
@@ -38,9 +39,12 @@
   补漏/收尾脚本（`fix_math_missing_options` / `fill_physics_*` / `postprocess_physics` / `repair_physics_wmf` /
   `repair_missing` 等）读取旧文件（小写 id）与新文件（大写 id）都要能跑：匹配时过 `option_key()` 统一小写，
   写盘前再 `normalize_choice_case_in_paper()`，并用 `count_nonempty_labels()` 断言 label 不丢。
-- **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `scripts/import-chinese-json.ts`。
+- **下游入库**：`~/gxexercise` 的 `scripts/import-math-json.ts` / `scripts/import-chinese-json.ts`；
+  **整卷四科（生物/历史/地理/政治）统一用 `scripts/import-subject-json.ts --subject <学科>`**。
+- **三科契约**（历史/地理/政治：JSON 字段、`<AnswerBox>` 答题框、图片取舍、`--check` 断言）见
+  [DESIGN-文史地一模.md](DESIGN-文史地一模.md)。
 
-## 质量检查与兜底（生物以外 6 科通用）
+## 质量检查与兜底（跨学科通用，`qa_scaffold.py`）
 
 每科解析完都要过一遍 [`qa_scaffold.py`](qa_scaffold.py)：**确定性检查 → AI 抽查 → 兜底修复**，
 入口与生物链路的 `--check / --cross-check` 同构，但适配器把 `groups` / `sections` / 图片版

@@ -8,7 +8,7 @@
 > - 每学科的具体命令见对应章节；README 只保留英语主流程与通用参数
 > - **质量脚手架（6 科通用的 `--check / --cross-check / --ai-audit / --repair`）见
 >   [第 10 节](#10-质量脚手架跨学科qascaffoldpy)**
-> - 最近一次校准：2026-10-30（本机 gpu-server）
+> - 最近一次校准：2026-11-05（本机 gpu-server；新增历史 / 地理链路，政治重写）
 
 ## 0. 共用底座（先读这里）
 
@@ -53,7 +53,9 @@ from paths import DATA_ROOT, GAOZHONG, OUTPUT_JSON_MATH, OUTPUT_DOCX_TO_MD
 | `output_json/` | 英语 JSON | `main.py` / `batch_convert_md_to_json.py` |
 | `output_json_math/<类型>/<学科>/` | 数学 / 物理 / 化学（选择题 JSON，同一套导入结构） | `convert_math_pdf.py` 等 |
 | `output_json_chinese/` | 语文（按类型平铺） | `convert_chinese_md.py` |
-| `output_json_politics/` | 政治（按类型平铺） | `convert_politics_md.py` |
+| `output_json_politics/` | 政治整卷（选择 + 一题一 section，与生物同构；按类型平铺） | `convert_politics_md.py` |
+| `output_json_history/` | 历史整卷（同上） | `convert_history_md.py` |
+| `output_json_geography/` | 地理整卷（同上） | `convert_geography_md.py` |
 | `output_json_chemistry_full/` | 化学整卷（选择+非选择） | `convert_chemistry_full.py` |
 | `output_json_bio/` | 生物整卷（选择题 + 一题一 section 的非选择题） | `convert_biology_md.py` |
 | `output_image_questions/<类型>/<学科>/<卷>/` | 图片版：`paper.json` + `qN.png` + `qN.json` | `batch_image_papers.py` 等 |
@@ -72,6 +74,17 @@ npx tsx scripts/import-math-json.ts   --file <output_json_math/.../*.json> --dry
 npx tsx scripts/import-chinese-json.ts --file <output_json_chinese/.../*.json> --dry-run
 ```
 
+**整卷链路（生物 / 历史 / 地理 / 政治）统一走 `import-subject-json.ts`**（`import-biology-json.ts` 的泛化版）：
+
+```bash
+cd ~/gxexercise
+npx tsx scripts/import-subject-json.ts --subject 历史 --type 一模 --dry-run     # 结构自检 + 缺图/分值/答案检查
+npx tsx scripts/import-subject-json.ts --subject 地理 --type 一模 --manifest ~/backups/imp.json
+npx tsx scripts/import-subject-json.ts --subject 政治 --file <json> --force     # 重导（作答快照→映射→重建，映射不上直接中止）
+npx tsx scripts/import-subject-json.ts --subject 政治 --delete "<套卷标题>"
+npx tsx scripts/import-subject-json.ts --rollback ~/backups/imp.json           # 按清单整批回退
+```
+
 ## 1. 总览：学科 × 链路
 
 | 学科 | 链路 | 入口脚本 | 输入 | 输出 | 状态（本机存量） |
@@ -84,9 +97,10 @@ npx tsx scripts/import-chinese-json.ts --file <output_json_chinese/.../*.json> -
 | 化学 | ⑥ PDF 页图→JSON（选择题，与物理同构） | `convert_chemistry_pdf.py` | `gaozhong/<类型>/化学/*.pdf` | `output_json_math/<类型>/化学/` | 可用的备选链路 |
 | 化学 | ⑦ **图片版**（按题裁图 + 多模态解析） | `batch_image_papers.py` → `add_image_choice_analysis.py` | PDF + docx→MD | `output_image_questions/<类型>/化学/` | **当前主线**（二模 108 卷 / 1555 题；**只做选择题**，非选择题未做） |
 | 语文 | ⑧ docx→MD→JSON | `convert_chinese_md.py` | `output_docx_to_md/<类型>/语文/<卷>/` | `output_json_chinese/` | 已跑通（二模 96 卷） |
-| 政治 | ⑨ docx→MD→JSON | `convert_politics_md.py` | `output_docx_to_md/<类型>/政治/<卷>/` | `output_json_politics/` | 试跑（二模 1 卷） |
+| 政治 | ⑨ docx→MD→整卷 JSON（生物同构，**2026-11 重写**） | `convert_politics_md.py` | `output_docx_to_md/<类型>/政治/<卷>/` | `output_json_politics/` | 已跑通（一模 3 卷 + 二模 1 卷重导） |
 | 生物 | ⑩ docx→MD→整卷 JSON（选择 + 一题一 section 的非选择） | `convert_biology_md.py` | `output_docx_to_md/<类型>/生物/<卷>（教师版）/` | `output_json_bio/<类型>/` | 已跑通（123 卷：二模 28 / 一模 42 / 上期末 38 / 真题 15） |
-| 历史 / 地理 | — | — | — | — | **仍无解析链路**（素材也没进 `gaozhong/`） |
+| 历史 | ⑪ docx→MD→整卷 JSON（生物同构） | `convert_history_md.py` | `output_docx_to_md/<类型>/历史/<卷>/` | `output_json_history/` | 已跑通（一模 3 卷） |
+| 地理 | ⑫ docx→MD→整卷 JSON（生物同构，图表走 PDF 裁图） | `convert_geography_md.py` | `output_docx_to_md/<类型>/地理/<卷>/` | `output_json_geography/` | 已跑通（一模 3 卷） |
 
 > 生物链路自带一套学科专用脚手架：`convert_biology_md.py --check / --cross-check / --reclassify`
 > （分值长句优先、表格可解析、答案图存在、选项答案与答案表/解析原文比对）。生物**不在**
@@ -228,25 +242,62 @@ python3 sanitize_chinese.py              # MDX/KaTeX 安全化
 - 名著阅读：单问卷为一题；多小问按 `(1)(2)` 拆题，材料进题组 `content`。
 - `docx_dots.py`：从 docx 读 ①②③ 填空标记，补 MD 里丢掉的空位。
 
-## 7. 政治（链路 ⑨）
+## 7. 政治（链路 ⑨，2026-11 重写为生物同构）
 
 ```bash
-python3 batch_convert_docx_to_md.py -T 二模 -s 政治 -w 4
-python3 convert_politics_md.py -p ../output_docx_to_md/二模/政治/<卷>/<卷>.md -T 二模
+python3 batch_convert_docx_to_md.py -p "gaozhong/一模/政治/<卷>.docx" -o output_docx_to_md/一模/政治
+python3 convert_politics_md.py -p ../output_docx_to_md/一模/政治/<卷> -T 一模 --force
+python3 convert_politics_md.py -T 一模 --check          # 纯 Python 断言，退出码 0 才算过
 ```
 
-按模块打标签：中特 / 经济社会 / 政治法治 / 哲学文化 / 国政国经 / 法律生活 / 逻辑思维。
+- **结构 = 一题一 section**：1 个选择题 section（`politics-choice` / category `选择`）+ **一个大题一个 section**
+  （`politics-fill`，category 取 中特/经济社会/政治法治/哲学文化/国政国经/法律生活/逻辑思维）。
+- **材料只出现一次**（写在 section.content），各小问是「设问 + 占位符」，`questions[i]` 只存该小问
+  （设问原文 + 参考答案 + 分值）。**旧版把材料复制进每个小问的 bug 已消除**；`--check` 内置这条红线断言。
+- 答题框用 `<AnswerBox></AnswerBox>`（前端渲染成英语「阅读表达」那种大答题框：placeholder
+  「请在此作答...」、可拖拽放大、起步 112px 并随内容长高）。**不再用** `<InputLong>` / `<Input>`；
+  编号由前端按文档顺序给，`content` 里不要手写「1.」前缀。
+- 答案区三种形态都吃：`1．B 2．C…` 串（含无分隔符 `1.B2.A…`）、`16．（7分）` + (1)(2)(3) 块、
+  **「等级水平 4→1」GFM 表**（原样保留在 answer 里，AI 批改按等级表判分）。
+- 参考答案后面的「阅卷细则/评分标准」附录**不并入** answer（留痕在 `.review.txt`）。
 
-## 8. 尚未覆盖的学科
+## 8. 历史 / 地理（链路 ⑪ ⑫，2026-11 新增）
 
-**历史、地理**目前没有解析链路，素材也没有进 `gaozhong/`。若要新增，建议直接复用：
+```bash
+# 历史
+python3 convert_history_md.py -p ../output_docx_to_md/一模/历史/<卷> -T 一模 --force
+python3 convert_history_md.py -T 一模 --check
+# 地理（含图表：PDF 裁图）
+python3 convert_geography_md.py -p ../output_docx_to_md/一模/地理/<卷> -T 一模 --force
+python3 convert_geography_md.py -T 一模 --check
+```
 
-- 文字型（以文字为主、图少）→ 抄 `convert_politics_md.py`（docx→MD→JSON）
-- 图文混合 / 公式多 → 抄 `convert_physics_pdf.py`（PDF 页图多模态）或图片版链路
-- 整卷（选择 + 非选择、一题一 section）→ 抄 `convert_biology_md.py`（链路 ⑩，自带学科脚手架）
+结构与政治同构（选择题一组 + 一个大题一个 section，答题框 `<AnswerBox>`），差别在**图**：
 
-并同步补：`paths.py` 的输出常量、本文件的矩阵、README 的学科导航、nginx 图片白名单（如需要），
-以及 [`qa_scaffold.py`](qa_scaffold.py) 里 `Layout` 的路径映射（见第 10 节）。
+- 历史：选择题常有图（政权示意图、漫画、钱币），docx 导出图能用就用；`pdfimages -list` 能证伪
+  「PDF 截图更清晰」的说法（同一份内嵌位图，重渲染只会放大）。
+- 地理：**图表是主体**。复杂地图/统计图宽度 < 900px、md 里图丢/错位、或「表格其实是图」时，
+  走 PDF 截图（`pdftoppm -r 200` 或 `pdftocairo -svg` 取 bbox 后 300dpi 裁），产物
+  `fig-<题号>[-后缀].png` 存进该卷 md 目录的 `images/`，由 `rewrite_images()` 复制到
+  `/exam-images/<类型>/地理/<卷名>/images/`（**扁平日录，nginx 只认这个**）。
+- 图片源按卷实测决定，**不要一刀切**：实测西城 PDF 内嵌图远强于 docx（全用 PDF 裁图）；
+  丰台反之（PDF 内嵌图只有 docx 的 1/2~1/5，用 docx 导出图）；海淀 11 张 PDF + 1 张只有 docx 有。
+- 共享材料（「读图，回答第 3、4 题」）**复制进该组每道选择题**，保证单题自洽。
+- 表格：GFM 表格（单元格内 `<br>` 保留，前端渲染时统一自闭合）；「图标列 + 文字列」的排版表
+  改写成列表或整块截图。
+- 历史标签：观点论证 / 史料分析 / 修改补写；地理标签：自然地理 / 人文地理 / 区域发展 / 图表判读。
+- 分类用**确定性关键词规则**（阐述/评析/点评→观点论证，依据材料归纳/概括/说明→史料分析），
+  规则不命中才调一次模型；`--no-ai` 与默认输出逐字节一致。
+
+> 三科契约（JSON 字段、图片规则、CLI、`--check` 口径）见 [`DESIGN-文史地一模.md`](DESIGN-文史地一模.md)。
+
+## 8.1 仍未覆盖的
+
+- `上期中 / 下期中` 卷：`check_missing.py`、`update_bank.py` 不进默认口径，需要时用
+  `--papers` 直接指定。
+- 历史/地理的**非一模**存量（二模、上期末、真题…）尚未批量跑；链路已通，按类型跑
+  `convert_history_md.py -T <类型>` / `convert_geography_md.py -T <类型>` 即可，注意每卷
+  `PAPERS[...]["assets"]` 的图片清单与人工分值补丁要补（地理脚本按卷写死，命中不到会落 review）。
 
 ## 9. 新增一条链路的检查清单
 
@@ -260,7 +311,7 @@ python3 convert_politics_md.py -p ../output_docx_to_md/二模/政治/<卷>/<卷>
 
 ## 10. 质量脚手架（跨学科，`qa_scaffold.py`）
 
-生物以外的 6 科（英语 / 语文 / 数学 / 物理 / 化学 / 政治）共用一套「**AI 检查 + 兜底修复**」脚手架，
+生物以外的 8 科（英语 / 语文 / 数学 / 物理 / 化学 / 政治 / 历史 / 地理）共用一套「**AI 检查 + 兜底修复**」脚手架，
 思路对齐生物链路已有的 `--check / --cross-check`，但**不复制生物专用逻辑**：先把三种产物结构
 归一成同一个模型再统一检查/修复。
 
@@ -271,7 +322,8 @@ Paper（一卷） → units（题组：groups | sections | 图片版 paper.json�
 | 产物结构 | 学科 / 链路 | 适配方式 |
 | --- | --- | --- |
 | `paper` + `sections` | 英语（`output_json/<类型>/英语/`）、数学 / 物理 / 化学（`output_json_math/<类型>/<学科>/`） | `sections` 即题组 |
-| `paper` + `groups` | 语文（`output_json_chinese/<类型>/`）、政治（`output_json_politics/<类型>/`） | `groups` 即题组 |
+| `paper` + `groups` | 语文（`output_json_chinese/<类型>/`）、政治 / 历史 / 地理的老结构（`groups`） | `groups` 即题组 |
+| `paper` + `sections` | 生物（`output_json_bio/`）、历史（`output_json_history/`）、地理（`output_json_geography/`）、政治（新结构） | `sections` 即题组 |
 | `paper.json` + `qN.json` | 化学图片版（`output_image_questions/<类型>/化学/<卷>/`） | 合成一个「图片版」题组；`--image` |
 
 > ⚠ 现状与旧文档的说法不同：**英语产物实际是 `paper` + `sections`**（`question` 有
@@ -285,6 +337,9 @@ Paper（一卷） → units（题组：groups | sections | 图片版 paper.json�
 python3 qa_scaffold.py --subject 英语 --type 二模 --check
 python3 qa_scaffold.py --subject 数学 --type all --check --report /path/to/数学.md
 python3 qa_scaffold.py --subject 化学 --type 二模 --check --image      # 只查图片版
+python3 qa_scaffold.py --subject 历史 --type 一模 --check
+python3 qa_scaffold.py --subject 地理 --type 一模 --check
+python3 qa_scaffold.py --subject 政治 --type 一模 --check
 
 # AI 抽查（抽样控制成本）
 python3 qa_scaffold.py --subject 英语 --type 二模 --cross-check 10          # 每卷最多 10 题
