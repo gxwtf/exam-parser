@@ -723,10 +723,24 @@ class Checker:
         （否则 "What can we infer from the passage?" 这类通用问句会误报）。"""
         seen: dict[str, tuple[Unit, Any, str]] = {}
         utext = {u.idx: norm_stem(u.text) for u in self.paper.units}
+
+        def dup_key(q: dict) -> str:
+            """判重键 = 题干 + 选项文本。
+            只看题干会把「同材料、靠选项区分」的选择题对误报成重复
+            （实测：2025 房山上期末地理 13/15 题原卷题干一样，只有选项不同）。"""
+            stem = norm_stem(q.get("content"))
+            opts = q.get("options") or []
+            if not isinstance(opts, list):
+                return stem
+            labels = "|".join(
+                norm_stem(str(o.get("label", ""))) for o in opts if isinstance(o, dict)
+            )
+            return stem + "##" + labels if labels else stem
+
         for u in self.paper.units:
             for q in u.questions:
-                key = norm_stem(q.get("content"))
-                if len(key) < 12:
+                key = dup_key(q)
+                if len(norm_stem(q.get("content"))) < 12:
                     continue
                 if key in seen:
                     u0, q0, t0 = seen[key]

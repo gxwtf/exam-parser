@@ -98,8 +98,9 @@ BOILER = re.compile(r"[（(]\s*考生务必将答案[^）)]*[）)]")
 NAME_LINE = re.compile(r"(?m)^[ \t]*\**[ \t]*姓\s*名[：:].*$")
 # 卷首抬头：卷名 / 「地 理」/ 日期 / 考试须知 / 分节标题 —— 都不该进题目内容
 HEAD_LINE = re.compile(
-    r"^(?:20\d{2}\s*北京|20\d{2}[.．-]\d{1,2}$|地\s*理$|地\s+理$|本试卷共|考试时长|考生务必|"
-    r"试卷共|第[一1]部分|本部分共|第二部分|姓\s*名|注\s*[:：]|选择题$|非选择题$)")
+    r"^(?:20\d{2}\s*北京|20\d{2}[.．-]\d{1,2}$|地\s*理$|地\s+理$|本试卷共|考试时长|考试时间|考生务必|"
+    r"试卷共|第[一1]部分|本部分共|第二部分|姓\s*名|注\s*[:：]|选择题$|非选择题$|满分|"
+    r"一\s*[、.]\s*选择题|选择题\s*[，,、]\s*本部分|答在答题卡|共\s*\d+\s*页)")
 
 # 答题框：版式与生物/历史一致（材料 + 各小问内联在 section.content 里，小问是 input 小题，
 # AI 批改的 {stem} 不变），只把占位符换成英语「阅读表达」那一款的大答题框 <AnswerBox></AnswerBox>
@@ -449,6 +450,81 @@ def choice_per_score(choice_text: str, qs: list[dict], review: list[str]) -> int
     return CHOICE_SCORE
 
 
+# 个别题的四个选项在 docx 里被拍成**一张**拼图（A/B/C/D 四幅图并排）→ 已从原图裁成 4 张，在这里登记。
+# key = 卷名，value = {题号: [A图, B图, C图, D图]}（文件名在 images/ 下）
+MANUAL_OPTION_IMAGES = {
+    "2024北京西城高三一模地理": {4: [f"opt-q4-{x}.png" for x in "abcd"]},
+    "2025北京西城高三（上）期末地理": {4: [f"opt-q4-{x}.png" for x in "abcd"]},
+}
+
+
+# 逐卷留痕（补丁/人工处理过的卷在 review 里写一行，说明为什么这么做）
+MANUAL_NOTES = {
+    "2025北京海淀高三一模地理": [
+        "第16(2)答案解析开头原有一张 EMF 图，转 PNG 后是空白（1×1），原卷该处无可读图形，已去掉引用，需人工核对答案图。",
+    ],
+    "2025北京西城高三一模地理": [
+        "第20题：教师版 PDF 在 20 题表格后直接翻页，**卷面设问整句缺失**；暂以导入语「实施乡村振兴战略是…读图，回答下列问题。」作设问（未臆造），需人工补真实设问。",
+    ],
+    "2024北京西城高三一模地理": [
+        "第4题四个选项在 docx 里是一张拼图（image3.png 下半部分），已按原图裁成 opt-q4-a~d.png 四张图片选项，已肉眼核对。",
+    ],
+    "2025北京西城高三（上）期末地理": [
+        "第4题四个选项在 docx 里是一张拼图（image2.png），已按原图裁成 opt-q4-a~d.png 四张图片选项，已肉眼核对。",
+    ],
+    "2025北京延庆高三一模地理": [
+        "docx 自动编号把多个题号/选项字母吃掉或重排（4、10、13 写成「1.」；A、C 选项写成「1.」「2.」；"
+        "第一/第二部分标题写成「1. （选择题…/综合题…）」），已按原卷逐处纠正（见 review 里对应补丁未命中的提示）。",
+    ],
+}
+
+
+# 逐卷文本补丁：docx→md 把某段（多为「设问」或整块版式）弄丢/弄成图片时，按卷补回原文。
+# key = 卷名（去掉（教师版）），value = [(旧片段, 新片段), ...]（旧片段必须命中，否则记 review）
+MANUAL_TEXT_PATCHES = {
+    # 2025 西城一模 20 题：教师版 PDF 在 20 题表格后直接翻页，**卷面设问整句缺失**；
+    # 这里把导入语挪到设问位置（不臆造设问），review 里注明需人工补。
+    "2025北京西城高三一模地理": [
+        ("实施乡村振兴战略是建设美丽中国的关键举措。图12示意吉林省不同区域乡村振兴的探索和实践。读图，回答下列问题。\n\n| 镇赉县",
+         "| 镇赉县"),
+        ("图12\n\n参考答案",
+         "图12\n\n实施乡村振兴战略是建设美丽中国的关键举措。图12示意吉林省不同区域乡村振兴的探索和实践。读图，回答下列问题。\n\n参考答案"),
+    ],
+    # 2025 海淀一模 16(2)：答案解析开头挂着一张 EMF 图（转 PNG 后是空白 1×1，原卷也没有可读内容）→ 去掉
+    "2025北京海淀高三一模地理": [
+        ("![](images/image12.emf)", ""),
+    ],
+    # 2025 延庆一模：docx 自动编号把多个题号吃掉/重排（4、10、13 写成 1；A/C 选项写成 1、2；
+    # 第一部分/第二部分标题被写成「1. （选择题…/综合题…）」），按原卷逐处纠正。
+    "2025北京延庆高三一模地理": [
+        ("1. （选择题 共45分）", "第一部分 （选择题 共45分）"),
+        ("1. （综合题 共55分）", "第二部分 （综合题 共55分）"),
+        ("\n1. 该区域\n", "\n4. 该区域\n"),
+        ("\n1. 图5（a）中", "\n10. 图5（a）中"),
+        ("\n1. 辛克雷水电站的建设", "\n13. 辛克雷水电站的建设"),
+        ("1. 福州受低气压影响，气温升高明显 B.", "A. 福州受低气压影响，气温升高明显 B."),
+        ("2. 昆明北部高压脊影响，天空云量少 D.", "C. 昆明北部高压脊影响，天空云量少 D."),
+        ("1. 说明这些具体措施对推进区域水资源利用与保护的作用。", "（2）说明这些具体措施对推进区域水资源利用与保护的作用。"),
+        ("1. （9分）阅读图文资料，回答下列问题。", "17.（9分）阅读图文资料，回答下列问题。"),
+        ("1. 塔斯马尼亚岛西部降水多，东部降水少，分析原因。", "（1）塔斯马尼亚岛西部降水多，东部降水少，分析原因。"),
+        ("\n1. 概述塔斯马尼亚岛混合农业的主要优点。", "\n（2）概述塔斯马尼亚岛混合农业的主要优点。"),
+        ("\n2. 简述在该地建设大面积自然保护区的意义。", "\n（3）简述在该地建设大面积自然保护区的意义。"),
+        ("\n1. 概括冷湖镇发展过程及其成因。", "\n（1）概括冷湖镇发展过程及其成因。"),
+        ("\n2. 分析冷湖镇成为", "\n（2）分析冷湖镇成为"),
+        ("\n3. 为打造世界级天文观测活动基地", "\n（3）为打造世界级天文观测活动基地"),
+    ],
+}
+
+
+# 个别卷的选择题答案在教师版里只以**图片**给出（整张答案表是截图）→ 人工 read_image 转录后写在这里。
+# key = 卷名（去掉（教师版）），value = {题号: 字母}
+MANUAL_CHOICE_ANSWERS = {
+    # 2023 东城高三二模：答案表是 image13.png（688×153），逐题转录
+    "2023北京东城高三二模地理": {1: "C", 2: "C", 3: "A", 4: "C", 5: "D", 6: "C", 7: "B", 8: "A",
+                                 9: "B", 10: "B", 11: "D", 12: "A", 13: "D", 14: "D", 15: "A"},
+}
+
+
 # 题号 → 卷名 之外的通用兜底（AI 不可用时按关键词猜 category）
 CAT_RULES = [
     ("自然地理", ("河流", "水系", "流域", "气候", "气温", "降水", "地貌", "地质", "植被", "土壤", "生态脆弱",
@@ -654,6 +730,25 @@ def strip_score(s: str) -> tuple[str, int | None]:
     return (s[:m.start()] + s[m.end():]).strip(), int(m.group(1))
 
 
+def _opt_chain(seg: str) -> list[tuple[int, str]]:
+    """找「A→B→C→D」按序排列的字母+圆点链（对 A.①②B.①④ 这种挤在一起的写法有效）。"""
+    # 候选：字母前面不是英文字母，后面紧跟「圆点」或「中文/圈码/占位符」（覆盖 A.①② / A![](图) ①②）
+    cand = [(m.start(1), m.group(1)) for m in
+            re.finditer(r"(?<![A-Za-z])([A-D])(?=[\s\u3000]{0,2}(?:[．.、]|[\u4e00-\u9fff①②③④⑤⑥⑦⑧⑨\u27e6]))", seg)]
+    if len(cand) < 4:
+        cand = [(m.start(1), m.group(1)) for m in re.finditer(r"([A-D])\s*[．.、]", seg)]
+    for i, (pos, k) in enumerate(cand):
+        if k != "A":
+            continue
+        seq = [(pos, "A")]
+        for p2, k2 in cand[i + 1:]:
+            if k2 == chr(ord(seq[-1][1]) + 1):
+                seq.append((p2, k2))
+                if k2 == "D":
+                    return seq
+    return []
+
+
 def opt_split(seg: str) -> tuple[str, list[dict]]:
     """把「题干 + A．… B．… C．… D．…」切成 (题干, 四个选项)。"""
     marks = [(m.start(1), m.group(1)) for m in
@@ -671,8 +766,13 @@ def opt_split(seg: str) -> tuple[str, list[dict]]:
     for pos, k in marks:
         seen.setdefault(k, pos)
     if len(seen) < 4:
-        return seg.strip(), []
-    order = sorted(((pos, k) for k, pos in seen.items()))
+        chain = _opt_chain(seg)                 # 兜底写法④：A.①②B.①④C.②③D.③④（字母紧跟圆点即可）
+        if chain:
+            order = chain
+        else:
+            return seg.strip(), []
+    else:
+        order = sorted(((pos, k) for k, pos in seen.items()))
     stem = seg[:order[0][0]].strip()
     labels: dict[str, str] = {}
     for i, (pos, k) in enumerate(order):
@@ -701,23 +801,79 @@ def split_item(body: str) -> tuple[str, list[dict], str, str]:
             k = i
             break
     if k is None:
-        stem, opts = opt_split(IMG_REF.sub("", body))
+        stem, opts = _opt_split_keep_imgs(body)
         return stem, opts, "", body
     head = "\n\n".join(paras[:k + 1])
     trail = "\n\n".join(paras[k + 1:])
-    stem, opts = opt_split(IMG_REF.sub("", head))
+    stem, opts = _opt_split_keep_imgs(head)
     return stem, opts, trail, head
 
 
+def _opt_split_keep_imgs(seg: str) -> tuple[str, list[dict]]:
+    """选项文字里可能夹着图片（`A.![](images/image3.png)`）：先把图换成占位符再切，切完还原。"""
+    imgs: list[str] = []
+
+    def mask(m):
+        imgs.append(m.group(0))
+        return f"\u27e6IMG{len(imgs)}\u27e7"
+
+    def unmask(t: str) -> str:
+        return re.sub(r"\u27e6IMG(\d+)\u27e7", lambda m: imgs[int(m.group(1)) - 1], t)
+
+    stem, opts = opt_split(IMG_REF.sub(mask, seg))
+    return re.sub(r"\u27e6IMG\d+\u27e7", "", stem).strip(), \
+        [{"id": o["id"], "label": unmask(o["label"])} for o in opts]
+
+
+def fix_num_then_image(text: str) -> str:
+    """题号后直接跟图片 / 或用了全角冒号当分隔（「6：若图示…」）→ 统一补成点。"""
+    text = re.sub(r"(?m)^([ \t]*\**\s*)(\d{1,2})(?=!\[)", r"\1\2.", text)
+    # 「6：若图示…」这种题号 + 全角冒号；后面跟数字的（10：00 这种时间）不动
+    return re.sub(r"(?m)^([ \t]*\**\s*)(\d{1,2})[ \t]*\**[ \t]*[：:][ \t]*(?=[^\d\s])", r"\1\2. ", text)
+
+
 def fix_swallowed_option_a(text: str) -> str:
-    """docx 自动编号把选项「A．」吃成「1.」时（昌平卷），紧邻「B．」行之前的编号行还原成 A。"""
-    return re.sub(r"(?m)^[ \t]*\d{1,2}[ \t]*[.．][ \t]*(?=[^\n]*(?:\n[ \t]*)*\n[ \t]*B[ \t]*[.．、])",
-                  "A. ", text)
+    """docx 自动编号把选项「A．」吃成「1.」时还原成 A。
+
+    判据：该编号行**出现在题号序列之后且编号倒退/重复**（如第 3 题后面出现「1. 沙尘暴 B. 寒潮…」），
+    并且它后面几行里紧跟着「B．」。正常的题号行（1. 2. 3. 递增）一律不动。
+    """
+    lines = text.split("\n")
+    last_no = 0
+    out = []
+    for i, ln in enumerate(lines):
+        if HEAD_LINE.match(ln.strip().strip("*").strip()):
+            last_no = 0                       # 新的分节 → 题号重新从 1 开始
+            out.append(ln)
+            continue
+        m = re.match(r"^[ \t]*\**\s*(\d{1,2})[ \t]*[\\]?[.．、][ \t]*", ln)
+        if not m:
+            out.append(ln)
+            continue
+        n = int(m.group(1))
+        nxt = None
+        for ln2 in lines[i + 1:i + 12]:
+            m2 = re.match(r"^[ \t]*\**\s*(\d{1,2})[ \t]*[\\]?[.．、]", ln2)
+            if m2:
+                nxt = int(m2.group(1))
+                break
+        if nxt is not None and nxt - n >= 10:      # 下一题是 12 而这里是 1 → 原题号是 11，不是选项 A
+            out.append(ln)
+            continue
+        if n <= 4 and n <= last_no:               # 只有 A–D 位置（1–4）且编号倒退才可能是被吃掉的选项 A
+            ahead = ln[m.end():] + "\n" + "\n".join(lines[i + 1:i + 4])
+            if re.search(r"(?:^|[\s\u3000])B[ \t]*[.．、]", ahead):
+                out.append("A. " + ln[m.end():])
+                continue
+        last_no = max(last_no, n)
+        out.append(ln)
+    return "\n".join(out)
 
 
 def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir: str,
                         review: list[str]) -> list[dict]:
     """返回 [{no, content, options}] —— content 已含共享材料与该组的图（每题自洽）。"""
+    text = fix_num_then_image(text)
     text = fix_swallowed_option_a(text)
     marks = [m for m in QMARK.finditer(text)]
     items = []
@@ -735,10 +891,57 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
 
     for it in items:
         it["stem"], it["options"], it["trail"], it["head"] = split_item(it["body"])
+
+    # 开头那段「没有 A–D 选项的题号」＝卷首须知/目录（如「1.答题前，考生务必…」）→ 并进材料
+    lead_drop = 0
+    while lead_drop < len(items) and not items[lead_drop]["options"]:
+        lead_drop += 1
+    if 0 < lead_drop < len(items):
+        dropped = [it["no"] for it in items[:lead_drop]]
+        head_txt = "\n\n".join(f"{it['no']}. {it['body'].strip()}" for it in items[:lead_drop])
+        pre = (head_txt + "\n\n" + pre).strip()
+        review.append(f"选择题开头 {lead_drop} 段没有 A–D 选项的编号（{dropped}）判定为卷首须知/目录，已并入材料")
+        items = items[lead_drop:]
+
+    for it in items:
         if not it["options"]:                       # 选项与题干混排兜底
             review.append(f"选择题第{it['no']}题：没切出 A–D 四个选项，原文保留在 content 里")
             it["stem"] = it["body"]
-        it["own_refs"] = IMG_REF.findall(it["lead"] + "\n" + it["head"])
+        opt_imgs = {r for o in it["options"] for r in IMG_REF.findall(o["label"] or "")}
+        it["own_refs"] = [r for r in IMG_REF.findall(it["lead"] + "\n" + it["head"]) if r not in opt_imgs]
+
+    # 选项是拼图的题（人工裁好的 A–D 四张图）→ 直接补成 4 个图片选项
+    man_opts = MANUAL_OPTION_IMAGES.get(title) or {}
+    for it in items:
+        names = man_opts.get(it["no"])
+        if names and not it["options"]:
+            it["options"] = [{"id": k, "label": f"![](images/{n})"} for k, n in zip("ABCD", names)]
+            review.append(f"选择题第{it['no']}题：选项在 docx 里是拼图，已按原图裁成 A–D 四张图片选项")
+
+    # 仍然没有选项的编号条目（材料里的「1. …」清单、分节标题）→ 并进下一题的材料，不当题目
+    if items and any(not it["options"] for it in items):
+        kept, pending = [], ""
+        for it in items:
+            if it["options"]:
+                if pending:
+                    it["lead"] = (pending + "\n" + it["lead"]).strip()
+                    pending = ""
+                kept.append(it)
+            else:
+                pending += "\n\n" + f"{it['no']}. {it['body'].strip()}"
+                review.append(f"选择题第{it['no']}题位置没有 A–D 选项，判定为材料/标题，已并入下一题材料")
+        if pending:
+            review.append("选择题区末尾有不成题的编号文本，已丢弃")
+        items = kept
+
+    # 题号自愈：卷面/docx 把某个题号写错（如把「3.」写成「1.」）时，按「上一题号+1」顺延
+    last_no = 0
+    for it in items:
+        if it["no"] <= last_no:
+            old_no = it["no"]
+            it["no"] = last_no + 1
+            review.append(f"选择题题号 {old_no} 与前一题重复/倒退，已顺延纠正为 {it['no']}（原卷第 {it['no']} 题）")
+        last_no = it["no"]
 
     # 分组：材料块 = 上一题选项之后、本题题号之前的文字（第一组用卷首那段）
     groups, cur = [], None
@@ -790,6 +993,7 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
 Q_VERB = re.compile(r"说明|简述|简答|分析|列举|概括|评价|描述|绘制|画出|画出|阐述|阐明|比较|判断|"
                      r"推测|归纳|提出|解释|指出|说出|写出|设计|论证|谈谈|选择|补充|完成|查找|计算|绘出|作答")
 REQ_START = re.compile(r"^(?:绘图要求|答题要求|要求|注\s*[:：]|[①②③④⑤⑥⑦⑧⑨])")
+MAT_LEAD = re.compile(r"(?:^|[。；，])\s*(?:图|表)\s*\d+\s*[为是]|下图为|上图为|如图|图为|下表为")
 HARD_MAT = re.compile(r"^(?:任务[一二三四五六七八九十\d]|材料[一二三四五六七八九十\d]?\s*[:：]|【)")
 
 
@@ -807,6 +1011,8 @@ def split_prompt_paras(paras: list[str]) -> int:
         if HARD_MAT.match(p):
             break
         nxt = paras[i + 1].strip() if i + 1 < len(paras) else ""
+        if MAT_LEAD.search(p):            # 这一句是材料引子（图N为…），设问到上一段为止
+            break
         if Q_VERB.search(p) or REQ_START.match(p):
             k = i + 1
         elif nxt and not HARD_MAT.match(nxt) and (Q_VERB.search(nxt) or REQ_START.match(nxt)):
@@ -818,7 +1024,7 @@ def split_prompt_paras(paras: list[str]) -> int:
 
 
 def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title: str, type_dir: str,
-                       review: list[str]) -> list[dict]:
+                       review: list[str], target_total: int | None = None) -> list[dict]:
     for pat, rep in cfg.get("patches", []):
         if pat.startswith("regex:"):
             new = re.sub(pat[len("regex:"):], rep, text)
@@ -829,6 +1035,7 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
             if pat not in text:
                 review.append(f"文本补丁未命中（需人工核对）：{pat[:40]}…")
             text = text.replace(pat, rep)
+    text = fix_num_then_image(text)
     marks = [m for m in QMARK.finditer(text)]
     scripts = []
     for i, m in enumerate(marks):
@@ -839,9 +1046,21 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
             "lead": (m.group(1) or "").strip(),
             "body": text[m.end():(nxt.start() if nxt else len(text))],
         })
+    # 末尾材料里常有「1. 2. 3.」这种编号条目（资料卡/任务清单），不是大题 → 只保留 >= 首题号的递增段
+    if scripts:
+        first = scripts[0]["no"]
+        keep, dropped = [], []
+        for sc in scripts:
+            if sc["no"] >= first and (not keep or sc["no"] > keep[-1]["no"]):
+                keep.append(sc)
+            else:
+                dropped.append(sc["no"])
+        if dropped:
+            review.append(f"非选择题区里 {dropped} 这些编号不成递增序列（材料里的条目编号），已忽略")
+            scripts = keep
     # 大题总分：卷面题号行的（N分）→ 人工配置 → 本部分声明总分按常规权重分配
     essay_decl = declared_essay_total(text)
-    totals = essay_totals(scripts, cfg, essay_decl, review)
+    totals = essay_totals(scripts, cfg, essay_decl or target_total, review)
     out = []
     for sc in scripts:
         no = sc["no"]
@@ -905,8 +1124,14 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
             total = ssum
             review.append(f"第{no}题：卷面没写大题分值，取小问分值合计 {total}")
         if ssum != total:
-            questions[-1]["score"] += total - ssum
-            review.append(f"第{no}题：小问分值合计 {ssum} ≠ 大题 {total}，差额 {total - ssum} 并入最后一问")
+            delta = total - ssum
+            if questions[-1]["score"] + delta > 0:
+                questions[-1]["score"] += delta
+                review.append(f"第{no}题：小问分值合计 {ssum} ≠ 大题 {total}，差额 {delta:+d} 并入最后一问")
+            else:
+                total = ssum
+                review.append(f"第{no}题：小问分值合计 {ssum} 与分配的大题分值 {total - delta} 差 {delta:+d}，"
+                              f"按卷面标注的分值合计 {ssum} 为准（需人工核对）")
         # section.content：材料 → 设问 → 答题框 → 下一问材料 → 设问 → 答题框 …
         # （单栏版式不变；只是占位符换成 <AnswerBox></AnswerBox>）
         blocks = []
@@ -922,6 +1147,38 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
         prompts = [(q["k"], IMG_REF.sub("", q["prompt"]).strip() or q["prompt"], q["score"])
                    for q in questions]
         out.append({"no": no, "score": total, "content": content, "prompts": prompts})
+
+    # 全卷兜底：非选择题总分应为「100 − 选择题分值」；卷面没标时差额并入最后一题的最后一问
+    if target_total and out:
+        delta = target_total - sum(sc["score"] for sc in out)
+        if delta:
+            last = out[-1]
+            k, prompt, sc_last = last["prompts"][-1]
+            if sc_last + delta > 0:
+                last["prompts"][-1] = (k, prompt, sc_last + delta)
+                last["score"] += delta
+                review.append(f"非选择题合计 {sum(sc['score'] for sc in out) - delta} ≠ 目标 {target_total}"
+                              f"（100−选择），差额 {delta:+d} 并入第{last['no']}题最后一问，需人工核对")
+            else:
+                # 最后一题塞不下（会让某问 <1 分）→ 从分值最大的小问里扣/补，仍然绝不留 0 分
+                before = sum(sc["score"] for sc in out)
+                for sec in sorted(out, key=lambda x: -x["score"]):
+                    for i in range(len(sec["prompts"]) - 1, -1, -1):
+                        k, prompt, sc_i = sec["prompts"][i]
+                        take = min(abs(delta), max(0, sc_i - 1)) if delta < 0 else abs(delta)
+                        if take <= 0:
+                            continue
+                        sec["prompts"][i] = (k, prompt, sc_i + (-take if delta < 0 else take))
+                        sec["score"] += (-take if delta < 0 else take)
+                        delta += take if delta < 0 else -take
+                        if delta == 0:
+                            break
+                    if delta == 0:
+                        break
+                if delta == 0:
+                    review.append(f"非选择题合计 {before} ≠ 目标 {target_total}（100−选择），已按比例从各题小问中配平，需人工核对")
+                else:
+                    review.append(f"非选择题合计 {before} 与目标 {target_total} 仍差 {delta:+d}，需人工核对")
     # 答案 + 详解（analysis）
     all_nos = [sc["no"] for sc in out]
     for sc in out:
@@ -1136,13 +1393,13 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
     """选择题答案：答案表 / 【答案】锚点 / 「1．A」罗列 / 菁优网「故选：C」四种写法都吃。"""
     got: dict[int, str] = {}
     # 1) 答案表：| 题号 | 1 | 2 | … | / | 答案 | D | B | … |
-    for m in re.finditer(r"(?m)^\|\s*题号\s*\|(.+)$", ans_text):
+    for m in re.finditer(r"(?m)^\|\s*(?:题号|题目|序号)\s*\|(.+)$", ans_text):
         nums = [x.strip() for x in m.group(1).strip().strip("|").split("|")]
         after = ans_text[m.end():]
         row = re.search(r"(?m)^\|\s*答案\s*\|(.+)$", after)
         if not row:
             continue
-        vals = [x.strip() for x in row.group(1).strip().strip("|").split("|")]
+        vals = [re.sub(r"[*\s]", "", x).upper() for x in row.group(1).strip().strip("|").split("|")]
         for n, v in zip(nums, vals):
             if n.isdigit() and re.fullmatch(r"[A-D]", v or ""):
                 got.setdefault(int(n), v)
@@ -1161,7 +1418,7 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
         if len(nums) < 2 or not all(c.isdigit() for c in nums):
             continue
         for j in range(i + 1, min(i + 4, len(lines))):
-            vals = [c for c in cells_of(lines[j]) if c]
+            vals = [re.sub(r"[*\s]", "", c).upper() for c in cells_of(lines[j]) if c]
             if len(vals) != len(nums) or not all(re.fullmatch(r"[A-D]", v) for v in vals):
                 continue
             for n, v in zip(nums, vals):
@@ -1169,9 +1426,54 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
             break
     if len(got) >= expect:
         return got
+    # 1b1) 裸区间写法（延庆：「1-15ACDAC CDCAA DDCCB」）
+    for m in re.finditer(r"(?m)^[ \t]*(\d{1,2})\s*[-–—~]\s*(\d{1,2})\s*([A-D](?:[A-D\s]*[A-D])?)[ \t]*$", ans_text):
+        a, b, letters = int(m.group(1)), int(m.group(2)), re.sub(r"\s", "", m.group(3)).upper()
+        if b - a + 1 == len(letters):
+            for k, v in zip(range(a, b + 1), letters):
+                got.setdefault(k, v)
+    if len(got) >= expect:
+        return got
+    # 1b2) 区间写法：「题号1-10答案CDABBABDCD」「题号11-15CABCD」
+    for m in re.finditer(r"题\s*号\s*(\d{1,2})\s*[-–—~至]\s*(\d{1,2})\s*答\s*案\s*[:：]?\s*([A-Da-d]{2,})", ans_text):
+        a, b, letters = int(m.group(1)), int(m.group(2)), m.group(3).upper()
+        for k, v in zip(range(a, b + 1), letters):
+            got.setdefault(k, v)
+    if len(got) >= expect:
+        return got
+    # 1c) 纯文本答案表：「题号 1 2 3 … 」+ 下一行「答案 C A C …」（可有若干段）
+    for i, ln in enumerate(lines):
+        hm = re.match(r"^[ \t]*\**\s*题\s*号\s*[:：]?[ \t]*(.+)$", ln)
+        if not hm:
+            continue
+        nums = re.findall(r"\d{1,2}", hm.group(1))
+        if not nums:
+            continue
+        for j in range(i + 1, min(i + 4, len(lines))):
+            am = re.match(r"^[ \t]*\**\s*答\s*案\s*[:：]?[ \t]*(.+)$", lines[j])
+            if not am:
+                continue
+            vals = [v for v in re.findall(r"(?<![A-Za-z])([A-D])(?![A-Za-z])", am.group(1))]
+            if len(vals) < len(nums):
+                vals = [v for v in re.split(r"[\s,，、]+", am.group(1).strip()) if re.fullmatch(r"[A-D]", v)]
+            for n, v in zip(nums, vals):
+                got.setdefault(int(n), v)
+            break
+    if len(got) >= expect:
+        return got
+    # 1d) 整行连写的答案串（「BADBC CBACD DBCCB」）→ 按顺序对应 1..N
+    for ln in lines[:60]:
+        t = re.sub(r"[^A-Da-d]", "", ln)
+        if len(t) >= expect and re.fullmatch(r"[A-D\sa-d]+", ln.strip()) and len(ln.strip()) < expect * 3 + 10:
+            for k, v in enumerate(t[:expect], start=1):
+                got.setdefault(k, v.upper())
+            break
+    if len(got) >= expect:
+        return got
     # 2) 【答案】锚点：`【答案】1. B 2. C` / `3. 【答案】D`
     for m in re.finditer(r"【答案】([^\n【]*)", ans_text):
-        for k, v in re.findall(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*([A-D])(?![A-Za-z\u4e00-\u9fff])", m.group(1)):
+        seg = re.sub(r"!\[[^\]]*\]\([^)]+\)", " ", m.group(1))
+        for k, v in re.findall(r"(\d{1,2})\s*[\\]?\s*[.．、]?\s*([A-D])(?![A-Za-z\u4e00-\u9fff])", seg):
             got.setdefault(int(k), v)
     for m in re.finditer(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*【答案】\s*([A-D])", ans_text):
         got.setdefault(int(m.group(1)), m.group(2))
@@ -1320,6 +1622,10 @@ def process(md: Path, type_dir: str, args) -> str:
     if cfg is None:                                  # 通用兜底：docx 导出图 + 卷面分值
         cfg = generic_cfg(md, review)
     txt = md.read_text(encoding="utf-8")
+    for old_s, new_s in MANUAL_TEXT_PATCHES.get(title, []):   # 逐卷补丁（丢设问/整块版式被拍成图）
+        if old_s not in txt:
+            review.append(f"文本补丁未命中（需人工核对）：{old_s[:40]}…")
+        txt = txt.replace(old_s, new_s)
     txt = NAME_LINE.sub("", txt)
     txt = BOILER.sub("", txt)
     body, ans = split_paper(txt)
@@ -1339,14 +1645,25 @@ def process(md: Path, type_dir: str, args) -> str:
     if not choices:
         raise RuntimeError("没切到选择题")
     answers = parse_choice_answers(ans, expect=len(choices))
+    if MANUAL_CHOICE_ANSWERS.get(title):          # 答案只以图片给出的卷：人工转录后覆盖
+        cfg = dict(cfg, choice_answers=MANUAL_CHOICE_ANSWERS[title])
+    if cfg.get("choice_answers"):                 # 答案只以图片给出的卷：人工转录后在此覆盖
+        answers.update({int(k): v for k, v in cfg["choice_answers"].items()})
+        review.append(f"选择题答案取自人工转录（卷面答案表是图片）：{len(cfg['choice_answers'])} 题")
     details = parse_choice_details(ans, max_no=max(q["no"] for q in choices))
     if details:
+        # 详解里常带图（多为 wmf/emf 位图）→ 与正文同一条链路落盘并改成 /exam-images/… 绝对路径
+        for k, v in list(details.items()):
+            if "![" in (v or ""):
+                v = sub_images(tidy(v), cfg, title, type_dir, {}, review)
+                details[k] = rewrite_images(v, md.parent, title, type_dir, review, SUBJECT)
         review.append(f"选择题详解 {len(details)} 题收进 analysis（{sorted(details)[:3]}…）")
     miss_ans = [q["no"] for q in choices if not (answers.get(q["no"]) or "").strip()]
     if miss_ans:
         review.append(f"选择题答案缺失：{miss_ans}（answer 置空占位，需人工补）")
     per = choice_per_score(choice_text, choices, review)
-    essays = parse_essay_region(essay_text, ans, cfg, md, title, type_dir, review)
+    essays = parse_essay_region(essay_text, ans, cfg, md, title, type_dir, review,
+                                target_total=(100 - per * len(choices)) or None)
     if not essays:
         raise RuntimeError("没切到非选择题")
     cats = classify(essays, args.ai, review, title=title, type_dir=type_dir)
@@ -1393,6 +1710,7 @@ def process(md: Path, type_dir: str, args) -> str:
     if cfg.get("generic"):
         figure_audit(payload, md, title, review)
     review += cfg.get("review_extra", [])
+    review += MANUAL_NOTES.get(title, [])
 
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
