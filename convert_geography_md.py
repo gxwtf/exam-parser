@@ -111,6 +111,87 @@ PH_ANY_BOX = re.compile(r"<AnswerBox\s*/?>(?:\s*</AnswerBox>)?")
 PH_OPEN = re.compile(r"<(?:Input|AnswerBox)")
 
 
+# ── 卷首说明 / 残渣清洗（这些说明会被复制进整组题，粘在每道题 content 开头）────────
+BOILER_BODY = [
+    r"考生须知",
+    r"本试卷(共|分)",
+    r"本部分共\s*\d+\s*(题|小题|道)",
+    r"下列各(小)?题均有四个选项",
+    r"[（(]\s*考试时间",
+    r"[（(]\s*满分",
+    r"答题前|答卷前",
+    r"试题所有答案必须|试题答案一律",
+    r"^(本次练习|在试卷和答题卡|考试结束|请严格按照|在答题卡上|本试卷总分|考试用时|"
+    r"试卷共|答题卡上|请在答题卡)",
+    r"^满分\s*\d+\s*分",
+    r"满分\s*(共)?\s*\d+\s*分",                            # 「本练习卷满分共100分」这类须知条目
+    r"^[（(]?\s*共\s*\d+\s*分[）)]?$",                     # 只剩「（共45分）」的标题残渣
+    r"^20\d{2}\s*年\s*\d{1,2}\s*月$",                    # 纯日期行（卷首）
+    r"^20\d{2}\s*北京.*(期末|一模|二模|高考|统练)",          # 卷名行
+    r"^选择题$",                                             # 分区标题
+]
+BOILER_ANY = [re.compile(x) for x in BOILER_BODY]
+# 反复剥掉这些前缀后再判断（加粗星号、空【】、序号、第N部分、选择题：…）
+PREFIX_STRIP = re.compile(
+    r"^(?:\*+|_+|【\s*】|\[[^\]]{0,8}\]|\d{1,2}\s*[.．、]|[一二三四五六七八九十]\s*[、.]|"
+    r"第\s*[一二1-9]\s*部分|选择题\s*[，,、：:]?|非选择题\s*[，,、：:]?|[（(]\s*[）)])\s*")
+HTML_LEAD = re.compile(r"^\s*<(div|table)\b.*?</\1>\s*", re.S | re.I)
+
+
+def _core(s: str) -> str:
+    c = re.sub(r"^[\s*|]+|[\s*|]+$", "", s).strip()
+    for _ in range(6):                       # 反复剥前缀：**→一、→选择题，→第N部分…
+        c2 = PREFIX_STRIP.sub("", c).strip().strip("*").strip()
+        if c2 == c:
+            break
+        c = c2
+    return c
+
+
+HEAD_ONLY = [re.compile(x) for x in (r"^[\-:|\s]+$", r"^[①②③④⑤⑥⑦⑧⑨]+$")]
+
+
+def is_boiler_line(s: str, head: bool = False) -> bool:
+    """head=True 时才把「表格分隔行 / 上一题选项残渣」当垃圾（避免正文表格被削掉）。"""
+    c = _core(s)
+    if not c:
+        return True
+    if head and any(r.search(c) for r in HEAD_ONLY):
+        return True
+    return any(r.search(c) for r in BOILER_ANY)
+
+
+def strip_boilerplate(text: str) -> tuple[str, bool]:
+    """删掉 content 里的卷首说明 / 分区标题 / 上一题选项残渣（只动独立成行的说明句）。"""
+    if not text:
+        return text, False
+    before = text
+    # 0) 开头的 HTML 表格（考生须知被拍成 HTML 表）整块去掉
+    while True:
+        m = HTML_LEAD.match(text)
+        if not m:
+            break
+        block = m.group(0)
+        if "考生须知" in block or "本试卷" in block or "考试" in block:
+            text = text[m.end():]
+        else:
+            break
+    lines = text.split("\n")
+    out: list[str] = []
+    in_head = True
+    for ln in lines:
+        s = ln.strip()
+        if in_head:
+            if is_boiler_line(s, head=True):
+                continue
+            in_head = False
+        if s and is_boiler_line(s):
+            continue
+        out.append(ln)
+    text2 = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+    return text2, text2 != before.strip()
+
+
 def placeholder_for(score: int | None = None) -> str:
     """答题框占位符（统一，不看分值）。"""
     return ANSWER_BOX
@@ -1702,6 +1783,23 @@ def process(md: Path, type_dir: str, args) -> str:
     payload = {"paper": paper, "sections": sections}
     normalize_choice_case_in_paper(payload, log=log)
 
+    # 出口清洗：卷首说明（考生须知/本试卷分第…/本部分共N题/…）不该出现在题干与材料里
+    n_cut = 0
+    for sec in sections:
+        if sec.get("type") == "选择题":
+            for q in sec.get("questions") or []:
+                new_c, ch = strip_boilerplate(q.get("content") or "")
+                if ch:
+                    q["content"] = new_c
+                    n_cut += 1
+        else:
+            new_c, ch = strip_boilerplate(sec.get("content") or "")
+            if ch:
+                sec["content"] = new_c
+                n_cut += 1
+    if n_cut:
+        review.append(f"已清洗卷首说明：{n_cut} 处（选择题题干/大题材料开头的考生须知、本部分共N题等）")
+
     # 图质复核提示（PAPERS 里的显式清单）
     for name, (w, h) in sorted(info.items()):
         if w < 400:
@@ -1874,6 +1972,11 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
                 errs.append(f"第{no}题 answer={a!r} 不在选项 id 里")
             if not (q.get("content") or "").strip():
                 errs.append(f"第{no}题 content 为空")
+            head = re.sub(r"^[\s*|]+", "", (q.get("content") or "")[:60])
+            if re.match(r"(考生须知|本试卷分第|本试卷共|本部分共\s*\d+\s*(题|小题)|"
+                        r"下列各小题均有四个选项|下列每小题均有四个选项|答题前|答卷前|"
+                        r"[（(]\s*考试时间)", head):
+                errs.append(f"第{no}题 content 以卷首说明开头：{head[:30]}…")
             if "analysis" not in q:
                 errs.append(f"第{no}题缺 analysis")
             for ref in re.findall(r"!\[\]\((/exam-images/[^)]+)\)", q.get("content") or ""):
@@ -1902,6 +2005,11 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
             errs.append(f"{title}：<AnswerBox 出现 {n_box} 次，questions {len(qs)} 个")
         if not content.strip():
             errs.append(f"{title}：section.content 为空（材料丢了）")
+        head = re.sub(r"^[\s*|]+", "", content[:60])
+        if re.match(r"(考生须知|本试卷分第|本试卷共|本部分共\s*\d+\s*(题|小题)|"
+                    r"下列各小题均有四个选项|下列每小题均有四个选项|答题前|答卷前|"
+                    r"[（(]\s*考试时间)", head):
+            errs.append(f"{title}：content 以卷首说明开头：{head[:30]}…")
         if s.get("questionType") != "geography-fill":
             errs.append(f"{title}：questionType={s.get('questionType')}")
         if s.get("category") not in CATS:

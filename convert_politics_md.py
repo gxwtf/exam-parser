@@ -951,6 +951,10 @@ def split_choice_by_options(choice_body: str, choice_n: int, review: list[str]) 
         table_mode = "|" in choice_body[a_pos:d_end + 1]
         if table_mode:                       # 选项就是一张表（首列 A–D）：整表留在题干
             end = _table_block_end(choice_body, a_pos)
+        if not table_mode:
+            # D 选项的文字通常就在同一行：截到行尾，免得「D.③④」的「③④」落到下一题题干开头
+            nl = choice_body.find("\n", d_end)
+            end = nl if nl > 0 else len(choice_body)
         seg = choice_body[prev_end:a_pos]
         seg = re.sub(r"^[ \t]*(?:#{1,6}[ \t]*)?((?:!\[[^\]]*\]\([^)]*\)[ \t]*)*)\**\s*\d{1,2}\s*\\?[．.、·]\s*\**",
                      r"\1", seg, count=1)
@@ -1119,6 +1123,55 @@ def _manual_choices(title: str) -> dict:
     return got
 
 
+CIRC_ONLY = re.compile(r"^[\s①②③④⑤⑥⑦⑧⑨⑩]+$")
+SECTION_LINE = re.compile(
+    r"^(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*"
+    r"(?:(?:第[一二1-2]部分|第[一二1-2]卷|[一二1-2][、.])[ \t]*[、.]?[ \t]*)?"
+    r"(?:\*\*)?[ \t]*(?:[（(][ \t]*)?"
+    r"(?:选择题|非选择题|单项选择题|多项选择题|综合题|选择题部分)"
+    r"[^。\n]{0,24}(?:[）)])?[ \t]*(?:\*\*)?$")
+BOILER_LINE = re.compile(
+    r"^(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*(?:[（(][ \t]*)?(?:[一二1-2][、.][ \t]*)?(?:\*\*)?[ \t]*"
+    r"(?:考生须知|考生注意|考生务必将|注意事项|"
+    r"本试卷(?:共|分|满分|分第)|本卷(?:共|分|满分)|本部分共|本大题共|"
+    r"下列各小题均有四个选项|在每小题列出的四个选项中|在每题列出的四个选项中|"
+    r"答题前|请将答案|考试结束后|温馨提示|试卷说明|本试卷分第|"
+    r"考试时间|满分\s*\d+\s*分)")
+DATE_LINE = re.compile(r"^\d{4}\s*[.．/年]\s*\d{1,2}\s*月?[日]?$")
+LEAD_MARK = re.compile(r"^(\d{1,2})[ \t]*[.．、][ \t]*(?=[\u4e00-\u9fff“《（(A-Za-z])")
+
+
+def clean_choice_lead(text: str) -> str:
+    """清掉选择题题干开头的排版残渣（入库扫描发现的系统性缺陷）：
+
+    - 上一题 D 选项的标签文字被复制过来（`③④`）；
+    - 分区标题（`选择题` / `第一部分 选择题` / `一、选择题`）；
+    - 卷首说明（`考生须知` / `本部分共15题…` / `下列各小题均有四个选项…`）；
+    - 题号残渣（`2.` 被拆到段首）。
+    只处理**开头独段**，题干正文里合法出现的 ①②③④ 一律不动。
+    """
+    paras = split_paras(text or "")
+    while paras:
+        p = paras[0].strip()
+        q = p.strip("*").strip()
+        if not q:
+            paras.pop(0)
+            continue
+        if CIRC_ONLY.match(q) or SECTION_LINE.match(p) or BOILER_LINE.match(p) or DATE_LINE.match(q):
+            paras.pop(0)
+            continue
+        m = LEAD_MARK.match(q)
+        if m:
+            rest = q[m.end():].strip()
+            if len(rest) >= 6:
+                paras[0] = rest
+                continue
+            paras.pop(0)
+            continue
+        break
+    return "\n\n".join(paras)
+
+
 def parse_choice_part(choice_body: str, review: list[str],
                       choice_n: int = N_CHOICE, choice_score: int = CHOICE_SCORE,
                       title: str = "") -> list[dict]:
@@ -1235,6 +1288,11 @@ def parse_choice_part(choice_body: str, review: list[str],
             parsed = parse_choice_segment(it["raw"], it["no"], review)
         # 老卷（2011–2019 文综）把「（4分）」写在题干开头，不该留在 content 里
         content = re.sub(r"^[ \t]*[（(]\s*\d+\s*分\s*[）)]\s*", "", parsed["content"].strip())
+        if it["no"] == 1 and items and len(items) > 1:
+            m0 = QMARK.search(content)
+            if m0 and m0.start() > 0:
+                content = content[m0.start():]
+        content = clean_choice_lead(content)
         if it["no"] in shared:
             content = "\n\n".join(shared[it["no"]] + [content])
         # 人工校订的选项（原卷选项文字被 Word 拆碎/丢失时用）：manual_choices/政治/<卷名>.json
@@ -2163,6 +2221,12 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
                 errs.append(f"选择题第{q.get('id')}题缺 analysis")
             if not (q.get("content") or "").strip():
                 errs.append(f"选择题第{q.get('id')}题 content 为空")
+            _cparas = split_paras(q.get("content") or "")
+            _first = (_cparas[0] if _cparas else "").strip()
+            if _first and (CIRC_ONLY.match(_first.strip("*").strip())
+                           or SECTION_LINE.match(_first)
+                           or BOILER_LINE.match(_first)):
+                errs.append(f"选择题第{q.get('id')}题 content 开头是排版残渣（{_first[:20]!r}）")
             for o in opts:
                 if not (o.get("label") or "").strip():
                     errs.append(f"选择题第{q.get('id')}题选项 {o.get('id')} label 为空")

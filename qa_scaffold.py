@@ -103,6 +103,7 @@ SUGGEST = {
     "E_ANSWER_NOT_IN_OPTIONS": "答案不在选项内：多为解析串入 answer 字段。核对原卷；确认后 `--repair --apply` 可替换为模型双跑一致且在选项内的字母。",
     "W_ANSWER_MULTI": "选择题出现多字母：若原卷为多选题可保留（questionType 应为 multiple）；否则按错答案处理。",
     "W_ANSWER_SEPARATOR": "答案带 / 、 等分隔符：判题端不认，需人工确认后规范为单个字母。",
+    "W_STEM_RESIDUE": "题干开头混进选项文本/分区标题/卷首说明（解析器切题粘连）→ 回解析侧清洗后重跑该卷。",
     "W_ANSWER_FORMAT": "大小写/全角/首尾空白不规范 → `--repair --apply` 可自动归一（不改语义）。",
     "E_DUP_OPTION_ID": "选项 id 重复 → 重新切选项，不能用 AI 兜。",
     "E_FEW_OPTIONS": "选项不足 2 项 → 多半是切题截断，需重跑该卷的选择题链路。",
@@ -717,6 +718,25 @@ class Checker:
                 self.add("W_BLANK_COUNT", "warn",
                          f"占位符 {nb} 个 ≠ 小题 {len(qs)} 个", u)
 
+    # ── 6c：题干残渣（题干开头混进选项/分区标题/卷首说明）──
+    STEM_RESIDUE = re.compile(r"^\s*(?:[①②③④⑤⑥]{1,6}|(?:[一二三四五六]、)?(?:选择题|非选择题)\**|\*\*[^\n]{0,6}选择题[^\n]{0,6}\*\*)\s*(?:\n|$)")
+    STEM_NOTICE = re.compile(r"(考生须知|本试卷分第|本部分共\s*\d+\s*题|下列各小题均有四个选项|答题前[，,]?\s*(?:请|考生)|考试时间\s*\d+\s*分钟\s*满分)")
+
+    def check_stem_residue(self):
+        """题干开头混进「上一题选项文本 / 分区标题 / 卷首说明」——解析器切题时把残渣粘连到了下一题，
+        线上表现为每道选择题前面多一行「③④」或「考生须知」之类。真实存在过（2026-11 政治 68 卷 / 地理 8 卷）。"""
+        for u in self.paper.units:
+            for q in u.questions:
+                c = q.get("content") or ""
+                if not c:
+                    continue
+                if self.STEM_RESIDUE.match(c):
+                    self.add("W_STEM_RESIDUE", "warn",
+                             f"题干以选项/分区标题开头：{c[:18]!r}", u, q.get("id"))
+                elif self.STEM_NOTICE.search(c[:120]):
+                    self.add("W_STEM_RESIDUE", "warn",
+                             f"题干混进卷首说明：{self.STEM_NOTICE.search(c[:120]).group(1)}", u, q.get("id"))
+
     # ── 7：重复题干 ──
     def check_dup_stems(self):
         """同卷重复题干：同题组内必报；跨题组还要求题面原文也相同
@@ -804,6 +824,7 @@ class Checker:
         self.check_images()
         self.check_blanks()
         self.check_dup_stems()
+        self.check_stem_residue()
         self.check_misaligned_fields()
         self.check_meta()
         return self.out

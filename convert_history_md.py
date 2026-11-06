@@ -275,6 +275,34 @@ def _norm_ws(text: str) -> str:
     return re.sub(r"\s+", "", text or "")
 
 
+STEM_SECTION_RESIDUE = re.compile(
+    r"(?m)^[ \t]*(?:\*\*|__)?[ \t]*"
+    r"(?:[一二三四1234][、.．]\s*)?(?:选择题|非选择题|材料题|解答题|单选题|判断题)"
+    r"[ \t]*(?:\*\*|__)?[ \t]*$")
+
+
+def strip_stem_residue(text: str) -> str:
+    """题干开头独占的分区标题（`**一、选择题**` 之类）是 docx 串行残留 → 从题干里剔掉。
+    只处理**开头独占行**，正文中间不动。"""
+    t = text or ""
+    hit = False
+    for _ in range(3):
+        lines = t.split("\n")
+        i = 0
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        if i < len(lines) and STEM_SECTION_RESIDUE.match(lines[i]):
+            del lines[i]
+            t = "\n".join(lines)
+            hit = True
+            continue
+        break
+    t = t.strip()
+    if hit:
+        t = re.sub(r"\n{3,}", "\n\n", t).strip()
+    return t
+
+
 def finalize_content(text: str) -> str:
     """section.content 出口：清掉任何 <Input…> 残留（历史不该有）、空行收敛到最多一个、首尾 strip。"""
     t = PH_ANY.sub("", text or "")
@@ -326,10 +354,14 @@ def split_paper_hist(txt: str, review: list[str] | None = None):
        答案区以「| 题号 |」答案表或「【答案】」块开头；
     ③ 最后退回语文版 split_paper。
     """
-    for m in re.finditer(r"(?m)^[ \t]*\**\s*(?:参考答案(?:与解析|及解析)?|答案与解析|评分标准)"
-                         r"\s*\**\s*[:：]?\s*$", txt):
-        if m.start() > 300:
-            return txt[:m.start()], txt[m.start():]
+    for m in re.finditer(r"(?m)^.*$", txt):
+        line = m.group(0)
+        probe = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", line)      # 去掉行内图片
+        probe = probe.replace("*", "").strip()
+        if re.fullmatch(r"(?:参考答案(?:与解析|及解析)?|答案与解析|评分标准)[:：]?", probe):
+            if m.start() > 300:
+                return txt[:m.start()], txt[m.start():]
+            break
     cands = []
     m = re.search(r"(?m)^[ \t]*\|\s*\**\s*题\s*号\s*\**\s*\|", txt)
     if m and m.start() > 300:
@@ -665,8 +697,10 @@ def parse_choices(text: str, review: list[str], each: float | None = None,
             if opts:
                 review.append(f"复核：第{no}题的 A–D 选项是表格（选项/史实/结论…），"
                               f"已按行转成 options（多列用「；」连接），请人工核对")
-        content = tidy(head)
+        content = strip_stem_residue(tidy(head))
         content = re.sub(r"^(?:[（(]\s*\d+(?:\.\d+)?\s*分\s*[）)])", "", content).strip()
+        if not content:
+            review.append(f"复核：第{no}题题干为空（可能整段是 residue/图片），请人工核对")
         item = {"id": no, "questionType": "single", "content": content,
                 "options": [], "answer": "", "analysis": "",
                 "score": float(sc) if sc else explicit.get(no, each)}
@@ -1801,6 +1835,12 @@ def process(md: Path, type_dir: str, args) -> str:
             lead = f"（{sb['no']}）" if sb["no"] is not None else ""
             qtext = tidy(f"{lead}{prompt}")
             qtext = repair_tables(qtext, review, f"第{no}题（{sb['no']}）设问")
+            _before = qtext
+            qtext = strip_stem_residue(qtext)
+            if qtext != _before:
+                review.append(f"复核：第{no}题（{sb['no']}）题干开头的分区标题被 docx 串进了正文，已剔除")
+            if not qtext.strip():
+                review.append(f"复核：第{no}题（{sb['no']}）题干被清洗后为空，请人工核对原卷设问")
             blocks_sub.append(qtext)
             ans_text = repair_tables((subs_a[i] or "").strip(), review, f"第{no}题（{sb['no']}）参考答案")
             questions.append({
