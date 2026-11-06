@@ -129,12 +129,15 @@ BOILER_BODY = [
     r"^20\d{2}\s*年\s*\d{1,2}\s*月$",                    # 纯日期行（卷首）
     r"^20\d{2}\s*北京.*(期末|一模|二模|高考|统练)",          # 卷名行
     r"^选择题$",                                             # 分区标题
+    r"^第\s*(?:[一二三四1-9]|[ⅠⅡⅢⅣ])\s*(?:部分|卷)",                  # 「第Ⅰ卷（选择题共45分）」
+    r"本卷共\s*\d+\s*(小)?题",                                       # 「本卷共15小题…」
 ]
 BOILER_ANY = [re.compile(x) for x in BOILER_BODY]
 # 反复剥掉这些前缀后再判断（加粗星号、空【】、序号、第N部分、选择题：…）
 PREFIX_STRIP = re.compile(
     r"^(?:\*+|_+|【\s*】|\[[^\]]{0,8}\]|\d{1,2}\s*[.．、]|[一二三四五六七八九十]\s*[、.]|"
-    r"第\s*[一二1-9]\s*部分|选择题\s*[，,、：:]?|非选择题\s*[，,、：:]?|[（(]\s*[）)])\s*")
+    r"第\s*(?:[一二三四1-9]|[ⅠⅡⅢⅣ])\s*(?:部分|卷)|选择题\s*[，,、：:]?|非选择题\s*[，,、：:]?|"
+    r"[（(]\s*[）)])\s*")
 HTML_LEAD = re.compile(r"^\s*<(div|table)\b.*?</\1>\s*", re.S | re.I)
 
 
@@ -153,12 +156,13 @@ HEAD_ONLY = [re.compile(x) for x in (r"^[\-:|\s]+$", r"^[①②③④⑤⑥⑦�
 
 def is_boiler_line(s: str, head: bool = False) -> bool:
     """head=True 时才把「表格分隔行 / 上一题选项残渣」当垃圾（避免正文表格被削掉）。"""
-    c = _core(s)
-    if not c:
+    c0 = re.sub(r"^[\s*|]+|[\s*|]+$", "", s).strip()     # 只去星号/竖线
+    c = _core(s)                                           # 再去「一、」「第Ⅰ卷」等前缀
+    if not c0 and not c:
         return True
-    if head and any(r.search(c) for r in HEAD_ONLY):
+    if head and any(r.search(x) for x in (c0, c) for r in HEAD_ONLY):
         return True
-    return any(r.search(c) for r in BOILER_ANY)
+    return any(r.search(x) for x in (c0, c) for r in BOILER_ANY)
 
 
 def strip_boilerplate(text: str) -> tuple[str, bool]:
@@ -190,6 +194,15 @@ def strip_boilerplate(text: str) -> tuple[str, bool]:
         out.append(ln)
     text2 = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
     return text2, text2 != before.strip()
+
+
+def safe_url_title(title: str) -> str:
+    """图片 URL 里的卷名不能带 ASCII 括号（会截断 markdown 链接、也会让 QA 的路径解析断掉）→ 换全角。"""
+    return (title or "").replace("(", "（").replace(")", "）").replace(" ", "")
+
+
+def geo_rewrite_images(text: str, md_dir: Path, title: str, type_dir: str, review: list[str]) -> str:
+    return rewrite_images(text, md_dir, safe_url_title(title), type_dir, review, SUBJECT)
 
 
 def placeholder_for(score: int | None = None) -> str:
@@ -563,6 +576,10 @@ MANUAL_NOTES = {
 # 逐卷文本补丁：docx→md 把某段（多为「设问」或整块版式）弄丢/弄成图片时，按卷补回原文。
 # key = 卷名（去掉（教师版）），value = [(旧片段, 新片段), ...]（旧片段必须命中，否则记 review）
 MANUAL_TEXT_PATCHES = {
+    # 2021 房山二模：第 1 题的题号整行丢了（只剩题干 + A–D），补回题号
+    "2021北京房山高三二模地理": [
+        ("\n图1为某地实景图、其所示地质构造的形成原因主要是", "\n1.图1为某地实景图、其所示地质构造的形成原因主要是"),
+    ],
     # 2025 西城一模 20 题：教师版 PDF 在 20 题表格后直接翻页，**卷面设问整句缺失**；
     # 这里把导入语挪到设问位置（不臆造设问），review 里注明需人工补。
     "2025北京西城高三一模地理": [
@@ -815,7 +832,7 @@ def _opt_chain(seg: str) -> list[tuple[int, str]]:
     """找「A→B→C→D」按序排列的字母+圆点链（对 A.①②B.①④ 这种挤在一起的写法有效）。"""
     # 候选：字母前面不是英文字母，后面紧跟「圆点」或「中文/圈码/占位符」（覆盖 A.①② / A![](图) ①②）
     cand = [(m.start(1), m.group(1)) for m in
-            re.finditer(r"(?<![A-Za-z])([A-D])(?=[\s\u3000]{0,2}(?:[．.、]|[\u4e00-\u9fff①②③④⑤⑥⑦⑧⑨\u27e6]))", seg)]
+            re.finditer(r"(?<![A-Za-z])([A-D])(?=[\s\u3000]{0,2}(?:[．.、。]|[\u4e00-\u9fff①②③④⑤⑥⑦⑧⑨\u27e6]))", seg)]
     if len(cand) < 4:
         cand = [(m.start(1), m.group(1)) for m in re.finditer(r"([A-D])\s*[．.、]", seg)]
     for i, (pos, k) in enumerate(cand):
@@ -909,6 +926,8 @@ def _opt_split_keep_imgs(seg: str) -> tuple[str, list[dict]]:
 def fix_num_then_image(text: str) -> str:
     """题号后直接跟图片 / 或用了全角冒号当分隔（「6：若图示…」）→ 统一补成点。"""
     text = re.sub(r"(?m)^([ \t]*\**\s*)(\d{1,2})(?=!\[)", r"\1\2.", text)
+    # 「18(12分)阅读图文材料…」——题号后面直接跟分值括号、没有点号
+    text = re.sub(r"(?m)^([ \t]*\**\s*)(\d{1,2})(?=[（(]\s*\d+\s*分)", r"\1\2．", text)
     # 「6：若图示…」这种题号 + 全角冒号；后面跟数字的（10：00 这种时间）不动
     return re.sub(r"(?m)^([ \t]*\**\s*)(\d{1,2})[ \t]*\**[ \t]*[：:][ \t]*(?=[^\d\s])", r"\1\2. ", text)
 
@@ -989,7 +1008,9 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
             review.append(f"选择题第{it['no']}题：没切出 A–D 四个选项，原文保留在 content 里")
             it["stem"] = it["body"]
         opt_imgs = {r for o in it["options"] for r in IMG_REF.findall(o["label"] or "")}
-        it["own_refs"] = [r for r in IMG_REF.findall(it["lead"] + "\n" + it["head"]) if r not in opt_imgs]
+        # 碎片图（5×6 之类）不算「本题自带图」，否则会被误判成新题组、丢掉共享材料
+        it["own_refs"] = [r for r in IMG_REF.findall(it["lead"] + "\n" + it["head"])
+                          if r not in opt_imgs and not is_fragment(cfg, cfg["imgmap"].get(Path(r).name) or "", None)]
 
     # 选项是拼图的题（人工裁好的 A–D 四张图）→ 直接补成 4 个图片选项
     man_opts = MANUAL_OPTION_IMAGES.get(title) or {}
@@ -1051,7 +1072,7 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
             it["stem"] = sub_images(tidy(it["stem"]), cfg, title, type_dir, seen, review)
             for o in it["options"]:
                 o["label"] = sub_images(tidy(o["label"]), cfg, title, type_dir, seen, review)
-                o["label"] = rewrite_images(o["label"], src_md.parent, title, type_dir, review, SUBJECT)
+                o["label"] = geo_rewrite_images(o["label"], src_md.parent, title, type_dir, review)
         figs = list(dict.fromkeys(figs))
         body_parts = [re.sub(r"!\[\]\([^)]+\)", "", mat_txt).strip()] if mat_txt else []
         for f in figs:
@@ -1061,7 +1082,7 @@ def parse_choice_region(text: str, cfg: dict, src_md: Path, title: str, type_dir
             stem = re.sub(r"!\[\]\([^)]+\)", "", it["stem"]).strip()
             stem = EMPTY_PAREN.sub("", stem).strip()
             content = (shared + "\n\n" + stem).strip() if shared else stem
-            content = normalize_md(rewrite_images(content, src_md.parent, title, type_dir, review, SUBJECT))
+            content = normalize_md(geo_rewrite_images(content, src_md.parent, title, type_dir, review))
             out.append({"no": it["no"], "content": content, "options": it["options"],
                         "score": it.get("score")})
     return out
@@ -1219,11 +1240,17 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
         for q in questions:
             if q["head"]:
                 blocks.append(q["head"])
-            blocks.append(f"{q['prompt']}\n\n{placeholder_for(q['score'])}")
+            # 设问里夹的图挪到设问文字之后（否则小问 content 去图后与 section.content 对不上）
+            ptxt = IMG_REF.sub("", q["prompt"]).strip()
+            imgs = IMG_REF.findall(q["prompt"])
+            seg = ptxt
+            if imgs:
+                seg += "\n\n" + "\n\n".join(f"![]({i})" for i in imgs)
+            blocks.append(f"{seg}\n\n{placeholder_for(q['score'])}")
             if q["tail"]:
                 blocks.append(q["tail"])
         content = "\n\n".join(b for b in blocks if b.strip())
-        content = normalize_md(rewrite_images(content, src_md.parent, title, type_dir, review, SUBJECT))
+        content = normalize_md(geo_rewrite_images(content, src_md.parent, title, type_dir, review))
         # 小问设问原文会给 AI 批改当 {stem}，里面不能带图片引用（图留在 section.content 里）
         prompts = [(q["k"], IMG_REF.sub("", q["prompt"]).strip() or q["prompt"], q["score"])
                    for q in questions]
@@ -1273,14 +1300,14 @@ def parse_essay_region(text: str, ans_text: str, cfg: dict, src_md: Path, title:
                 a = "（原卷未提供该小问的参考答案）"
             a = sub_images(tidy(a), cfg, title, type_dir, {}, review) if "![" in (a or "") else a
             if "![" in (a or ""):
-                a = rewrite_images(a, src_md.parent, title, type_dir, review, SUBJECT)
+                a = geo_rewrite_images(a, src_md.parent, title, type_dir, review)
             sc.setdefault("answers", []).append(a)
             an = (det or {}).get(k, "")
             if not an and k is not None:
                 an = (det or {}).get(None, "")
             an = sub_images(an, cfg, title, type_dir, {}, review) if "![" in (an or "") else an
             if "![" in (an or ""):
-                an = rewrite_images(an, src_md.parent, title, type_dir, review, SUBJECT)
+                an = geo_rewrite_images(an, src_md.parent, title, type_dir, review)
             sc.setdefault("analyses", []).append(an)
     return out
 
@@ -1477,7 +1504,7 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
     for m in re.finditer(r"(?m)^\|\s*(?:题号|题目|序号)\s*\|(.+)$", ans_text):
         nums = [x.strip() for x in m.group(1).strip().strip("|").split("|")]
         after = ans_text[m.end():]
-        row = re.search(r"(?m)^\|\s*答案\s*\|(.+)$", after)
+        row = re.search(r"(?m)^\|\s*(?:答案|选项|正确答案)\s*\|(.+)$", after)
         if not row:
             continue
         vals = [re.sub(r"[*\s]", "", x).upper() for x in row.group(1).strip().strip("|").split("|")]
@@ -1495,12 +1522,12 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
         return [c.strip() for c in ln.strip().strip("|").split("|")]
 
     for i, ln in enumerate(lines):
-        nums = [c for c in cells_of(ln) if c]
+        nums = [re.sub(r"[*\s]", "", c) for c in cells_of(ln) if re.sub(r"[*\s]", "", c)]
         if len(nums) < 2 or not all(c.isdigit() for c in nums):
             continue
         for j in range(i + 1, min(i + 4, len(lines))):
             vals = [re.sub(r"[*\s]", "", c).upper() for c in cells_of(lines[j]) if c]
-            if len(vals) != len(nums) or not all(re.fullmatch(r"[A-D]", v) for v in vals):
+            if not vals or len(vals) > len(nums) or not all(re.fullmatch(r"[A-D]", v) for v in vals):
                 continue
             for n, v in zip(nums, vals):
                 got.setdefault(int(n), v)
@@ -1552,10 +1579,24 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
     if len(got) >= expect:
         return got
     # 2) 【答案】锚点：`【答案】1. B 2. C` / `3. 【答案】D`
+    used: set[int] = set()
+    next_no = 1
     for m in re.finditer(r"【答案】([^\n【]*)", ans_text):
         seg = re.sub(r"!\[[^\]]*\]\([^)]+\)", " ", m.group(1))
-        for k, v in re.findall(r"(\d{1,2})\s*[\\]?\s*[.．、]?\s*([A-D])(?![A-Za-z\u4e00-\u9fff])", seg):
-            got.setdefault(int(k), v)
+        pairs = re.findall(r"(\d{1,2})\s*[\\]?\s*[.．、]?\s*([A-D])(?![A-Za-z\u4e00-\u9fff])", seg)
+        if pairs:
+            for k, v in pairs:
+                got.setdefault(int(k), v)
+                used.add(int(k))
+        else:
+            bare = re.fullmatch(r"[\s*、。.,，]*(?:答案[:：])?[\s*]*([A-D])[\s*、。.,，]*", seg)
+            if bare:                       # 「【答案】D」这种单字母块 → 补给下一个未用题号
+                while next_no in used:
+                    next_no += 1
+                got.setdefault(next_no, bare.group(1))
+                used.add(next_no)
+        while next_no in used:
+            next_no += 1
     for m in re.finditer(r"(\d{1,2})\s*[\\]?\s*[.．、]\s*【答案】\s*([A-D])", ans_text):
         got.setdefault(int(m.group(1)), m.group(2))
     if len(got) >= expect:
@@ -1566,6 +1607,18 @@ def parse_choice_answers(ans_text: str, expect: int = N_CHOICE) -> dict[int, str
         got.setdefault(int(k), v)
     if len(got) >= expect:
         return got
+    # 3b) 菁优网教师版：全文「故选：X」按出现顺序 = 第 1..N 题的答案（解析里常有「1. 2. 3.」条目，不能按题号切）
+    picked_all = SELECTED.findall(ans_text)
+    if len(picked_all) == expect and not got:
+        for k, v in enumerate(picked_all, start=1):
+            got.setdefault(k, v)
+        return got
+    # 3c) 答案串里被空格掰断的两位数（顺义 2021：「13.B1 4.A」= 13.B、14.A）
+    if len(got) < expect:
+        for m in re.finditer(r"([A-D])\s*(\d)\s+(\d)\s*[.．、]\s*([A-D])", ans_text):
+            k = int(m.group(2) + m.group(3))
+            if k not in got:
+                got[k] = m.group(4)
     # 4) 菁优网教师版：每题一段「N．【分析】…【解答】…故选：C。」→ 按题号段找「故选」
     qs = [m for m in QMARK.finditer(ans_text)]
     for i, m in enumerate(qs):
@@ -1737,7 +1790,7 @@ def process(md: Path, type_dir: str, args) -> str:
         for k, v in list(details.items()):
             if "![" in (v or ""):
                 v = sub_images(tidy(v), cfg, title, type_dir, {}, review)
-                details[k] = rewrite_images(v, md.parent, title, type_dir, review, SUBJECT)
+                details[k] = geo_rewrite_images(v, md.parent, title, type_dir, review)
         review.append(f"选择题详解 {len(details)} 题收进 analysis（{sorted(details)[:3]}…）")
     miss_ans = [q["no"] for q in choices if not (answers.get(q["no"]) or "").strip()]
     if miss_ans:

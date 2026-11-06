@@ -108,7 +108,7 @@ SCORE_RE = re.compile(r"[（(]\s*(\d+)\s*分\s*[）)]")
 ANSMARK = re.compile(r"(?m)^[ \t]*\**\s*(\d{1,2})\s*[．.、]?\s*[（(]\s*(\d+)\s*分\s*[）)]")
 # 选项标记：`A．` `A.` `A、`（前后允许空白/中文）
 OPT_MARK = re.compile(
-    r"(?:^|(?<=[\s\u3000\u00a0>)\u4e00-\u9fff①②③④⑤⑥⑦⑧⑨⑩|]))([A-D])\s*"
+    r"(?:^|(?<=[\s\u3000\u00a0>)\u4e00-\u9fff①②③④⑤⑥⑦⑧⑨⑩|*]))([A-D])\s*"
     r"(?:[．.、]\s*|(?=[①②③④⑤⑥⑦⑧⑨⑩（(])|(?=\|))"   # 挤在一起/点号丢了/表格首列都要认
 )
 # 「回答第13、14题」这类共享材料引导句
@@ -870,6 +870,17 @@ def options_from_label_table(seg: str, review: list[str], no: int) -> tuple[list
     return [], seg
 
 
+QNUM_FIX = re.compile(
+    r"(?m)^([ \t]*)(\*\*)?(\d{1,2})[ \t]*[，,：:][ \t]*(?=[\u4e00-\u9fff“《（(A-Za-z①-⑩])")
+
+
+def norm_question_marks(text: str) -> str:
+    """把 `1，设问` / `2：设问` 这种把逗号/冒号当题号分隔符的写法归一成 `1．`（2021 通州卷实测）。"""
+    if not text:
+        return text
+    return QNUM_FIX.sub(lambda m: f"{m.group(1)}{m.group(2) or ''}{m.group(3)}．", text)
+
+
 def norm_option_labels(text: str) -> str:
     """Word 自动编号把「A.」变成「1.」的题（2024 顺义一模实测）：
 
@@ -1157,7 +1168,8 @@ def clean_choice_lead(text: str) -> str:
         if not q:
             paras.pop(0)
             continue
-        if CIRC_ONLY.match(q) or SECTION_LINE.match(p) or BOILER_LINE.match(p) or DATE_LINE.match(q):
+        if CIRC_ONLY.match(q) or SECTION_LINE.match(p) or BOILER_LINE.match(p) or DATE_LINE.match(q) \
+                or (p.lstrip().startswith("|") and re.search(r"考生须知|注意事项|答题卡", p[:200])):
             paras.pop(0)
             continue
         m = LEAD_MARK.match(q)
@@ -1176,6 +1188,7 @@ def parse_choice_part(choice_body: str, review: list[str],
                       choice_n: int = N_CHOICE, choice_score: int = CHOICE_SCORE,
                       title: str = "") -> list[dict]:
     """第一部分：单选（常规 15 题，文综卷 12 题）。共享材料/共享图复制进该组每道题的 content。"""
+    choice_body = norm_question_marks(choice_body)
     choice_body = norm_option_labels(choice_body)
     segs = split_marks(choice_body, 1, max(choice_n, MAX_CHOICE))
     if not segs:
@@ -1263,7 +1276,8 @@ def parse_choice_part(choice_body: str, review: list[str],
         dropped = []
         while len(items) > choice_n:
             cands = [(len(it["raw"]), k) for k, it in enumerate(items)
-                     if len(it["raw"]) < 170 and not ASK_HINT.search(it["raw"])]
+                     if len(it["raw"]) < 170 and not ASK_HINT.search(it["raw"])
+                     and not OPT_MARK.search(it["raw"])]
             if not cands:
                 break
             _, k = min(cands)
@@ -1477,6 +1491,8 @@ def clean_answer(ans: str, score: int | None, review: list[str], label: str) -> 
     a = (ans or "").strip()
     if not a:
         return ""
+    # 「（10![](images/x.png)分）」这种分值括号里夹了图片的写法也要去掉
+    a = re.sub(r"^[（(]\s*\d+\s*(?:!\[[^\]]*\]\([^)]*\))?\s*分\s*[）)]\s*", "", a)
     lead = SCORE_RE.match(a)
     if lead and a[lead.end():].strip():
         # 「（9分）」这种分值残渣不能进 answer；与本题分值不同也没关系，照样去掉
@@ -1686,6 +1702,71 @@ def layout_of(body: str, ans: str, review: list[str]) -> dict:
 # 主流程
 # ──────────────────────────────────────────────────────────────────
 
+def resolve_essay_marks(essay_body: str, ans: str, choice_n: int,
+                        review: list[str]) -> list[tuple]:
+    """非选择题区 → [(mark, 题号)]，含两种「题号被 Word 自动编号写成 1.」的兜底：
+
+    ① 序列中间（2021 昌平：16 → 17 → **1.** → 19）：带 ≥5 分 + 后一题号 == 前一题号+2 +
+       答案区存在「前一题号+1」的块；
+    ② 序列末尾（2024 顺义：19 → **1.** → **1.**）：带 ≥6 分 + 这一段足够长。
+    """
+    marks = [m for m in QMARK.finditer(essay_body) if int(m.group(2)) > choice_n]
+    ans_nos: set[int] = set()
+    for m in QMARK.finditer(ans):
+        if int(m.group(2)) > choice_n:
+            ans_nos.add(int(m.group(2)))
+    for m in ANSMARK.finditer(ans):
+        if int(m.group(1)) > choice_n:
+            ans_nos.add(int(m.group(1)))
+
+    forced: dict[int, int] = {}
+    if marks:
+        have = {m.start() for m in marks}
+        for m in QMARK.finditer(essay_body):
+            if m.start() in have:
+                continue
+            if (_mark_score_at(essay_body, m) or 0) < 5:
+                continue
+            pos = m.start()
+            prev = [x for x in marks if x.start() < pos]
+            nxt_m = [x for x in marks if x.start() > pos]
+            if not prev or not nxt_m:
+                continue
+            p_no, n_no = int(prev[-1].group(2)), int(nxt_m[0].group(2))
+            if n_no == p_no + 2 and (p_no + 1) in ans_nos:
+                marks.append(m)
+                forced[pos] = p_no + 1
+        if forced:
+            marks = sorted(marks, key=lambda m: m.start())
+            review.append(f"非选择题区有 {len(forced)} 道大题的题号在序列中间被 Word 自动编号写成"
+                          f"「1.」（应为第 {'、'.join(str(v) for v in sorted(forced.values()))} 题），"
+                          f"已按「前一题号+1 + 答案区印证」捞回")
+
+    if marks:
+        tail = essay_body[marks[-1].start():]
+        cand = []
+        for m in QMARK.finditer(tail):
+            if m.start() == 0:
+                continue
+            if (_mark_score_at(tail, m) or 0) >= 6 and len(tail[m.end():]) > 400:
+                cand.append(m.start() + marks[-1].start())
+        if cand:
+            extra = [m for m in QMARK.finditer(essay_body) if m.start() in set(cand)]
+            marks = sorted(marks + extra, key=lambda m: m.start())
+            review.append(f"非选择题区有 {len(extra)} 道大题的题号被 Word 自动编号吃掉"
+                          f"（写成「1.」），已按「≥6 分 + 段长」捞回并顺序编号")
+
+    if not marks:
+        return []
+    nos = [int(m.group(2)) for m in marks]
+    renumber = any(b <= a for a, b in zip(nos, nos[1:]))
+    out = []
+    for i, m in enumerate(marks):
+        no = forced.get(m.start()) or ((i + 1 + choice_n) if renumber else int(m.group(2)))
+        out.append((m, no))
+    return out
+
+
 def process(md: Path, type_dir: str, args) -> str:
     title = re.sub(r"[（(]\s*教师版\s*[）)]|[（(]\s*含答案\s*[）)]", "", md.stem).strip()
     title = re.sub(r"\s+", "", title)
@@ -1722,6 +1803,7 @@ def process(md: Path, type_dir: str, args) -> str:
     # ---- 一、选择题 ----
     lay = layout_of(body, ans, review)
     choice_body, essay_body = lay["choice_body"], lay["essay_body"]
+    essay_body = norm_question_marks(essay_body)
     choice_n, choice_score, essay_total = lay["choice_n"], lay["choice_score"], lay["essay_total"]
     choice_body = re.sub(r"(?m)^[ \t]*\**\s*本部分共\s*\d+\s*题[^\n]*\n?", "", choice_body)
 
@@ -1789,33 +1871,15 @@ def process(md: Path, type_dir: str, args) -> str:
     }
 
     # ---- 二、非选择题（一题一个 section） ----
-    emarks = [m for m in QMARK.finditer(essay_body) if int(m.group(2)) > choice_n]
-    # 大题题号被 Word 自动编号写成「1.」时（顺义卷常见）：只在**最后一道正常大题之后**，
-    # 把「题号后紧跟 ≥6 分、且这一段足够长」的标记当成大题捞回来
-    if emarks:
-        tail = essay_body[emarks[-1].start():]
-        cand = []
-        for m in QMARK.finditer(tail):
-            if m.start() == 0:
-                continue
-            sc = _mark_score_at(tail, m) or 0
-            seg_len = len(tail[m.end():])
-            if sc >= 6 and seg_len > 400:
-                cand.append(m.start() + emarks[-1].start())
-        if cand:
-            extra = [m for m in QMARK.finditer(essay_body) if m.start() in set(cand)]
-            emarks = sorted(emarks + extra, key=lambda m: m.start())
-            review.append(f"非选择题区有 {len(extra)} 道大题的题号被 Word 自动编号吃掉"
-                          f"（写成「1.」），已按「≥6 分 + 段长」捞回并顺序编号")
-    if not emarks:
+    pairs = resolve_essay_marks(essay_body, ans, choice_n, review)
+    if not pairs:
         raise RuntimeError("没切到非选择题（第二部分）的大题")
+    emarks = [m for m, _no in pairs]
     essays = []
-    _nos = [int(m.group(2)) for m in emarks]
-    _renumber = any(b <= a for a, b in zip(_nos, _nos[1:]))
-    for i, m in enumerate(emarks):
+    for i, (m, _no) in enumerate(pairs):
         nxt = emarks[i + 1] if i + 1 < len(emarks) else None
         essays.append({
-            "no": (i + 1 + choice_n) if _renumber else int(m.group(2)),
+            "no": _no,
             "printed": _mark_score_at(essay_body, m),
             "lead": (m.group(1) or "").strip(),
             "text": re.sub(r"^[ \t]*\n*[ \t]*\**[ \t]*[（(]\s*\d+\s*分\s*[）)]\s*",
@@ -2012,7 +2076,7 @@ def process(md: Path, type_dir: str, args) -> str:
                 _ptxt = clean_answer((_pa + "\n\n" + _pb).strip(), None, [], label)
                 _ptxt = re.sub(r"^[（(]\s*\d+\s*分\s*[）)]\s*", "", _ptxt).strip()   # 别把分值残渣写进 analysis
                 if _ptxt:
-                    qs[0]["analysis"] = (_ptxt + ("\n\n" + (qs[0]["analysis"] or "")).strip()).strip()
+                    qs[0]["analysis"] = rewrite((_ptxt + ("\n\n" + (qs[0]["analysis"] or "")).strip()).strip())
 
         content = "\n\n".join(p.strip() for p in parts if p and p.strip())
         content = drop_running_heads(content, title)
@@ -2158,8 +2222,8 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
             declared_essay_total = lay["essay_total"]
             m = re.search(r"(?m)^[ \t]*(?:#{1,6}[ \t]*)?\**\s*(?:第[二2]部分|[二2][、.][ \t]*\**\s*"
                           r"(?:非选择题|解答题|综合题|第二部分))", body)
-            md_essay_n = len([x for x in QMARK.finditer(lay["essay_body"])
-                              if int(x.group(2)) > lay["choice_n"]])
+            md_essay_n = len(resolve_essay_marks(lay["essay_body"], split_paper(whole)[1],
+                                                 lay["choice_n"], []))
             stat["md_essay"] = md_essay_n
             if m:
                 mm = HDR_COUNT.search(body[m.start():m.start() + 300])
