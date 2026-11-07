@@ -247,7 +247,14 @@ def _rank_key(cat: str, sc: dict[str, dict], prior: list[str]):
     return (s["score"], s["strong"], s["total"], -prior.index(cat))
 
 
-def classify(text: str, no: int, year: int | None, strict_position: bool = False) -> tuple[str, dict, str]:
+# 人工例外：个别卷的题型顺序与「15结构 16原理 17有机 18流程 19探究」不同，用户已确认的写在这里。
+# key = (卷名(去掉（教师版）), 题号)，value = 短名分类
+PAPER_OVERRIDES: dict[tuple[str, int], str] = {
+    # 海淀 2026 期中：第 17 题考的是化学反应原理（该卷没有有机题），其余四题与标准一致
+    ("2026北京海淀高三（上）期中化学", 17): "原理",
+}
+
+def classify(text: str, no: int, year: int | None, strict_position: bool = True) -> tuple[str, dict, str]:
     """给一道非选择题定题型。
 
     **2021 及以后**（北京卷新高考题型位置固定，用户口径）：
@@ -363,12 +370,15 @@ def load_paper(md_path: Path) -> dict:
     return {"name": name, "year": year_of(name), "questions": qs}
 
 
-def analyze_paper(md_path: Path, strict_position: bool = False) -> dict:
+def analyze_paper(md_path: Path, strict_position: bool = True) -> dict:
     """分类一卷，返回 {name, year, questions: {题号: {category, score, reason, top, hits}}}。"""
     info = load_paper(md_path)
     out = {}
     for no, q in info["questions"].items():
         cat, sc, reason = classify(q["text"], no, info["year"], strict_position)
+        override = PAPER_OVERRIDES.get((md_path.parent.name.replace("（教师版）", ""), no))
+        if override:
+            cat, reason = override, "人工例外"
         top = {c: sc[c]["score"] for c in
                sorted(CATS, key=lambda c: sc[c]["score"], reverse=True) if sc[c]["score"] > 0}
         out[str(no)] = {
@@ -428,6 +438,8 @@ def main():
     ap.add_argument("--json", default=None, help="把结果写成 JSON")
     ap.add_argument("--print", dest="do_print", action="store_true", help="打印逐题分类明细")
     ap.add_argument("--root", default=None, help="output_docx_to_md 根目录（默认取 paths.py）")
+    ap.add_argument("--content-override", action="store_true",
+                    help="2021+ 也允许内容覆盖位置（默认关闭：按题号拆，听 15结构/16原理/17有机/18流程/19探究）")
     ap.add_argument("--strict-position", action="store_true",
                     help="2021+ 一律按位置，不做「覆盖」（对比口径用）")
     args = ap.parse_args()
@@ -444,7 +456,7 @@ def main():
     no_score_papers: list[str] = []
     for md in mds:
         try:
-            rep = analyze_paper(md, args.strict_position)
+            rep = analyze_paper(md, not args.content_override)
         except Exception as e:                      # 单卷失败不影响全量
             print(f"  ✗ {md.parent.name}: {str(e)[:160]}", file=sys.stderr)
             continue
