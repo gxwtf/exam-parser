@@ -90,7 +90,7 @@ def main():
     paper = {
         "title": stem, "subject": "化学", "source": stem, "grade": "高三",
         "year": int(re.search(r"(20\d{2})", stem).group(1)) if re.search(r"(20\d{2})", stem) else None,
-        "tags": ["化学", "高三", "二模", "图片题"],
+        "tags": ["化学", "高三", args.type, "图片题"],
         "questions": questions,
     }
     out = qdir / "paper.json"
