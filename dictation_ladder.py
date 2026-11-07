@@ -110,6 +110,30 @@ def extract_blanks(qmd: str) -> tuple[str, int]:
 ANSWER_GROUP = re.compile(r"(?m)^\s*(?:[①②③④⑤⑥⑦⑧⑨⑩]|（\d{1,2}）|\(\d{1,2}\)|\d{1,2}\s*[．.])\s*")
 
 
+BAD_ANSWER_HINTS = ("答案要点", "评分标准", "解析", "本题考查", "方面", "作用", "影响", "启示", "分）", "示例", "概括", "赏析")
+# 只挡「明显是分析/答案要点」的说法；单个虚词不作判据（默写原句里也可能有「可以」）
+MODERN_HINTS = ("我们", "他们", "应该", "通过", "进行", "其中", "因此", "并且", "方面", "机制")
+
+
+def looks_like_dictation(answers: list[str]) -> bool:
+    """默写答案应当是短的诗文片段；出现分析性文字/明显重复就说明取错了答案段。"""
+    if not answers:
+        return False
+    if len(set(a.strip() for a in answers)) < len(answers) * 0.8:   # 大量重复 = 切错了
+        return False
+    for a in answers:
+        a = str(a or "").strip()
+        if not a:
+            continue
+        if len(a) > 20:
+            return False
+        if any(k in a for k in BAD_ANSWER_HINTS):
+            return False
+        if any(k in a for k in MODERN_HINTS):
+            return False
+    return True
+
+
 def extract_answers(amd: str, need: int, qno: str | None = None) -> list[str]:
     """常规提取答案：按 ①②③ / （1）（2） 分组，去掉（重点字：…）等批注。"""
     if not amd or need <= 0:
@@ -138,8 +162,10 @@ def extract_answers(amd: str, need: int, qno: str | None = None) -> list[str]:
                 p = p.strip()
                 if len(p) >= 2:
                     out.append(p)
-    # 按每题 2 空切分（北京卷默写惯例），不足则原样
-    return out[:need] if len(out) >= need else out
+    res = out[:need] if len(out) >= need else out
+    if not looks_like_dictation(res):
+        return []
+    return res
 
 
 # ─────────────────────── 2/3/4. AI 阶梯（md → md → PDF）───────────────────────
@@ -239,11 +265,16 @@ def ai_items_from_qmd(qmd: str, cache_dir: Path | None = None) -> list[str]:
 def ai_answers_from_amd(amd: str, cache_dir: Path | None = None) -> list[str]:
     if not amd.strip():
         return []
+    # 只把「默写题号段」发给模型，避免读到别的板块答案
+    _m = re.search(r"(?m)^\s*(\d{1,2})\s*[．.]\s*[（(]?\s*(?:\d{1,2}\s*分)?\s*[）)]?\s*[①②③④⑤⑥⑦⑧⑨⑩]", amd)
+    if _m:
+        amd = amd[_m.start():_m.start() + 800]
     text = amd[:4000]
     data = _ai_json("", cache_dir, "answers:" + text[:400], lambda _p: _chat_json(PROMPT_ANSWERS.format(text=text)))
     if not data.get("found"):
         return []
-    return [str(a).strip() for a in (data.get("answers") or []) if str(a).strip()]
+    got = [str(a).strip() for a in (data.get("answers") or []) if str(a).strip()]
+    return got if looks_like_dictation(got) else []
 
 
 def ai_from_pdf(pdf: Path, cache_dir: Path | None = None, tries: int = 2) -> tuple[list[str], list[str]]:
