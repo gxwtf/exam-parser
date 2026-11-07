@@ -1904,7 +1904,7 @@ def check_paper(jf: Path, exceptions_path: Path | None = None) -> tuple[dict, li
         for _q in qs:
             _sc = _q.get("score") or 0
             if _q.get("options"):
-                if not 2 <= _sc <= 6:
+                if not 2 <= _sc <= 6 + (1 if _q.get("questionType") == "multiple" else 0):
                     errs.append(f"{_cat0} 第{_q.get('id')}题 {_sc} 分，超出选择题上限 6 分（下限 2 分）")
             elif _cat0 == "默写":
                 if _sc != 1:
@@ -1919,6 +1919,20 @@ def check_paper(jf: Path, exceptions_path: Path | None = None) -> tuple[dict, li
                 errs.append(f"{_cat0} 第{_q.get('id')}题 {_sc} 分，超出主观题上限 9 分（下限 1 分）")
         if not qs:
             errs.append(f"{sec.get('category')}：没有问题")
+
+    # ⑥b 五选二（「正确的/不正确的两项是」）：必须 5 个选项 + 多选 + 两个字母
+    import re as _re2
+    _pair2 = _re2.compile(r"(两|二)项(是|）|\)|。|$)")
+    for sec in sections:
+        for _q in sec.get("questions") or []:
+            if not _pair2.search(_q.get("content") or ""):
+                continue
+            _opts = _q.get("options") or []
+            _letters = _re2.sub(r"[^A-E]", "", str(_q.get("answer") or "").upper())
+            if _q.get("questionType") != "multiple" or len(_opts) != 5 or len(_letters) != 2:
+                err(f"{sec.get('category')} 第{_q.get('id')}题：五选二应 5 个选项 + 多选 + 2 个答案字母"
+                    f"（现 {len(_opts)} 选项 / {_q.get('questionType')} / {_q.get('answer')!r}）",
+                    "五选二", str(_q.get("id")), "题型/选项")
 
     # ⑦ 板块口径
     cats = [sec.get("category") for sec in sections]

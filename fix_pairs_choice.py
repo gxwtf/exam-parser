@@ -119,7 +119,7 @@ def find_page(pdf: Path, stem: str) -> int | None:
     return None
 
 
-def ask_vision(img: Path, stem: str, strict: bool = False) -> dict:
+def ask_vision(img: Path, stem: str, strict: bool = False, prompt: str | None = None) -> dict:
     b64 = base64.b64encode(img.read_bytes()).decode()
     resp = requests.post(
         f"{BASE_URL}/chat/completions",
@@ -128,7 +128,7 @@ def ask_vision(img: Path, stem: str, strict: bool = False) -> dict:
             "messages": [
                 {"role": "system", "content": "你是语文试卷录入员，只输出 JSON。"},
                 {"role": "user", "content": [
-                    {"type": "text", "text": (PROMPT_STRICT if strict else PROMPT).format(stem=stem)},
+                    {"type": "text", "text": (prompt or (PROMPT_STRICT if strict else PROMPT)).format(stem=stem)},
                     {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}},
                 ]},
             ],
