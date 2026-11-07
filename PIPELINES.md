@@ -89,14 +89,14 @@ npx tsx scripts/import-subject-json.ts --rollback ~/backups/imp.json           #
 
 | 学科 | 链路 | 入口脚本 | 输入 | 输出 | 状态（本机存量） |
 | --- | --- | --- | --- | --- | --- |
-| 英语 | ① MD→JSON（单目录/批量） | `main.py`、`batch_convert_md_to_json.py` | `output_docx_to_md/**/*.md` | `output_json/<类型>/英语/` | 已跑通（全量 445 卷） |
+| 英语 | ① docx→MD→整卷 JSON（**2026-11 重写为单入口**） | `convert_english_md.py` | `output_docx_to_md/<类型>/英语/<卷>/` | `output_json_english/` | 新链路已过三区一模 3 卷（存量 445 卷仍是旧链路的 `output_json/`） |
 | 数学 | ② PDF 页图→JSON（多模态） | `convert_math_pdf.py` | `gaozhong/<类型>/数学/*.pdf` | `output_json_math/<类型>/数学/` | 已跑通（163 卷） |
 | 物理 | ③ PDF 页图→JSON（只选择题） | `convert_physics_pdf.py` | `gaozhong/<类型>/物理/*.pdf` | `output_json_math/<类型>/物理/` | 已跑通（112 卷） |
 | 化学 | ④ docx→MD→JSON（选择题，确定性切题） | `convert_chemistry_md.py` | `output_docx_to_md/<类型>/化学/<卷>/` | `output_json_math/<类型>/化学/` | 已跑通（107 卷） |
 | 化学 | ⑤ 整卷（选择+非选择） | `convert_chemistry_full.py` | docx→MD 同上 | `output_json_chemistry_full/` | 试跑（1 卷） |
 | 化学 | ⑥ PDF 页图→JSON（选择题，与物理同构） | `convert_chemistry_pdf.py` | `gaozhong/<类型>/化学/*.pdf` | `output_json_math/<类型>/化学/` | 可用的备选链路 |
 | 化学 | ⑦ **图片版**（按题裁图 + 多模态解析） | `batch_image_papers.py` → `add_image_choice_analysis.py` | PDF + docx→MD | `output_image_questions/<类型>/化学/` | **当前主线**（二模 108 卷 / 1555 题；**只做选择题**，非选择题未做） |
-| 语文 | ⑧ docx→MD→JSON | `convert_chinese_md.py` | `output_docx_to_md/<类型>/语文/<卷>/` | `output_json_chinese/` | 已跑通（二模 96 卷） |
+| 语文 | ⑧ docx→MD→整卷 JSON（**2026-11 重写为单入口**，4 个后处理脚本已并入） | `convert_chinese_md.py` | `output_docx_to_md/<类型>/语文/<卷>/` | `output_json_chinese/` | 新契约已过 6 卷（2026 一模 3 + 二模 3）；**二模其余 93 卷仍是旧 `groups` 格式** |
 | 政治 | ⑨ docx→MD→整卷 JSON（生物同构，**2026-11 重写**） | `convert_politics_md.py` | `output_docx_to_md/<类型>/政治/<卷>/` | `output_json_politics/` | 已跑通（一模 3 卷 + 二模 1 卷重导） |
 | 生物 | ⑩ docx→MD→整卷 JSON（选择 + 一题一 section 的非选择） | `convert_biology_md.py` | `output_docx_to_md/<类型>/生物/<卷>（教师版）/` | `output_json_bio/<类型>/` | 已跑通（123 卷：二模 28 / 一模 42 / 上期末 38 / 真题 15） |
 | 历史 | ⑪ docx→MD→整卷 JSON（生物同构） | `convert_history_md.py` | `output_docx_to_md/<类型>/历史/<卷>/` | `output_json_history/` | 已跑通（一模 3 卷） |
@@ -112,31 +112,27 @@ MD 里则可能丢公式——所以同一份卷会出现“文字完整但公�
 
 ---
 
-## 2. 英语（链路 ①）
+## 2. 英语（链路 ①，2026-11 重写为单入口）
 
 ```bash
-# ① doc/docx → MD（本仓库内，权威副本）
-python3 batch_convert_docx_to_md.py -T 二模 -s 英语 -w 4
-
-# ② MD → JSON（批量，保持 类型/学科/卷 层级）
-python3 batch_convert_md_to_json.py -T 二模 -s 英语
-python3 batch_convert_md_to_json.py -p ./path/to/paper.md          # 单份
-
-# ③ 单目录模式（data/input/*.md → data/output/）
-python3 main.py -i ./data/input -o ./data/output --force
-
-# ④ 校验（不调 AI）
-python3 main.py --validate
-python3 validate_json.py <json 路径>
+python3 batch_convert_docx_to_md.py -p "../gaozhong/一模/英语/<卷>.docx" -o output_docx_to_md/一模/英语
+python3 convert_english_md.py -p ../output_docx_to_md/一模/英语/<卷>/<卷>.md -T 一模
+python3 convert_english_md.py --check -T 一模            # 契约断言，出错 exit 2
+python3 qa_scaffold.py --subject 英语 --type 一模 --check --json-root output_json_english
 ```
 
-- 题型：完形填空 / 语法填空 / 阅读 / 七选五 / 选词填空 / 阅读表达 / 作文（见 `config.py`）。
-- 阅读类用 `start` 锚点从 MD 抽原文；`backfill_re_stems.py` 可离线重算「阅读表达」题干。
-- **答案大小写约定**：**所有学科**的选择题 `answer` 与选项 `options[].id` 一律大写字母（`"C"` / `{"id": "C"}`）。
-  英语由 `src/json_builder.py` 按 `questionType` 处理；数学 / 物理 / 语文 / 政治 / 化学 / 图片版 / 英语批量
-  都在写盘出口调 [`src/answer_case.py`](src/answer_case.py) 的 `normalize_choice_case_in_paper()`（一行，别改各脚本
-  内部的解析/合并逻辑）。语法填空 / 选词填空 / 阅读表达 / 作文的单词答案保留原文大小写（`faced`、`FACE` 不改写）。
-  存量 JSON 迁移：`python3 normalize_json_case.py`（默认 dry-run；`--apply` 先备份到 `_backup_json_case_<时间戳>/`）。
+- 产出 `output_json_english/<类型>/<卷>.json`（`{paper, sections}`）+ `.review.txt`；**不再**走
+  `batch_convert_md_to_json.py` / `main.py` / `src/json_builder.py`（只 import 其纯函数）。
+- 七个板块：完形填空 `cloze`（10×1.5）/ 语法填空 `grammar`（10×1.5，`<Input>`）/ 选词填空 `word-choice`
+  （`<Input2>`）/ 阅读 `en-reading`（A–D 四段，14×2）/ 七选五 `seven-choose-five`（5×2，7 项池 + `<Blank>`）/
+  阅读表达 `reading-expression`（`<InputLong>`）/ 作文 `en-writing`（20 分，`<InputLong>`）。
+- **原文写 `section.content`**（旧数据用 `article`，导入端 `article || content` 都认，新链路只写 `content`）。
+- `paper.title` **不带学科后缀**（`2026北京西城高三一模`，与库内 442 卷一致）。
+- 选择题板块按前端「左原文右题目」版式：题干只在 `questions[].content`，`--check` 对此豁免（见
+  `MIGRATION-语文英语.md` §6.3）。
+- 空标记三路兜底：`__11__` 写法 / 裸题号（`He 11 (calm)`）/ **PDF 上下文回填**（md 把空标记吃光时用
+  `pdftotext -layout` 前后词锚点插标签）。
+- 源卷没有解析就不生成解析（丰台这类教师版自带 `【N题详解】` 的会写入 `analysis`）。
 
 ## 3. 数学（链路 ②）
 
@@ -226,21 +222,27 @@ python3 add_image_choice_analysis.py -T 二模 --workers 4
   图片同写一份到 `output_docx_to_md/.../images/` 供 nginx 直出。
 - 核对表与预览 HTML 是人工检查用的副产物（历史放在 `~/化学二模样例/`）。
 
-## 6. 语文（链路 ⑧）
+## 6. 语文（链路 ⑧，2026-11 重写为单入口）
 
 ```bash
-python3 batch_convert_docx_to_md.py -T 二模 -s 语文 -w 4
-python3 convert_chinese_md.py -p ../output_docx_to_md/二模/语文/<卷>/<卷>.md -T 二模
-python3 convert_chinese_md.py --dir ../output_docx_to_md -T 二模 -w 3
-# 收尾
-python3 merge_chinese_groups.py          # 合并题组
-python3 normalize_chinese_scores.py      # 分值归一（满分 150）
-python3 repair_chinese_tables.py --dry-run   # 表格用页面图像重识别
-python3 sanitize_chinese.py              # MDX/KaTeX 安全化
+python3 batch_convert_docx_to_md.py -p "../gaozhong/一模/语文/<卷>.docx" -o output_docx_to_md/一模/语文
+python3 convert_chinese_md.py -p ../output_docx_to_md/一模/语文/<卷>/<卷>.md -T 一模
+python3 convert_chinese_md.py --check -T 一模              # 契约断言（7 条），出错 exit 2
+python3 qa_scaffold.py --subject 语文 --type 一模 --check
+# 表格识别可疑时再加 --repair-tables（要 PDF + 多模态，默认关）
 ```
 
-- 名著阅读：单问卷为一题；多小问按 `(1)(2)` 拆题，材料进题组 `content`。
-- `docx_dots.py`：从 docx 读 ①②③ 填空标记，补 MD 里丢掉的空位。
+- 产出 `output_json_chinese/<类型>/<卷>.json`（`{paper, sections}`，**旧格式 `groups` 已废止**）+ `.review.txt`。
+- 原来串行跑的 4 个脚本已并进出口：`merge_chinese_groups` → `merge_sections()`、
+  `normalize_chinese_scores` → `normalize_scores()`（卷面分对得上就原样保留，只把默写固定 1 分/空；
+  对不上才按北京卷标准分值表 18/18/12/8/10/18/6/10/50 + 最大余数法分配）、
+  `repair_chinese_tables` → `repair_tables()`（`--repair-tables`）、`sanitize_chinese` → `sanitize_payload()`；
+  另加 `strip_residue()` 出口清洗（分区标题 / 卷首说明 / 与 intro 重复的引导语 / 材料末尾「（10分）」）。
+- 结构规划缓存到 `<输出根>/<类型>/.cache/<卷>-plan.json`，重跑不调模型；`--no-ai` 可完全离线复现。
+- 板块口径：多文本/文言文/古诗/文学类/语用/名著 = `chinese-reading`，默写 = `chinese-dictation`
+  （每空一个 `<Input2 />`，空数 == 默写分 == 8），微写作 = `chinese-micro-writing`，作文 = `chinese-essay`（50 分）。
+- 名著阅读：单问卷为一题，多小问按 `(1)(2)` 拆题（题号形如 `11-1`），材料进 section.content。
+- 陈旧数据：2025 及以前的二模 JSON 仍是 `groups` 格式，`--check -T 二模` 会跳过并提示「未迁移」。
 
 ## 7. 政治（链路 ⑨，2026-11 重写为生物同构）
 

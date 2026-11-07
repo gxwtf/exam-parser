@@ -1,22 +1,37 @@
 #!/usr/bin/env python3
-"""语文试卷（教师版）docx→MD → 结构化试卷 JSON
+"""语文试卷（教师版）docx→MD → 结构化试卷 JSON（链路 ⑧，2026-11 迁移到成熟格式）
+
+一个入口打通「md → JSON + review」，自带 `--check`，不再需要串行跑
+`merge_chinese_groups.py` / `normalize_chinese_scores.py` / `repair_chinese_tables.py` / `sanitize_chinese.py`
+（四者的等价逻辑已并入本脚本出口，见 `merge_sections` / `normalize_scores` / `repair_tables` / `sanitize_payload`）。
 
 和英语同一套思路：**大段文章不交给模型复述**，而是让模型给出「原文里的起止锚点（anchor）」，
 再由脚本从 Markdown 里按锚点精确截出文章；题目/选项/答案同样按题号从原文切，模型只做结构规划。
+规划结果缓存到 `<输出根>/<类型>/.cache/<卷名>-plan.json`，重跑同一卷不再调模型（可复现、可断网重跑）。
 
-输出：output_json_chinese/<类型>/<卷>.json
+输出：output_json_chinese/<类型>/<卷>.json（**顶层键 `sections`**，与生物/历史/地理/政治一致）
 {
   "paper": {title, subject, source, grade, year, totalScore, duration, tags},
-  "groups": [
-    {"category":"多文本","questionType":"chinese-reading","title":"…","intro":"阅读下面材料，完成1-5题。",
-     "content":"<文章 Markdown>","score":18,
-     "questions":[{"id":1,"questionType":"single","content":"…","options":[…],"answer":"C","score":3}]}
+  "sections": [
+    {"type":"多文本","category":"多文本","questionType":"chinese-reading","title":"多文本阅读 · …",
+     "intro":"阅读下面材料，完成1-5题。","content":"<文章 Markdown>","score":18,
+     "questions":[{"id":1,"questionType":"single","content":"…","options":[…],"answer":"C","analysis":"","score":3}]}
   ]
 }
 
+板块口径（题库契约，不能改）：
+| 板块 category | section.questionType | 小题 questionType | 内联占位 |
+| 多文本/文言文/古诗/文学类/语用/名著 | chinese-reading | single / text | 无（前端 `Problem` 按小题渲染，`content` 只放阅读材料）|
+| 默写 | chinese-dictation | input | 每空一个 `<Input2 />`（在 `content` 里内联）|
+| 微写作 | chinese-micro-writing | text | 无（前端按题目渲染大答题框）|
+| 作文 | chinese-essay | text | 无（同上）|
+整卷 150 分；默写每空 1 分（8 或 10 空）、微写作 10 分、作文 50 分。
+
 用法：
-  python3 convert_chinese_md.py -p ../output_docx_to_md/二模/语文/xxx/xxx.md
-  python3 convert_chinese_md.py --dir ../output_docx_to_md -T 二模 -w 3
+  python3 convert_chinese_md.py -p ../output_docx_to_md/一模/语文/<卷>/<卷>.md [-T 一模] [-o 输出根]
+  python3 convert_chinese_md.py -T 一模                       # 处理 output_docx_to_md/一模/语文/*
+  python3 convert_chinese_md.py --check -T 一模                # 契约自检（纯 Python，不调模型）
+  python3 convert_chinese_md.py --check -p <单卷 json | 卷名>   # 单卷自检
 """
 import argparse, json, os, re, time
 from pathlib import Path
@@ -67,12 +82,191 @@ PLAN_PROMPT = r"""下面是一份北京高三语文二模试卷的【试题部�
 2. 只有「有阅读材料」的题组才给 article_start/article_end；默写/微写作/作文没有材料，写空字符串。
 3. questionType 映射：多文本/文言文/古诗/文学类/名著/语用 → chinese-reading；默写 → chinese-dictation；
    微写作 → chinese-micro-writing；作文 → chinese-essay。
-4. article_start / article_end 必须是原文里**逐字出现**的片段（用于脚本精确截取），不要概括、不要加标点。
-5. 题号用数字数组，按原文题号。
-6. 只输出 JSON。
+4. **整本书阅读**（材料是多则《论语》语录、或《红楼梦》《乡土中国》《边城》《呐喊》等整本书的节选/回目）
+   一律归「名著」，即使它排在「文言文」大题里、卷面没有单独标题；两小问按 (1)(2) 算同组的 2 道小题。
+5. article_start / article_end 必须是原文里**逐字出现**的片段（用于脚本精确截取），不要概括、不要加标点。
+6. 题号用数字数组，按原文题号。
+7. 只输出 JSON。
 
 原文：
 """
+
+
+# ── 成熟格式（sections）常量 ────────────────────────────────────────
+CATEGORIES = ["多文本", "文言文", "古诗", "文学类", "名著", "默写", "语用", "微写作", "作文"]
+QTYPE_OF = {
+    "多文本": "chinese-reading", "文言文": "chinese-reading", "古诗": "chinese-reading",
+    "文学类": "chinese-reading", "名著": "chinese-reading", "语用": "chinese-reading",
+    "默写": "chinese-dictation", "微写作": "chinese-micro-writing", "作文": "chinese-essay",
+}
+# 北京卷标准分值（卷面分值解析不到时的兜底；正常以卷面为准）
+DEFAULT_SCORES = {"多文本": 18, "文言文": 18, "古诗": 12, "默写": 8, "名著": 10,
+                  "文学类": 18, "语用": 6, "微写作": 10, "作文": 50}
+TOTAL_SCORE = 150
+FIXED_SCORES = {"微写作": 10, "作文": 50}      # 硬口径（§6.7）
+DICTATION_SCORES = (8, 10)                     # 默写：每空 1 分，8 或 10 空
+PLACEHOLDER_TAGS = ("Input2", "Blank", "Input", "InputLong", "Blank2", "ClozeBlank")
+PH_RE = re.compile(r"<(?:" + "|".join(PLACEHOLDER_TAGS) + r")\b[^<>]*>")
+
+# 出口清洗：分区标题 / 卷首说明 / 残留题号 / 纯 ①②③④ 行
+RESIDUE_PATTERNS = [
+    re.compile(r"^\s*\**\s*[一二三四五六七八九十]\s*、\s*本大题共[^\n]*$"),
+    re.compile(r"^\s*\**\s*第[一二二2]\s*部分[^\n]*$"),
+    re.compile(r"^\s*\**\s*本试卷共[^\n]*$"),
+    re.compile(r"^\s*\**\s*语\s*文\s*\**$"),
+    re.compile(r"^\s*\**\s*20\d{2}\s*[.．]\s*\d{1,2}\s*\**$"),
+    re.compile(r"^\s*\**(?:一|二|三|四|五|六|七)\s*、\s*(?:本大题共)?\s*$"),
+    re.compile(r"^\s*[①②③④⑤⑥⑦⑧⑨⑩]{1,10}\s*$"),
+    re.compile(r"^\s*[（(]\s*共\s*\d+\s*分\s*[）)]\s*$"),
+]
+NOTICE_RE = re.compile(r"(考生须知|本试卷分第|本部分共\s*\d+\s*题|下列各小题均有四个选项|"
+                       r"答题前[，,]?\s*(?:请|考生)|考试时间\s*\d+\s*分钟\s*满分)")
+
+
+def strip_residue(text: str, intro: str = "") -> str:
+    """出口清洗：去掉材料/题干开头的分区标题、卷首说明、残留题号、重复的引导语。"""
+    if not text:
+        return text
+    lines = text.split("\n")
+    intro_s = (intro or "").strip()
+    changed = True
+    while changed and lines:
+        changed = False
+        i = next((k for k, ln in enumerate(lines) if ln.strip()), None)
+        if i is None:
+            break
+        first = lines[i].strip()
+        if intro_s and first == intro_s:                      # 引导语已在 intro 里
+            lines = lines[i + 1:]
+            changed = True
+            continue
+        if any(p.match(first) for p in RESIDUE_PATTERNS):
+            lines = lines[i + 1:]
+            changed = True
+            continue
+        if NOTICE_RE.search(first[:120]) and len(first) <= 200:
+            lines = lines[i + 1:]
+            changed = True
+            continue
+        break
+    return "\n".join(lines).strip()
+
+
+def blank_phrases(ans_text: str) -> list[list[str]]:
+    """默写答案 → 每行（(1)(2)… 或 ①②③…）的若干短语（每短语 = 一个空）。"""
+    t = re.split(r"【?评分(?:参考|标准|要求)】?", ans_text or "")[0]
+    parts: list[str] = []
+    marks = list(SUBQ_RE.finditer(t))
+    if marks:
+        for i, m in enumerate(marks):
+            end = marks[i + 1].start() if i + 1 < len(marks) else len(t)
+            parts.append(t[m.end():end])
+    else:
+        marks2 = list(re.finditer(r"[①②③④⑤⑥⑦⑧⑨⑩]", t))
+        if marks2:
+            for i, m in enumerate(marks2):
+                end = marks2[i + 1].start() if i + 1 < len(marks2) else len(t)
+                parts.append(t[m.end():end])
+        else:
+            parts = [t]
+    out = []
+    for p in parts:
+        p = re.sub(r"[①②③④⑤⑥⑦⑧⑨⑩]", " ", p)
+        ph = [x for x in re.split(r"[\s，,、；;]+", p.strip()) if x and x not in ("分", "。")]
+        out.append(ph)
+    return out
+
+
+BLANK_RUN = re.compile(r"[\\_*]*\\[_*][\\_*]*")     # Word 导出的下划线填空字形（\_**\_**…）
+BLANK_MARK = re.compile(r"[①②③④⑤⑥⑦⑧⑨⑩]")
+# 引号内只剩空格当空位的写法：`"落木千山天远大， "` / `" ， ，进，吾往也"`
+
+
+def tidy_blank_glyphs(text: str) -> str:
+    """把残留的下划线填空字形换成全角下划线（MDX/Markdown 里安全、不会变成分隔线/强调）。"""
+    return BLANK_RUN.sub("＿＿＿", text or "")
+
+
+_QS = "\u201c\u201d\u300c\u300d\"\u2018\u2019"
+
+
+def space_slots_in_quotes(line: str) -> str:
+    """把引号内只剩空格当空位的写法补成占位符（如 " ， ，进，吾往也" → "<Input2 />，<Input2 />，进，吾往也"）。"""
+    def repl(m):
+        inner = m.group(2)
+        inner2 = re.sub(r"[ \t\u3000]+", "<Input2 />", inner)
+        return m.group(1) + inner2 + m.group(3)
+
+    for a, b in (("\u201c", "\u201d"), ("\u300c", "\u300d"), ('"', '"'), ("\u2018", "\u2019")):
+        line = re.sub("(" + re.escape(a) + ")([^" + re.escape(b) + "]*)" + "(" + re.escape(b) + ")", repl, line)
+    return line
+
+
+def build_dictation(stem: str, ans_text: str, qid, review: list[str]):
+    """默写：题干里每个空 → `<Input2 />`，每个空一道 input 小题（答案按空对）。
+
+    改进点（相对旧链路）：一行里有几处下划线/答案里有多短语时，按「短语数」拆成多个空，
+    不再把「汉家烟尘在东北 汉将辞家破残贼」这种一行两句压成一个空。
+    """
+    groups = blank_phrases(ans_text)
+    lines = stem.split("\n")
+    line_idx = [i for i, ln in enumerate(lines) if SUBQ_RE.match(ln.strip())]
+    if not line_idx:
+        line_idx = [i for i, ln in enumerate(lines)
+                    if BLANK_RUN.search(ln) or BLANK_MARK.search(ln)]
+    blanks: list[str] = []
+    for k, li in enumerate(line_idx):
+        ln = lines[li]
+        phrases = groups[k] if k < len(groups) else []
+        runs = list(BLANK_RUN.finditer(ln))
+        marks = [] if runs else list(BLANK_MARK.finditer(ln))
+        if not runs and not marks:
+            # 有些卷（如 2026 丰台一模）docx 里的空位只剩引号内的空格，没有下划线字形
+            seg = space_slots_in_quotes(ln)
+            got = len(PH_RE.findall(seg))
+            if got:
+                lines[li] = seg
+                blanks += [phrases[i] if i < len(phrases) else "" for i in range(got)]
+                if got != len(phrases):
+                    review.append(f"默写第{k + 1}行：空位 {got} 个 / 答案短语 {len(phrases)} 个（按空位留空）")
+            continue
+        n = len(phrases) or len(runs) or len(marks) or 1
+        if runs and len(runs) not in (1, n):
+            n = len(runs)                                   # 下划线段数优先
+            review.append(f"默写第{k + 1}行：下划线 {len(runs)} 处 / 答案 {len(phrases)} 个，按下划线数留空")
+        if runs:
+            if len(runs) == 1 and n > 1:
+                ln = ln[:runs[0].start()] + "，".join(["<Input2 />"] * n) + ln[runs[0].end():]
+            else:
+                out, pos = [], 0
+                for r in runs:
+                    out.append(ln[pos:r.start()])
+                    out.append("<Input2 />")
+                    pos = r.end()
+                out.append(ln[pos:])
+                ln = "".join(out)
+                n = len(runs)
+        else:
+            out, pos = [], 0
+            for m in marks:
+                out.append(ln[pos:m.start()])
+                out.append("<Input2 />")
+                pos = m.end()
+            out.append(ln[pos:])
+            ln = "".join(out)
+            n = len(marks)
+        blanks += [phrases[i] if i < len(phrases) else "" for i in range(n)]
+        lines[li] = ln
+    content = "\n".join(lines)
+    content = BLANK_RUN.sub("<Input2 />", content)           # 兜底：其它行残留的下划线
+    n_ph = len(PH_RE.findall(content))
+    if n_ph != len(blanks):
+        review.append(f"默写：占位符 {n_ph} 个 ≠ 答案短语 {len(blanks)} 个（按占位符数补齐答案）")
+        blanks = (blanks + [""] * n_ph)[:n_ph]
+    questions = [{"id": f"{qid}-{i + 1}", "questionType": "input", "content": "",
+                  "options": [], "answer": blanks[i], "analysis": "", "score": 1}
+                 for i in range(len(blanks))]
+    return content, questions
 
 
 def log(msg: str):
@@ -813,11 +1007,13 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
         if q["questionType"] == "single":
             seg_q = _question_segment(body, no)
             if looks_broken(q, seg_q):
-                fixed = ai_options(seg_q)
+                fixed = ai_options(seg_q) if AI_ENABLED.get("on") else {}
                 if fixed:
                     q["options"] = [{"id": k, "label": fixed[k]} for k in "abcd"]
-                else:
+                elif AI_ENABLED.get("on"):
                     review.append(f"第{no}题选项切分可疑且 AI 未能还原")
+                else:
+                    review.append(f"第{no}题选项切分可疑（--no-ai 未调模型还原），请人工核对")
         if not q["answer"]:
             review.append(f"第{no}题缺答案")
         if dots is not None and q["questionType"] == "single":
@@ -827,25 +1023,9 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
         qs.append(q)
 
     if qtype == "chinese-dictation" and qs:
-        # 默写：题干里的每个空 → <Input2 />，每个空一道 input 题（答案按空格拆）
+        # 默写：题干里每个空 → <Input2 />，每个空一道 input 小题（答案按空对）
         q0 = qs[0]
-        stem = q0["content"]
-        n_blank = len(BLANK.findall(stem))
-        ans_text = q0["answer"]
-        blanks = []
-        for part in re.findall(r"[（(]\s*\d+\s*[）)]\s*([^（(]+)", ans_text):
-            blanks += [x for x in re.split(r"\s+", part.strip()) if x]
-        if not blanks:
-            blanks = [x for x in re.split(r"\s+", re.sub(r"[（(]\s*\d+\s*[）)]", " ", ans_text).strip()) if x]
-        if n_blank == 0:
-            n_blank = len(blanks)
-        content = BLANK.sub("<Input2 />", stem)
-        inputs = [{"id": f"{q0['id']}-{i+1}", "questionType": "input", "content": "",
-                   "options": [], "answer": blanks[i] if i < len(blanks) else "", "score": 1}
-                  for i in range(n_blank)]
-        if len(blanks) != n_blank:
-            review.append(f"默写空数 {n_blank} 与答案数 {len(blanks)} 不一致")
-        qs = inputs
+        content, qs = build_dictation(q0["content"], q0["answer"], q0["id"], review)
         article = content
 
     if qtype in ("chinese-micro-writing", "chinese-essay") and qs:
@@ -923,40 +1103,290 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             q["content"] = rewrite_images(q["content"], md_dir, stem_name, type_dir, review)
             for o in q["options"]:
                 o["label"] = rewrite_images(str(o["label"]), md_dir, stem_name, type_dir, review)
+    intro = (g.get("intro") or "").strip()
+    article = strip_residue(article, intro)
+    # 材料末尾残留的分值括号（分值已由 section.score 表达）
+    article = re.sub(r"[（(]\s*共?\s*\d+\s*分\s*[）)]\s*$", "", article).strip()
+    for q in qs:
+        q["content"] = strip_residue(q["content"])
+    if qtype != "chinese-dictation":
+        article = tidy_blank_glyphs(article)
+        for q in qs:
+            q["content"] = tidy_blank_glyphs(q["content"])
+            if str(q.get("answer") or "").strip():
+                q["answer"] = q["answer"].replace("\\_", "_")
     return {
-        "category": cat, "questionType": qtype,
+        "type": cat, "category": cat, "questionType": qtype,
         "title": g.get("title") or f"{cat}阅读",
-        "intro": g.get("intro") or "",
+        "intro": intro,
         "content": article, "score": total, "questions": qs,
     }
 
 
 OUT = {"root": OUT_ROOT}
+AI_ENABLED = {"on": True}          # --no-ai 时置 False，保证「零模型调用、输出可复现」
 
 
-DEFAULT_GROUP_SCORES = {"多文本": 18, "文言文": 18, "古诗": 12, "默写": 8, "名著": 10,
-                        "文学类": 18, "语用": 6, "微写作": 10, "作文": 50}
+# ══════════════════════════════════════════════════════════════════
+# 出口后处理（原 4 个后处理脚本的等价逻辑，一次做完）
+# ══════════════════════════════════════════════════════════════════
+def merge_sections(sections: list[dict], review: list[str]) -> list[dict]:
+    """← merge_chinese_groups.py：同 category 的重复 section 合并（AI 规划偶尔把同一题型拆 2-3 组）。
+
+    题目按原顺序拼接；content 取第一个非空；score 重算为小题合计。
+    """
+    merged: dict[str, dict] = {}
+    order: list[str] = []
+    for sec in sections:
+        cat = sec.get("category") or ""
+        if cat not in merged:
+            merged[cat] = dict(sec)
+            merged[cat]["questions"] = list(sec.get("questions") or [])
+            order.append(cat)
+        else:
+            m = merged[cat]
+            m["questions"].extend(sec.get("questions") or [])
+            if not (m.get("content") or "").strip() and (sec.get("content") or "").strip():
+                m["content"] = sec["content"]
+            review.append(f"合并重复板块「{cat}」：多出的一组 {len(sec.get('questions') or [])} 题已并入")
+    if len(order) == len(sections):
+        return sections
+    # 按板块标准顺序重排（阅读类保持原顺序）
+    out = [merged[c] for c in order]
+    for sec in out:
+        sec["score"] = sum(q.get("score") or 0 for q in sec["questions"])
+    return out
 
 
-def fix_scores(out_groups: list[dict]) -> None:
-    """旧卷/个别卷的分值解析不到时，用北京卷标准分值兜底（总 150）。"""
-    total = sum(g["score"] for g in out_groups)
-    if total >= 100:
+def _largest_remainder(weights: list[float], total: int) -> list[int]:
+    """按权重把 total 分给各项（最大余数法，保证和恰好等于 total、每项 ≥1）。"""
+    n = len(weights)
+    if n == 0:
+        return []
+    s = sum(weights) or n
+    raw = [w * total / s for w in weights]
+    out = [max(1, int(x)) for x in raw]
+    diff = total - sum(out)
+    if diff > 0:
+        order = sorted(range(n), key=lambda i: -(raw[i] - int(raw[i])))
+        for k in range(diff):
+            out[order[k % n]] += 1
+    elif diff < 0:
+        order = sorted(range(n), key=lambda i: raw[i] - int(raw[i]))
+        for k in range(-diff):
+            i = order[k % n]
+            if out[i] > 1:
+                out[i] -= 1
+    return out
+
+
+def normalize_scores(sections: list[dict], review: list[str], target: int = TOTAL_SCORE) -> None:
+    """← normalize_chinese_scores.py：把整卷分值规整到 150（卷面分对得上就不动）。
+
+    1) 卷面分合计 == 150 且每个 section == Σ小问 → 原样保留（优先相信卷面）；
+    2) 否则按北京卷标准分值表兜底/缩放，并保证 Σ小问 == section.score、Σ section == 150；
+    3) 默写每空 1 分；微写作 10、作文 50 为硬口径。
+    """
+    # ① 卷面已经对得上就直接过
+    total = sum(sec.get("score") or 0 for sec in sections)
+    consistent = all((sec.get("score") or 0) == sum(q.get("score") or 0 for q in sec["questions"])
+                     for sec in sections)
+    hard_ok = all(sec.get("score") == FIXED_SCORES.get(sec.get("category"), sec.get("score"))
+                  for sec in sections)
+    if total == target and consistent and hard_ok:
+        for sec in sections:                      # 默写仍要保证每空 1 分
+            if sec.get("category") == "默写":
+                for q in sec["questions"]:
+                    q["score"] = 1
+                sec["score"] = len(sec["questions"])
         return
-    for g in out_groups:
-        default = DEFAULT_GROUP_SCORES.get(g["category"])
-        if not default:
+
+    qsum = sum(q.get("score") or 0 for sec in sections for q in sec["questions"])
+    if consistent and qsum > 0 and target * 0.8 <= qsum <= target * 1.2:
+        # 卷面每题分值看起来可信 → 只在作文（或最后一段）吸收差额，不按比例重分
+        diff = target - total
+        if diff:
+            tgt = next((x for x in sections if x.get("category") == "作文"), sections[-1])
+            if tgt.get("questions"):
+                tgt["questions"][-1]["score"] = max(1, (tgt["questions"][-1].get("score") or 1) + diff)
+                tgt["score"] = sum(q.get("score") or 0 for q in tgt["questions"])
+            review.append(f"分值规整：卷面合计 {total} 分 → 差额 {diff} 分记到「{tgt.get('category')}」最后一题"
+                          f"（每题分值以卷面为准，未按比例重分）")
+        for sec in sections:
+            if sec.get("category") == "默写":
+                for q in sec["questions"]:
+                    q["score"] = 1
+                sec["score"] = len(sec["questions"])
+        return
+
+    review.append(f"分值规整：卷面合计 {total} 分 / 每题合计 {qsum} 分 → 按北京卷标准分值表归到 {target} 分")
+    # ② 每个板块的目标分：优先标准分值表，表里没有的按卷面
+    targets = []
+    for sec in sections:
+        cat = sec.get("category") or ""
+        targets.append(DEFAULT_SCORES.get(cat) or (sec.get("score") or 0) or 1)
+    if sum(targets) != target:
+        targets = _largest_remainder([float(t) for t in targets], target)
+    # ③ 板块内部分配
+    for sec, t in zip(sections, targets):
+        cat = sec.get("category") or ""
+        qs = sec["questions"]
+        if not qs:
+            sec["score"] = 0
             continue
-        if g["category"] == "默写":
-            for q in g["questions"]:
-                q["score"] = q["score"] or 1
-            g["score"] = sum(q["score"] for q in g["questions"]) or default
+        if cat == "默写":
+            for q in qs:
+                q["score"] = 1
+            sec["score"] = len(qs)
+            if sec["score"] != t:
+                review.append(f"默写 {len(qs)} 空 → {sec['score']} 分（标准 {t} 分），以空数为准")
             continue
-        n = max(1, len(g["questions"]))
-        per = max(1, round(default / n))
-        for q in g["questions"]:
-            q["score"] = per
-        g["score"] = sum(q["score"] for q in g["questions"])
+        if cat in FIXED_SCORES:
+            t = FIXED_SCORES[cat]
+        cur = [max(1, q.get("score") or 0) for q in qs]
+        if sum(cur) == t and all(q.get("score") for q in qs):
+            sec["score"] = t
+            continue
+        alloc = _largest_remainder([float(x) for x in cur], t)
+        for q, sc in zip(qs, alloc):
+            q["score"] = sc
+        sec["score"] = sum(q["score"] for q in qs)
+        review.append(f"{cat}：{len(qs)} 题重分 {[q['score'] for q in qs]}（合计 {sec['score']}）")
+    # ④ 兜底：合计再差多少，补到作文/最后一题
+    diff = target - sum(sec.get("score") or 0 for sec in sections)
+    if diff:
+        tgt = next((x for x in sections if x.get("category") == "作文"), sections[-1])
+        if tgt.get("questions"):
+            tgt["questions"][-1]["score"] = max(1, (tgt["questions"][-1].get("score") or 1) + diff)
+            tgt["score"] = sum(q.get("score") or 0 for q in tgt["questions"])
+            review.append(f"总分差 {diff} 分补到「{tgt.get('category')}」最后一题")
+
+
+def normalize_choice_answers(sections: list[dict], review: list[str]) -> int:
+    """选择题答案从「A(B 错…)」「B. …」里只取字母，其余当解析（教师版常把解析写在答案后面）。"""
+    n = 0
+    filled = 0
+    for sec in sections:
+        for q in sec["questions"]:
+            opts = q.get("options") or []
+            if not opts:
+                continue
+            ids = [str(o.get("id") or "").upper() for o in opts]
+            ans = str(q.get("answer") or "").strip()
+            m = re.match(r"^([A-D]{1,4})\s*[.．、)）:：]?\s*(.*)$", ans, re.S)
+            if not m or m.group(1) not in ids:
+                continue
+            letter, rest = m.group(1), m.group(2).strip()
+            if len(letter) > 1:
+                continue                                  # 多选连写，保持原样
+            if ans != letter:
+                q["answer"] = letter
+                n += 1
+            if rest and len(rest) >= 8 and not str(q.get("analysis") or "").strip():
+                q["analysis"] = rest
+                filled += 1
+    if n:
+        review.append(f"选择题答案清洗：{n} 题从「字母+解析」里只取字母")
+    if filled:
+        review.append(f"选择题解析：{filled} 题用教师版答案后的原文解析（非 AI 生成）")
+    return n
+
+
+def sanitize_payload(sections: list[dict], review: list[str]) -> int:
+    """← sanitize_chinese.py：MDX/KaTeX 安全化（content / analysis / 选项 label）。"""
+    try:
+        import sanitize_mdx as S
+    except Exception as e:                                   # 依赖缺失也不能挡主流程
+        review.append(f"MDX 安全化跳过（{str(e)[:40]}）")
+        return 0
+    S.KEEP_TAGS = tuple(dict.fromkeys(list(S.KEEP_TAGS) + ["InputLong", "AnswerBox"]))
+    n = 0
+
+    def fix(t):
+        nonlocal n
+        new = S.fix(t or "")
+        if new != (t or ""):
+            n += 1
+        return new
+
+    for sec in sections:
+        sec["content"] = fix(sec.get("content"))
+        for q in sec["questions"]:
+            q["content"] = fix(q.get("content"))
+            q["analysis"] = fix(q.get("analysis"))
+            for o in q.get("options") or []:
+                o["label"] = fix(str(o.get("label") or ""))
+    if n:
+        review.append(f"MDX 安全化：{n} 个字段（< > → $<$/$>$、sub/sup → Unicode、去掉杂标签）")
+    return n
+
+
+def suspicious_table(text: str) -> bool:
+    lines = [l for l in (text or "").split("\n") if l.strip().startswith("|")]
+    if len(lines) < 3:
+        return False
+    return len({len(l.strip().strip("|").split("|")) for l in lines}) > 1
+
+
+def repair_tables(sections: list[dict], pdf: Path, type_dir: str, review: list[str]) -> int:
+    """← repair_chinese_tables.py：表格被 Word 弄乱（合并单元格/跨列）时，用 PDF 页面图像重识别。
+
+    只在 `--repair-tables` 时跑（要 pdftoppm + 多模态），默认不动。
+    """
+    targets = [(sec, q) for sec in sections for q in sec["questions"]
+               if suspicious_table(str(q.get("content") or ""))]
+    if not targets:
+        return 0
+    if not pdf or not Path(pdf).exists():
+        review.append(f"表格修复跳过：{len(targets)} 处可疑表格但找不到 PDF")
+        return 0
+    try:
+        import tempfile
+        import convert_math_pdf as M
+        import requests
+    except Exception as e:
+        review.append(f"表格修复跳过（依赖缺失：{str(e)[:40]}）")
+        return 0
+    prompt = ("这是语文试卷的一页图像。如果本页有【第 {no} 题】的表格，请把它完整转成 Markdown 表格：\n"
+              "1. 保留原文所有文字与填空标记 ①②③④⑤⑥，不要补答案、不要改写；\n"
+              "2. 合并单元格用空单元格/重复上级标签如实表达，保持「上级→下级」的层级；\n"
+              "3. 只输出 Markdown 表格；本页没有该题的表格就输出空。")
+    fixed = 0
+    with tempfile.TemporaryDirectory() as td:
+        pages = M.render_pages(Path(pdf), 140, Path(td), 8)
+        for sec, q in targets:
+            got = ""
+            for img in pages:
+                try:
+                    r = requests.post(
+                        f"{BASE_URL}/chat/completions",
+                        json={"model": MODEL, "max_tokens": 3000, "temperature": 0.0,
+                              "reasoning_effort": "none",
+                              "messages": [{"role": "system", "content": "你是语文试卷录入员，只输出 Markdown 表格。"},
+                                           {"role": "user", "content": [
+                                               {"type": "text", "text": prompt.format(no=q.get("id"))},
+                                               {"type": "image_url", "image_url":
+                                                {"url": "data:image/png;base64," +
+                                                        __import__("base64").b64encode(img.read_bytes()).decode()}}]}]},
+                        headers={"Authorization": f"Bearer {API_KEY}"}, timeout=300)
+                    r.raise_for_status()
+                    got = (r.json()["choices"][0]["message"].get("content") or "").strip()
+                except Exception:
+                    got = ""
+                if got and got.count("\n") >= 3 and "|" in got:
+                    break
+                got = ""
+            if not got:
+                review.append(f"{sec.get('category')} 第{q.get('id')}题：可疑表格未能用页面图像重识别")
+                continue
+            lines = str(q.get("content") or "").split("\n")
+            idx = [i for i, l in enumerate(lines) if l.strip().startswith("|")]
+            if not idx:
+                continue
+            q["content"] = "\n".join(lines[:idx[0]] + got.split("\n") + lines[idx[-1] + 1:])
+            fixed += 1
+            review.append(f"{sec.get('category')} 第{q.get('id')}题：表格已用页面图像重识别并替换")
+    return fixed
 
 
 def process(md: Path, type_dir: str, args) -> str:
@@ -993,10 +1423,22 @@ def process(md: Path, type_dir: str, args) -> str:
             except Exception as e:
                 log(f"  {title}: 读取 docx 着重号失败 {str(e)[:80]}")
 
-    plan = {}
-    if args.ai:
+    # 结构规划（缓存到 <输出根>/<类型>/.cache/<卷名>-plan.json，重跑不再调模型）
+    cache = OUT["root"] / type_dir / ".cache" / f"{title}-plan.json"
+    plan = None
+    if cache.exists() and not args.refresh_plan:
+        try:
+            plan = json.loads(cache.read_text(encoding="utf-8"))
+        except Exception:
+            plan = None
+    if plan is None:
+        if not args.ai:
+            raise RuntimeError("没有规划缓存且指定了 --no-ai（先跑一次联网版，或用 --refresh-plan）")
         plan = chat([{"role": "system", "content": SYSTEM_PROMPT},
                      {"role": "user", "content": PLAN_PROMPT + body[:60000]}], max_tokens=6000)
+        if isinstance(plan, dict) and plan.get("groups"):
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
     groups = plan.get("groups") if isinstance(plan, dict) else None
     if not groups:
         raise RuntimeError("结构规划为空")
@@ -1042,27 +1484,298 @@ def process(md: Path, type_dir: str, args) -> str:
                         filled += 1
             if filled:
                 log(f"  {title}：AI 从答案区补 {filled}/{len(missing)} 题答案")
-            left = [q["id"] for grp in out_groups for q in grp["questions"] if not str(q.get("answer") or "").strip()]
-            if left:
-                review.append(f"仍缺答案：{left[:20]}")
+    # 微写作/作文：教师版常不给答案，题库惯例写「略」
+    for sec in out_groups:
+        if sec.get("category") in ("微写作", "作文"):
+            for q in sec["questions"]:
+                if not str(q.get("answer") or "").strip():
+                    q["answer"] = "略"
+                    review.append(f"{sec['category']} 第{q['id']}题：教师版无参考答案，按题库惯例填「略」")
+    left = [q["id"] for sec in out_groups for q in sec["questions"] if not str(q.get("answer") or "").strip()]
+    if left:
+        review.append(f"仍缺答案：{left[:20]}")
 
-    fix_scores(out_groups)
+    # ── 出口后处理（原 4 个后处理脚本，一次做完）──
+    sections = merge_sections(out_groups, review)
+    normalize_choice_answers(sections, review)
+    normalize_scores(sections, review)
+    if args.repair_tables:
+        pdfs = sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))
+        repair_tables(sections, pdfs[0] if pdfs else None, type_dir, review)
+    sanitize_payload(sections, review)
+
     year = re.search(r"(20\d{2})", title)
-    total = sum(g["score"] for g in out_groups)
+    total = sum(sec["score"] for sec in sections)
     paper = {
         "title": title, "subject": "语文", "source": title, "grade": args.grade,
         "year": int(year.group(1)) if year else None,
         "totalScore": total or None, "duration": 150,
-        "tags": ["语文", args.grade, "二模"] + ([year.group(1)] if year else []),
+        "tags": ["语文", args.grade, type_dir] + ([year.group(1)] if year else []),
     }
     dst.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"paper": paper, "groups": out_groups}
+    # 旧格式（groups）先备份成 <卷>.old-groups.json，再覆盖
+    if dst.exists():
+        try:
+            old = json.loads(dst.read_text(encoding="utf-8"))
+        except Exception:
+            old = None
+        if isinstance(old, dict) and "groups" in old and "sections" not in old:
+            bak = dst.with_name(f"{dst.stem}.old-groups.json")
+            if not bak.exists():
+                bak.write_text(json.dumps(old, ensure_ascii=False, indent=2), encoding="utf-8")
+                review.append(f"旧格式 JSON 已备份：{bak.name}")
+    payload = {"paper": paper, "sections": sections}
     normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写
     dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    if review:
-        dst.with_suffix(".review.txt").write_text("\n".join(review), encoding="utf-8")
-    n = sum(len(g["questions"]) for g in out_groups)
-    return f"✓ {title}：{len(out_groups)} 组 / {n} 题（复核 {len(review)} 处）"
+    dst.with_suffix(".review.txt").write_text("\n".join(review) + "\n", encoding="utf-8")
+    n = sum(len(sec["questions"]) for sec in sections)
+    return f"✓ {title}：{len(sections)} 板块 / {n} 题 / {total} 分（复核 {len(review)} 处）"
+
+
+
+# ══════════════════════════════════════════════════════════════════
+# --check：契约自检（纯 Python，不调模型）
+# ══════════════════════════════════════════════════════════════════
+EXPECTED_QNUM = {"多文本": 5, "文言文": 5, "文学类": 4, "古诗": 3, "语用": 2,
+                 "名著": 2, "微写作": 1, "作文": 1}
+STEM_RESIDUE = re.compile(r"^\s*(?:[①②③④⑤⑥]{1,6}|(?:[一二三四五六]、)?(?:选择题|非选择题)\**|"
+                          r"\*\*[^*\n]+(?:选择题|非选择题)[^*\n]+\*\*)\s*(?:\n|$)")
+EXAM_IMG = re.compile(r"/exam-images/([^\"'\s)]+)")
+_norm = lambda t: re.sub(r"\s+", "", t or "")
+
+
+def img_exists(ref: str, type_dir: str) -> bool:
+    """/exam-images/<类型>/语文/<卷名>/images/x.png → 落盘（卷目录带「（教师版）」也要命中）"""
+    if not ref.startswith("/exam-images/"):
+        return False
+    parts = ref[len("/exam-images/"):].split("/")
+    if len(parts) < 5:
+        return False
+    t, subj, paper, _img, fname = parts[0], parts[1], parts[2], parts[3], parts[4]
+    parent = MD_ROOT / t / subj
+    if not parent.exists():
+        return False
+    for d in parent.iterdir():
+        if not d.is_dir():
+            continue
+        base = re.sub(r"[（(]教师版[）)]|[（(]含答案[）)]", "", d.name).strip()
+        if (base == paper or d.name == paper) and (d / "images" / fname).exists():
+            return True
+    return (parent / paper / "images" / fname).exists()
+
+
+def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
+    stat: dict = {"title": jf.stem}
+    errs: list[str] = []
+    notes: list[str] = []
+    raw = jf.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    type_dir = jf.parent.name
+    paper = data.get("paper") or {}
+    sections = data.get("sections")
+    if sections is None:
+        errs.append("顶层键不是 sections（还是旧契约 groups？）")
+        return stat, errs, notes
+    if paper.get("subject") != "语文":
+        errs.append(f"paper.subject={paper.get('subject')!r}（应为 语文）")
+    if not sections:
+        errs.append("sections 为空")
+        return stat, errs, notes
+
+    # ① 分值
+    total = sum(sec.get("score") or 0 for sec in sections)
+    if paper.get("totalScore") != total:
+        errs.append(f"paper.totalScore={paper.get('totalScore')} ≠ Σsection {total}")
+    if total != TOTAL_SCORE:
+        errs.append(f"整卷 {total} 分 ≠ 语文标准 {TOTAL_SCORE} 分")
+    for sec in sections:
+        qs = sec.get("questions") or []
+        ssum = sum(q.get("score") or 0 for q in qs)
+        if ssum != (sec.get("score") or 0):
+            errs.append(f"{sec.get('category')}：Σ小问 {ssum} ≠ section.score {sec.get('score')}")
+        if any((q.get("score") or 0) <= 0 for q in qs):
+            errs.append(f"{sec.get('category')}：有小问分值 ≤ 0")
+        if not qs:
+            errs.append(f"{sec.get('category')}：没有问题")
+
+    # ⑦ 板块口径
+    cats = [sec.get("category") for sec in sections]
+    dup = {c for c in cats if cats.count(c) > 1}
+    if dup:
+        errs.append(f"板块重复（未合并）：{sorted(dup)}")
+    for sec in sections:
+        cat = sec.get("category")
+        if cat not in CATEGORIES:
+            errs.append(f"未知板块 {cat!r}（只能取 {'/'.join(CATEGORIES)}）")
+            continue
+        if sec.get("questionType") != QTYPE_OF[cat]:
+            errs.append(f"{cat}：questionType={sec.get('questionType')!r}（应为 {QTYPE_OF[cat]}）")
+        if cat in FIXED_SCORES and (sec.get("score") or 0) != FIXED_SCORES[cat]:
+            errs.append(f"{cat}：{sec.get('score')} 分（应固定 {FIXED_SCORES[cat]} 分）")
+        if cat == "默写":
+            n_ph = len(PH_RE.findall(sec.get("content") or ""))
+            if n_ph != len(sec.get("questions") or []):
+                errs.append(f"默写：占位符 {n_ph} 个 ≠ 空/小题 {len(sec.get('questions') or [])} 个")
+            if (sec.get("score") or 0) != n_ph or n_ph not in DICTATION_SCORES:
+                errs.append(f"默写：{n_ph} 空 / {sec.get('score')} 分（应每空 1 分且空数 ∈ {DICTATION_SCORES}）")
+        elif cat in ("微写作", "作文"):
+            if len(sec.get("questions") or []) != 1:
+                errs.append(f"{cat}：应恰好 1 题，实为 {len(sec.get('questions') or [])}")
+        elif PH_RE.search(sec.get("content") or ""):
+            errs.append(f"{cat}：content 里有占位符（阅读类不内联，前端按小题渲染）")
+        exp = EXPECTED_QNUM.get(cat)
+        if exp and len(sec.get("questions") or []) != exp:
+            notes.append(f"{cat}：{len(sec.get('questions'))} 题（常规 {exp} 题，个别卷有差异）")
+
+    # ② ③ ④ ⑤ 逐题
+    for sec in sections:
+        cat = sec.get("category")
+        content = sec.get("content") or ""
+        if cat in ("多文本", "文言文", "古诗", "文学类", "名著", "语用") and not content.strip():
+            errs.append(f"{cat}：content（阅读材料）为空")
+        if STEM_RESIDUE.match(content) or NOTICE_RE.search(content[:120]):
+            errs.append(f"{cat}：材料开头混进分区标题/卷首说明：{content[:20]!r}")
+        body = _norm(content)
+        for q in sec.get("questions") or []:
+            qc = (q.get("content") or "").strip()
+            qid = q.get("id")
+            if STEM_RESIDUE.match(qc) or NOTICE_RE.search(qc[:120]):
+                errs.append(f"{cat} 第{qid}题：题干开头混进分区标题/卷首说明：{qc[:20]!r}")
+            opts = q.get("options") or []
+            if opts:
+                oids = [str(o.get("id") or "").upper() for o in opts]
+                if oids != ["A", "B", "C", "D"]:
+                    errs.append(f"{cat} 第{qid}题：options={oids}（应为 A–D 四项）")
+                ans = str(q.get("answer") or "")
+                if len(ans) != 1 or ans != ans.upper() or ans not in oids:
+                    errs.append(f"{cat} 第{qid}题：answer={ans!r}（应为单个大写字母且 ∈ options）")
+                if any(not str(o.get("label") or "").strip() for o in opts):
+                    errs.append(f"{cat} 第{qid}题：有空选项")
+            elif q.get("questionType") not in ("text", "input"):
+                errs.append(f"{cat} 第{qid}题：questionType={q.get('questionType')!r}")
+            if cat in ("多文本", "文言文", "古诗", "文学类", "名著", "语用"):
+                if not qc:
+                    errs.append(f"{cat} 第{qid}题：题干为空")
+                elif _norm(qc) in body:
+                    errs.append(f"{cat} 第{qid}题：设问重复出现在 section.content 里（前端会双显）")
+            if cat in ("微写作", "作文") and not qc:
+                errs.append(f"{cat} 第{qid}题：题目为空")
+            if not str(q.get("answer") or "").strip():
+                notes.append(f"{cat} 第{qid}题：没有参考答案")
+
+    # ⑥ 图片
+    refs = sorted(set(EXAM_IMG.findall(raw)))
+    for ref in refs:
+        if not img_exists("/exam-images/" + ref, type_dir):
+            errs.append(f"图片不存在：/exam-images/{ref}")
+    notes.append(f"图片引用 {len(refs)} 张")
+
+    stat.update({
+        "sections": len(sections),
+        "questions": sum(len(sec.get("questions") or []) for sec in sections),
+        "choices": sum(1 for sec in sections for q in (sec.get("questions") or []) if q.get("options")),
+        "opens": sum(1 for sec in sections for q in (sec.get("questions") or [])
+                     if not q.get("options") and q.get("questionType") in ("text", "input")),
+        "total": total,
+        "imgs": len(refs),
+        "answered": sum(1 for sec in sections for q in (sec.get("questions") or [])
+                        if str(q.get("answer") or "").strip()),
+        "analysed": sum(1 for sec in sections for q in (sec.get("questions") or [])
+                        if str(q.get("analysis") or "").strip()),
+    })
+    return stat, errs, notes
+
+
+def run_check(args) -> int:
+    files: list[Path] = []
+    if args.path:
+        p = Path(args.path)
+        if p.is_file() and p.suffix == ".json":
+            files = [p]
+        elif p.is_file():
+            stem = re.sub(r"[（(]教师版[）)]", "", p.stem).strip()
+            files = [OUT["root"] / args.type / f"{stem}.json"]
+        else:
+            # 目录：JSON 或 md 目录都收
+            files = sorted(x for x in p.glob("*.json") if not x.name.endswith(".old-groups.json"))
+            if not files:
+                for d in sorted(p.iterdir()):
+                    if d.is_dir() and not d.name.endswith("（教师版）"):
+                        q = OUT["root"] / args.type / f"{d.name}.json"
+                        if q.exists():
+                            files.append(q)
+            if not files:
+                files = [OUT["root"] / args.type / f"{p.name}.json"]
+    else:
+        types = ([t.name for t in sorted(OUT["root"].iterdir()) if t.is_dir() and t.name != ".cache"]
+                 if (args.type or "").strip().lower() == "all" else [args.type])
+        for t in types:
+            files += sorted(x for x in (OUT["root"] / t).glob("*.json")
+                            if not x.name.endswith(".old-groups.json"))
+    files = [f for f in files if f.exists()]
+    if getattr(args, "only", None):
+        files = [f for f in files if args.only in f.stem]
+    if not files:
+        print(f"没有找到 JSON：{args.path or OUT['root'] / args.type}")
+        return 2
+    bad = 0
+    rows = []
+    skipped = []
+    kept = []
+    for jf in files:
+        try:
+            probe = json.loads(jf.read_text(encoding="utf-8"))
+        except Exception:
+            probe = {}
+        if "sections" not in probe and "groups" in probe:
+            skipped.append(jf.stem)
+            continue
+        kept.append(jf)
+    files = kept
+    if skipped:
+        print(f"（跳过 {len(skipped)} 份仍是旧格式 groups、尚未迁移的卷：{', '.join(skipped[:3])}"
+              f"{' …' if len(skipped) > 3 else ''}）")
+    if not files:
+        print("没有可检查的（新格式）JSON")
+        return 0
+    for jf in files:
+        try:
+            stat, errs, notes = check_paper(jf)
+        except Exception as e:                              # noqa: BLE001
+            print(f"\n===== {jf.name} =====\n  ✗ 读不了：{str(e)[:160]}")
+            bad += 1
+            continue
+        print(f"\n===== {jf.name} =====")
+        print(f"{stat.get('sections')} 板块 / {stat.get('questions')} 题"
+              f"（选择 {stat.get('choices')} · 主观 {stat.get('opens')}）"
+              f" / {stat.get('total')} 分 / 图片 {stat.get('imgs')} 张"
+              f" / 有答案 {stat.get('answered')} · 有解析 {stat.get('analysed')}")
+        data = json.loads(jf.read_text(encoding="utf-8"))
+        for sec in data.get("sections") or []:
+            qs = sec.get("questions") or []
+            print(f"   · {sec.get('category')}｜{sec.get('questionType')}｜{sec.get('score')} 分"
+                  f"｜{len(qs)} 题｜Σ{sum(q.get('score') or 0 for q in qs)}"
+                  f"｜材料 {len(sec.get('content') or '')} 字")
+        if errs:
+            bad += 1
+            print(f"  ✗ 契约错误 {len(errs)} 条：")
+            for e in errs:
+                print(f"     - {e}")
+        else:
+            print("  ✓ 契约校验通过")
+        for n in notes:
+            print(f"  · 提示：{n}")
+        rows.append((jf.stem, stat.get("sections"), stat.get("questions"), stat.get("total"),
+                     "✓" if not errs else "✗", len(errs)))
+    print("\n| 卷 | 板块 | 题 | 总分 | 结论 | 错误 |")
+    print("| --- | --- | --- | --- | --- | --- |")
+    for r in rows:
+        print(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} | {r[5]} |")
+    if bad:
+        print(f"\n共 {len(rows)} 卷，{bad} 卷有问题")
+        return 2
+    print(f"\n共 {len(rows)} 卷，全部通过 ✓")
+    return 0
 
 
 def main():
@@ -1073,13 +1786,22 @@ def main():
     ap.add_argument("-g", "--grade", default="高三")
     ap.add_argument("-o", "--output", default=str(OUT_ROOT))
     ap.add_argument("--force", action="store_true")
-    ap.add_argument("--no-ai", dest="ai", action="store_false")
+    ap.add_argument("--no-ai", dest="ai", action="store_false",
+                    help="不调模型（结构规划走 .cache 缓存；没有缓存会报错）")
     ap.add_argument("--no-dots", dest="dots", action="store_false")
     ap.add_argument("--no-ai-analysis", dest="ai_analysis", action="store_false")
+    ap.add_argument("--refresh-plan", action="store_true", help="忽略缓存、重新让模型做结构规划")
+    ap.add_argument("--repair-tables", action="store_true",
+                    help="用 PDF 页面图像重识别可疑表格（原 repair_chinese_tables.py，慢）")
+    ap.add_argument("--check", action="store_true", help="契约自检（纯 Python，不调模型）")
+    ap.add_argument("--only", default=None, help="配合 --check：只检查卷名含该子串的卷")
     ap.add_argument("-w", "--workers", type=int, default=3)
     args = ap.parse_args()
 
     OUT["root"] = Path(args.output)
+    AI_ENABLED["on"] = bool(args.ai)
+    if args.check:
+        raise SystemExit(run_check(args))
     if args.path:
         p = Path(args.path)
         files = sorted(p.glob("*.md"))[:1] if p.is_dir() else [p]

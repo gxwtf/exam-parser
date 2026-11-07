@@ -225,12 +225,16 @@ def truncate(s: str, n: int) -> str:
 class Layout:
     subject: str
     kind: str            # json | image
+    root: Path | None = None    # 覆盖「JSON 根目录」（新课标的 output_json_english 等）
 
     def paper_files(self, type_name: str) -> list[Path]:
         s = self.subject
         if self.kind == "image":
             d = OUTPUT_IMAGE_QUESTIONS / type_name / s
             return sorted(d.glob("*/paper.json")) if d.exists() else []
+        if self.root is not None:                       # --json-root 指定时按 <root>/<类型>/*.json
+            d = Path(self.root) / type_name
+            return sorted(d.glob("*.json")) if d.exists() else []
         if s == "英语":
             d = OUTPUT_JSON / type_name / "英语"
         elif s == "语文":
@@ -251,10 +255,10 @@ class Layout:
         return [t for t in ALL_TYPES if self.paper_files(t)]
 
 
-def layouts_for(subject: str, image: bool) -> list[Layout]:
+def layouts_for(subject: str, image: bool, root: str | None = None) -> list[Layout]:
     if subject == "化学" and image:
         return [Layout(subject, "image")]
-    return [Layout(subject, "json")]
+    return [Layout(subject, "json", Path(root) if root else None)]
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -2068,6 +2072,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="cross-check 抽样卷数（默认 20）")
     ap.add_argument("--audit-papers", type=int, default=10,
                     help="ai-audit 抽样卷数（默认 10）")
+    ap.add_argument("--json-root", default=None, metavar="DIR",
+                    help="覆盖该学科的 JSON 根目录（如 output_json_english），按 <DIR>/<类型>/*.json 读")
     ap.add_argument("--report", default=None,
                     help="报告路径（.md 文件或缺省目录；默认 <数据根>/qa/<学科>.md）")
     args = ap.parse_args(argv)
@@ -2081,7 +2087,7 @@ def main(argv: list[str] | None = None) -> int:
     if not do_any:
         args.check = True
 
-    layout = layouts_for(args.subject, args.image)[0]
+    layout = layouts_for(args.subject, args.image, args.json_root)[0]
     types = resolve_types(layout, args.type)
     papers = collect_papers(layout, types, args.limit, args.papers)
     if not papers:
