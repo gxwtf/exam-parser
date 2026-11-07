@@ -154,8 +154,11 @@ def strip_residue(text: str, intro: str = "") -> str:
 
 def blank_phrases(ans_text: str) -> list[list[str]]:
     """默写答案 → 每行（(1)(2)… 或 ①②③…）的若干短语（每短语 = 一个空）。"""
-    t = re.split(r"【?评分(?:参考|标准|要求|说明|细则|意见)】?|【考点】|【分析】|【解答】|【点评】",
-                 ans_text or "")[0]
+    raw = ans_text or ""
+    m = re.search(r"【解答】([\s\S]*?)(?:【点评】|【考点】|【分析】|$)", raw)
+    if m and re.search(r"[①②③④⑤⑥⑦⑧⑨⑩]", m.group(1)):
+        raw = m.group(1)                      # 解答版式：答案就在【解答】里
+    t = re.split(r"【?评分(?:参考|标准|要求|说明|细则|意见)】?|【考点】|【分析】|【点评】", raw)[0]
     parts: list[str] = []
     marks = list(SUBQ_RE.finditer(t))
     if marks:
@@ -310,6 +313,7 @@ def build_dictation(stem: str, ans_text: str, qid, review: list[str],
         review.append(f"默写：占位符 {n_ph} 个 ≠ 答案短语 {len(blanks)} 个（按占位符数对齐）")
         blanks = (blanks + [""] * n_ph)[:n_ph]
 
+    blanks = [re.sub(r"[（(]\s*(?:重点字|易错字|注意)[^）)]*[）)]\s*$", "", b or "").strip() for b in blanks]
     questions = [{"id": f"{qid}-{i + 1}", "questionType": "input", "content": "",
                   "options": [], "answer": blanks[i], "analysis": "", "score": 1}
                  for i in range(len(blanks))]
@@ -398,7 +402,8 @@ def _question_segment(body: str, qno: int) -> str:
     cut = len(seg)
     for pat in (SEC_SPLIT,
                 re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
-                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
+                re.compile(r"(?m)^[ \t]*[（(]\s*[一二三四五六七八九十]\s*[）)]\s*阅读"),
+            re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
                 re.compile(r"(?m)^[ \t]*\**[ \t]*[一二三四五六七八九十]\s*、"),
                 re.compile(r"(?m)^[ \t]*第[二2]部分")):
         m = pat.search(seg)
@@ -420,7 +425,8 @@ def parse_question(body: str, qno: int) -> dict | None:
     cut = len(seg)
     for pat in (SEC_SPLIT,
                 re.compile(r"(?m)^[ \t]*[一二三四五六七八九十]、\s*本大题"),
-                re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
+                re.compile(r"(?m)^[ \t]*[（(]\s*[一二三四五六七八九十]\s*[）)]\s*阅读"),
+            re.compile(r"(?m)^[ \t]*阅读下面[^\n]{0,30}完成\s*\d"),
                 re.compile(r"(?m)^[ \t]*\**[ \t]*[一二三四五六七八九十]\s*、"),
                 re.compile(r"(?m)^[ \t]*第[二2]部分")):
         m = pat.search(seg)
@@ -1341,6 +1347,16 @@ def normalize_scores(sections: list[dict], review: list[str], target: int = TOTA
             sec["score"] = len(qs)
             continue
         if cat in ("作文", "微写作"):
+            if cat in ("微写作", "作文") and len(qs) > 1:        # 三选一 → 合并成 1 题 10 分
+                one = dflt[cat]
+                merged = {"id": qs[0].get("id"), "questionType": "text",
+                          "content": "\n\n".join((q.get("content") or "").strip() for q in qs),
+                          "options": [], "answer": (qs[0].get("answer") or "略"),
+                          "analysis": "", "score": one}
+                sec["questions"] = [merged]
+                sec["score"] = one
+                review.append(f"{cat}：{len(qs)} 个「任选一题」小题合并为 1 题（{one} 分）")
+                continue
             for q in qs:
                 q["score"] = dflt[cat]
             sec["score"] = sum(q["score"] for q in qs)
@@ -1376,6 +1392,32 @@ def normalize_scores(sections: list[dict], review: list[str], target: int = TOTA
                 q["score"] = _clamp((q.get("score") or 50) + diff, 40, 62)
                 comp["score"] = sum(x.get("score") or 0 for x in comp["questions"])
                 diff = target - sum(sec.get("score") or 0 for sec in sections)
+    # 兜底：把合计精确拉回 150（先削阅读板块的主观题，再削作文）
+    for _ in range(400):
+        _t = sum(sec.get("score") or 0 for sec in sections)
+        if _t == target:
+            break
+        step = -1 if _t > target else 1
+        cands = [q for sec in sections if sec.get("category") not in ("默写", "作文", "微写作")
+                 for q in (sec.get("questions") or []) if not q.get("options")]
+        done = False
+        for q in ([x for x in reversed(cands)]):
+            lo, hi = (2, 9) if not q.get("options") else (2, 6)
+            if q.get("options"):
+                continue
+            cur = q.get("score") or 0
+            if step < 0 and cur > lo:
+                q["score"] = cur - 1
+                done = True
+                break
+            if step > 0 and cur < hi:
+                q["score"] = cur + 1
+                done = True
+                break
+        if not done:
+            break
+        for sec in sections:
+            sec["score"] = sum(x.get("score") or 0 for x in sec.get("questions") or [])
     review.append(f"分值分配：按题型给定（选择 2–6 / 主观 2–9 / 默写 1 分每空），合计 "
                   f"{sum(sec.get('score') or 0 for sec in sections)} 分")
 
@@ -1776,6 +1818,16 @@ def process(md: Path, type_dir: str, args) -> str:
     payload = {"paper": paper, "sections": sections}
     normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写
     dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not getattr(args, "no_passes", False):
+        run_post_passes(dst, type_dir, review, args,
+                        md_path=md,
+                        pdf_path=next(iter(sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))), None))
+        try:                                   # pass 之后重算总分/写回
+            fixed = json.loads(dst.read_text(encoding="utf-8"))
+            fixed["paper"]["totalScore"] = sum(sec.get("score") or 0 for sec in fixed.get("sections") or [])
+            dst.write_text(json.dumps(fixed, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
     dst.with_suffix(".review.txt").write_text("\n".join(review) + "\n", encoding="utf-8")
     n = sum(len(sec["questions"]) for sec in sections)
     return f"✓ {title}：{len(sections)} 板块 / {n} 题 / {total} 分（复核 {len(review)} 处）"
@@ -2444,6 +2496,61 @@ def split_inline_options(text):
     return stem, opts
 
 
+def run_post_passes(dst: Path, type_dir: str, review: list[str], args,
+                    md_path: Path | None = None, pdf_path: Path | None = None) -> None:
+    """出口后处理 pass（顺序：五选二 → 两栏句对/加点词 → 默写重建）。
+
+    直接复用三个已验证工具的函数（它们就地改 JSON），失败不中断整卷，只写 review。
+    """
+    if getattr(args, "no_ai", False) is False:
+        pass
+    try:
+        import fix_multi_choice as FMC
+        try:
+            got = FMC.fix_paper(dst, None, apply=True)
+            for x in got or []:
+                review.append(f"五选二：{x}")
+        except Exception as e:
+            review.append(f"五选二 pass 失败：{str(e)[:80]}")
+    except Exception as e:
+        review.append(f"五选二 pass 不可用：{str(e)[:60]}")
+    try:
+        import fix_pairs_choice as FPC
+        try:
+            got = FPC.fix_paper(dst, None, apply=True)
+            for x in got or []:
+                review.append(f"句对/加点词：{x}")
+        except Exception as e:
+            review.append(f"句对/加点词 pass 失败：{str(e)[:80]}")
+    except Exception as e:
+        review.append(f"句对/加点词 pass 不可用：{str(e)[:60]}")
+    # 默写：阶梯式（md 常规 → AI 读题目 md → AI 读答案 md → PDF 视觉），用卷面分值做门限
+    try:
+        import json as _json
+        import dictation_ladder as DL
+        # md_path / pdf_path 由调用方以参数传入（线程安全）
+        data = _json.loads(Path(dst).read_text(encoding="utf-8"))
+        secs = [x for x in (data.get("sections") or []) if x.get("category") == "默写"]
+        if secs and md_path is not None and md_path.is_file():
+            sec, how = DL.build_dictation(
+                md_path.read_text(encoding="utf-8"),
+                pdf_path,
+                use_ai=not getattr(args, "no_ai", False),
+                cache_dir=Path(dst).parent / ".cache" / "dictation",
+            )
+            if sec:
+                for x in secs:
+                    x["content"] = sec["content"]
+                    x["questions"] = sec["questions"]
+                    x["score"] = len(sec["questions"])
+                Path(dst).write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                review.append(f"默写重建：{len(sec['questions'])} 空（{how}）")
+            else:
+                review.append(f"默写重建：未成功（{how}），保留原状")
+    except Exception as e:
+        review.append(f"默写重建 pass 失败：{str(e)[:80]}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="语文试卷 MD → 结构化 JSON")
     ap.add_argument("-p", "--path")
@@ -2463,6 +2570,8 @@ def main():
                     help="用 PDF 页面图像重识别可疑表格（原 repair_chinese_tables.py，慢）")
     ap.add_argument("--check", action="store_true", help="契约自检（纯 Python，不调模型）")
     ap.add_argument("--only", default=None, help="配合 --check：只检查卷名含该子串的卷")
+    ap.add_argument("--no-passes", dest="no_passes", action="store_true",
+                    help="跳过出口后处理（五选二/句对/默写重建）")
     ap.add_argument("--strict", action="store_true",
                     help="配合 --check：忽略例外白名单（CI/发版前用）")
     ap.add_argument("--exceptions", default=None,
