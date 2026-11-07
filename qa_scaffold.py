@@ -234,7 +234,9 @@ class Layout:
             return sorted(d.glob("*/paper.json")) if d.exists() else []
         if self.root is not None:                       # --json-root 指定时按 <root>/<类型>/*.json
             d = Path(self.root) / type_name
-            return sorted(d.glob("*.json")) if d.exists() else []
+            # 跳过 `<卷>.no-analysis.json`（convert_english_md.py --gen-analysis 的无解析备份）
+            return ([f for f in sorted(d.glob("*.json")) if not f.name.endswith(".no-analysis.json")]
+                    if d.exists() else [])
         if s == "英语":
             d = OUTPUT_JSON / type_name / "英语"
         elif s == "语文":

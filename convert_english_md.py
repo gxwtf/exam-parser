@@ -52,19 +52,26 @@
 `section.content` 里找得到」这条断言（MIGRATION-语文英语.md §6.3 例外条款）：这三类板块走
 「左原文右题目」版式，题干只在 `questions[].content`；相应地改成断言「题干不得被抄进原文」。
 
+解析（`analysis`）：源卷教师版自带解析（丰台那种 `【N题详解】`）照抄；**其余默认留空**。
+需要补中文解析时加 `--gen-analysis`（可选，默认关）：只补空、不覆盖源卷、按「卷名+题号+题干指纹」
+缓存在 `<输出根>/<类型>/.cache/analysis/<卷>.json`，并发默认 3，单题失败写 review 不中断整卷。
+
 用法：
-    python3 convert_english_md.py -p <md 文件> [-T 一模] [-o <输出根>] [--force]
+    python3 convert_english_md.py -p <md 文件> [-T 一模] [-o <输出根>] [--force] [--gen-analysis]
     python3 convert_english_md.py -T 一模                    # 批量（单进程）
     python3 convert_english_md.py --check -T 一模 [--report x.md]
     python3 convert_english_md.py --check -p <json 路径>     # 单卷自查
 """
 import argparse
+import hashlib
 import json
 import re
+import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from convert_chinese_md import rewrite_images, split_paper, log
+from convert_chinese_md import chat, rewrite_images, split_paper, log
 from paths import DATA_ROOT, GAOZHONG, OUTPUT_DOCX_TO_MD
 from src.answer_case import normalize_choice_case_in_paper
 
@@ -291,6 +298,209 @@ def separate_images(text: str) -> str:
         if tail:
             out.append(tail)
     return "\n\n".join(out)
+
+
+# ──────────────────────────────────────────────────────────────────
+# 解析生成（--gen-analysis，可选，默认关）
+#
+# 旧 app 链路（prompts/__init__.py 的 EXTRACTION_PROMPT_TEMPLATE）会让模型在抽题时顺带写
+# 中文解析，规则是「完形解释为什么选这个选项、阅读说明每个 ABCD 选/不选的原因、七选五说明
+# 为什么选、语法填空/选词填空/阅读表达依据题目说明」。本函数把这条规则单独拆出来，只对
+# `analysis` 为空的题按需补写，沿用同一套「本机网关 + chat() 封装」，不另造一套调用风格。
+#
+# 硬约束：
+# - 只补空，源卷自带解析（丰台那种【N题详解】）绝不覆盖；
+# - 缓存键 = 卷名 + 题号 + 题干/答案/材料指纹，重跑不重复调用；
+# - 单题失败只写 review 并发下一题，不中断整卷；
+# - 并发默认 3（--workers 可调），单卷耗时与调用次数打印出来。
+# ──────────────────────────────────────────────────────────────────
+
+ANA_SYSTEM = "你是北京高考英语阅卷老师，只输出 JSON。"
+ANA_RULE = {
+    "完形填空": "说明该空为什么填这个选项（词义/搭配/上下文线索），并指出最容易混的 1 个干扰项的错因",
+    "语法填空": "说明语法或搭配依据（时态、语态、非谓语、词性转换、固定搭配等），不需要逐个讲干扰项",
+    "选词填空": "说明选词的语法或搭配依据（词性、词形变化、固定搭配），并说明方框里其它词为什么不合",
+    "阅读": "说明为什么选它（引哪一段的哪条信息），并点出至少一个干扰项的错因",
+    "七选五": "说明这一空为什么选它（上下文的承接/指代/复现关系），并点出一个干扰项为什么接不上",
+    "阅读表达": "只给评分要点（要点 1/2/3，说明要答到哪些信息才给分），不要写范例答案",
+    "作文": "只给评分要点（内容要点是否齐全、语言表达、篇章结构三个角度各一句），不要写范文",
+}
+ANA_PROMPT = """你是北京高考英语阅卷老师。请为下面这道题写一段**中文解析**。
+
+硬性要求：
+1. **严格 60–120 字（超过 120 字就是不合格）**，先点明考点（如「考查动词词义辨析」
+   「考查非谓语动词作定语」「考查细节理解」），再说为什么选它 / 为什么别的错；
+2. {rule}；
+3. 只讲这道题，不要复述整段文章，不要写口水话，不要 markdown、不要换行、不要引号；
+   干扰项只点 1–2 个最易混的，别把四个选项都铺开；
+4. 只输出 JSON：{{"analysis": "解析正文"}}
+
+【板块】{band}
+【文章/材料】{passage}
+【题目】{stem}
+【选项】{options}
+【正确答案】{answer}
+"""
+
+
+def _ana_fingerprint(band: str, q: dict, content: str) -> str:
+    """缓存指纹 = 板块 + 题干 + 选项 + 答案 + 材料摘要。"""
+    h = hashlib.sha1()
+    h.update((band or "").encode())
+    h.update((q.get("content") or "").encode())
+    h.update(json.dumps(q.get("options") or [], ensure_ascii=False).encode())
+    h.update(str(q.get("answer") or "").encode())
+    h.update((content or "")[:600].encode())
+    return h.hexdigest()[:16]
+
+
+def _blank_context(content: str, tag: str, idx: int) -> str:
+    """把第 idx 个空所在的句子（前后各留一点）取出来给模型看。"""
+    parts = content.split(tag)
+    if len(parts) < 2:
+        return content[:800]
+    left = parts[idx] if idx < len(parts) else ""
+    right = parts[idx + 1] if idx + 1 < len(parts) else ""
+    left = re.split(r"(?<=[.!?])\s+", left)[-1]
+    right = re.split(r"(?<=[.!?])\s+", right)[0]
+    return (left + " ___ " + right).strip()[-600:]
+
+
+def build_ana_prompt(band: str, section: dict, q: dict, blank_idx: int) -> str:
+    content = section.get("content") or ""
+    tag = BAND_TYPE.get(band, ("", "", ""))[2] or "<InputLong></InputLong>"
+    if band in ("完形填空", "语法填空", "选词填空", "七选五"):
+        passage = _blank_context(content, tag, blank_idx)
+    else:
+        passage = content if len(content) <= 4000 else content[:4000] + "…（后略）"
+    opts = q.get("options") or []
+    if band == "七选五":
+        options = "；".join(f"{o['id']}. {o['label']}" for o in opts)
+        stem = f"第 {q['id']} 空（七选五，选项池共 7 项）"
+    elif opts:
+        options = "；".join(f"{o['id']}. {o['label']}" for o in opts)
+        stem = q.get("content") or f"第 {q['id']} 空"
+    else:
+        options = "—"
+        stem = q.get("content") or f"第 {q['id']} 题"
+    return ANA_PROMPT.format(rule=ANA_RULE.get(band, "说明答案依据"), band=band,
+                             passage=passage.replace(tag, " ___ "),
+                             stem=stem.strip()[:600],
+                             options=options[:1500],
+                             answer=(q.get("answer") or "（无参考答案）")[:600])
+
+
+def _ana_call(band: str, section: dict, q: dict, blank_idx: int) -> tuple[str, str]:
+    """单题一次调用 → (解析, 错误原因)。"""
+    prompt = build_ana_prompt(band, section, q, blank_idx)
+    try:
+        got = chat([{"role": "system", "content": ANA_SYSTEM},
+                    {"role": "user", "content": prompt}], 600)
+    except Exception as e:                                   # noqa: BLE001
+        return "", f"调用失败:{str(e)[:60]}"
+    if not isinstance(got, dict):
+        return "", "返回不是 JSON 对象"
+    a = str(got.get("analysis") or "").strip()
+    if not a:
+        return "", "返回里没有 analysis 字段"
+    a = re.sub(r"^解析[:：]\s*", "", a)
+    a = re.sub(r"\s+", " ", a).strip()
+    if len(a) < 15:
+        return "", f"解析过短({len(a)}字)"
+    return a, ""
+
+
+ANA_SHRINK = """下面这段英语试题的中文解析有 {n} 字，超过 120 字上限。请压缩到 80–120 字，
+必须保留「考点 + 正确项理由 + 1–2 个干扰项错因」三要素，只输出 JSON：{{"analysis": "解析正文"}}
+
+【原解析】
+{text}
+"""
+
+
+def _shrink_call(text: str) -> str:
+    try:
+        got = chat([{"role": "system", "content": ANA_SYSTEM},
+                    {"role": "user", "content": ANA_SHRINK.format(n=len(text), text=text)}], 400)
+    except Exception:                                        # noqa: BLE001
+        return ""
+    a = str(got.get("analysis") or "").strip() if isinstance(got, dict) else ""
+    a = re.sub(r"\s+", " ", re.sub(r"^解析[:：]\s*", "", a)).strip()
+    return a if 40 <= len(a) < len(text) else ""
+
+
+def gen_analysis(payload: dict, title: str, type_dir: str, cache_dir: Path,
+                 workers: int, limit: int, review: list[str]) -> dict:
+    """给 `analysis` 为空的题补中文解析（源卷已有的不动）。返回统计。"""
+    cache_file = cache_dir / f"{title}.json"
+    cache: dict = {}
+    if cache_file.exists():
+        try:
+            cache = json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:                                    # noqa: BLE001
+            cache = {}
+    tasks, skipped = [], 0
+    for section in payload["sections"]:
+        band = section.get("category")
+        content = section.get("content") or ""
+        tag = BAND_TYPE.get(band, ("", "", ""))[2] or ""
+        seen_blank = 0
+        for q in section["questions"]:
+            blank_idx = seen_blank if band in ("完形填空", "语法填空", "选词填空", "七选五") else 0
+            if band in ("完形填空", "语法填空", "选词填空", "七选五"):
+                seen_blank += 1
+            if (q.get("analysis") or "").strip():
+                skipped += 1                                  # 源卷自带，绝不覆盖
+                continue
+            fp = _ana_fingerprint(band, q, content)
+            c = cache.get(str(q["id"]))
+            if isinstance(c, dict) and c.get("h") == fp and c.get("a"):
+                q["analysis"] = c["a"]
+                skipped += 1
+                continue
+            tasks.append((band, section, q, blank_idx, fp))
+    if limit > 0:
+        tasks = tasks[:limit]
+    t0 = time.time()
+    ok, fail, fails = 0, 0, []
+    if tasks:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+            futs = {ex.submit(_ana_call, b, sec, q, bi): (b, q, fp)
+                    for b, sec, q, bi, fp in tasks}
+            for fu in as_completed(futs):
+                band, q, fp = futs[fu]
+                text, err = fu.result()
+                if text:
+                    q["analysis"] = text
+                    cache[str(q["id"])] = {"h": fp, "a": text}
+                    ok += 1
+                else:
+                    fail += 1
+                    fails.append((q["id"], band, err))
+    # pass 2：超过 120 字的压一次（题面要求 60–120 字）
+    over = [(q, fp) for _b, _sec, q, _bi, fp in tasks if len(q.get("analysis") or "") > 120]
+    shrunk = 0
+    if over:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+            futs = {ex.submit(_shrink_call, q["analysis"]): (q, fp) for q, fp in over}
+            for fu in as_completed(futs):
+                q, fp = futs[fu]
+                new_text = fu.result()
+                if new_text:
+                    q["analysis"] = new_text
+                    cache[str(q["id"])] = {"h": fp, "a": new_text}
+                    shrunk += 1
+        log(f"    解析：{len(over)} 条超过 120 字，压缩成功 {shrunk} 条")
+    for qid, band, err in sorted(fails):                     # 顺序稳定，review 可复现
+        review.append(f"第 {qid} 题解析生成失败（{band}：{err}）")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if ok:
+        cache_file.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+    dt = time.time() - t0
+    log(f"    解析：新生成 {ok} 题 / 复用(源卷+缓存) {skipped} 题 / 失败 {fail} 题 / "
+        f"调用 {len(tasks) + len(over)} 次 / 耗时 {dt:.0f}s（{workers} 并发）")
+    return {"ok": ok, "skipped": skipped, "fail": fail,
+            "calls": len(tasks) + len(over), "sec": dt, "shrunk": shrunk}
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -908,13 +1118,42 @@ def process(md: Path, type_dir: str, args) -> str:
     }
     payload = {"paper": paper, "sections": sections}
     normalize_choice_case_in_paper(payload, log=log)
+
+    # --gen-analysis：只补 analysis 为空的题（源卷自带的【N题详解】绝不覆盖）
+    ana_stat = None
+    if getattr(args, "gen_analysis", False):
+        bak = dst.with_suffix(".no-analysis.json")
+        if dst.exists() and not bak.exists():
+            try:
+                old = json.loads(dst.read_text(encoding="utf-8"))
+                n_ana = sum(1 for s2 in old.get("sections", [])
+                            for q2 in s2.get("questions", []) if (q2.get("analysis") or "").strip())
+                if n_ana == 0:                     # 只有「确实不含解析」的旧版才值得备份
+                    shutil.copyfile(dst, bak)
+                    review.append(f"不带解析的版本已备份为 {bak.name}")
+            except Exception:                       # noqa: BLE001
+                pass
+        ana_stat = gen_analysis(payload, title, type_dir,
+                                OUT["root"] / type_dir / ".cache" / "analysis",
+                                args.workers, args.gen_analysis_limit, review)
+        n_ana = sum(1 for s2 in sections for q2 in s2["questions"] if (q2.get("analysis") or "").strip())
+        n_all = sum(len(s2["questions"]) for s2 in sections)
+        log(f"    解析覆盖：{n_ana}/{n_all} 题")
+        review.append(f"解析（--gen-analysis）：覆盖 {n_ana}/{n_all} 题；新生成 {ana_stat['ok']} 条"
+                      f"（含压缩 {ana_stat['shrunk']} 条）、源卷/缓存复用 {ana_stat['skipped']} 条、"
+                      f"失败 {ana_stat['fail']} 条；调用 {ana_stat['calls']} 次、耗时 {ana_stat['sec']:.0f}s")
+
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if review:
         dst.with_suffix(".review.txt").write_text(
             "\n".join(_rev_line(x) for x in review) + "\n", encoding="utf-8")
     n_q = sum(len(s["questions"]) for s in sections)
-    return (f"✓ {title}：{len(sections)} 个板块 / {n_q} 题 / 卷面 {total} 分 → {dst.name}")
+    extra = ""
+    if ana_stat:
+        extra = (f" / 解析 +{ana_stat['ok']}（失败 {ana_stat['fail']}，"
+                 f"耗时 {ana_stat['sec']:.0f}s）")
+    return (f"✓ {title}：{len(sections)} 个板块 / {n_q} 题 / 卷面 {total} 分{extra} → {dst.name}")
 
 
 def _rev_line(x: str) -> str:
@@ -1085,17 +1324,22 @@ def check_one(jf: Path) -> tuple[dict, list[str], list[str]]:
 
 
 def run_check(args) -> int:
+    def _papers(d: Path) -> list[Path]:
+        """目录下的试卷 JSON；跳过 `.no-analysis.json` 备份与 .cache。"""
+        return [f for f in sorted(d.glob("*.json"))
+                if not f.name.endswith(".no-analysis.json") and not f.name.startswith(".")]
+
     files: list[Path] = []
     if args.path:
         p = Path(args.path)
-        files = [p] if p.is_file() else sorted(p.glob("*.json"))
+        files = [p] if p.is_file() else _papers(p)
     else:
         types = [t for t in (args.type or "").replace("，", ",").split(",") if t] or ["一模"]
         if "all" in types:
             types = sorted(x.name for x in Path(args.output).iterdir()
                            if x.is_dir() and x.name != ".cache")
         for t in types:
-            files.extend(sorted((Path(args.output) / t).glob("*.json")))
+            files.extend(_papers(Path(args.output) / t))
     bad, blocks = 0, []
     for jf in files:
         try:
@@ -1159,6 +1403,11 @@ def main():
     ap.add_argument("--papers", nargs="*", default=None, help="只处理这几套（按卷名片段匹配）")
     ap.add_argument("--force", action="store_true", help="忽略已有 JSON，重跑")
     ap.add_argument("--no-ai", dest="ai", action="store_false", help="本链路不调模型（保留参数兼容）")
+    ap.add_argument("--gen-analysis", dest="gen_analysis", action="store_true",
+                    help="给 analysis 为空的题补中文解析（源卷自带的解析不覆盖；按卷缓存，重跑不重复调用）")
+    ap.add_argument("--gen-analysis-limit", dest="gen_analysis_limit", type=int, default=0,
+                    metavar="N", help="每卷最多生成 N 条解析（调试/控成本用，0=不限）")
+    ap.add_argument("--workers", type=int, default=3, help="解析生成的并发数（默认 3）")
     ap.add_argument("--check", action="store_true", help="只做自查（纯 Python，不调模型）")
     ap.add_argument("--report", default=None, help="自查报告输出路径（配合 --check）")
     args = ap.parse_args()
