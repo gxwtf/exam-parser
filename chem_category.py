@@ -254,7 +254,7 @@ PAPER_OVERRIDES: dict[tuple[str, int], str] = {
     ("2026北京海淀高三（上）期中化学", 17): "原理",
 }
 
-def classify(text: str, no: int, year: int | None, strict_position: bool = True) -> tuple[str, dict, str]:
+def classify(text: str, no: int, year: int | None, strict_position: bool = False) -> tuple[str, dict, str]:
     """给一道非选择题定题型。
 
     **2021 及以后**（北京卷新高考题型位置固定，用户口径）：
@@ -370,7 +370,7 @@ def load_paper(md_path: Path) -> dict:
     return {"name": name, "year": year_of(name), "questions": qs}
 
 
-def analyze_paper(md_path: Path, strict_position: bool = True) -> dict:
+def analyze_paper(md_path: Path, strict_position: bool = False) -> dict:
     """分类一卷，返回 {name, year, questions: {题号: {category, score, reason, top, hits}}}。"""
     info = load_paper(md_path)
     out = {}
@@ -456,7 +456,7 @@ def main():
     no_score_papers: list[str] = []
     for md in mds:
         try:
-            rep = analyze_paper(md, not args.content_override)
+            rep = analyze_paper(md, args.strict_position)
         except Exception as e:                      # 单卷失败不影响全量
             print(f"  ✗ {md.parent.name}: {str(e)[:160]}", file=sys.stderr)
             continue
