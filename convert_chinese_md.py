@@ -33,7 +33,7 @@
   python3 convert_chinese_md.py --check -T 一模                # 契约自检（纯 Python，不调模型）
   python3 convert_chinese_md.py --check -p <单卷 json | 卷名>   # 单卷自检
 """
-import argparse, json, os, re, time
+import argparse, hashlib, json, os, re, time
 from pathlib import Path
 
 import requests
@@ -154,7 +154,8 @@ def strip_residue(text: str, intro: str = "") -> str:
 
 def blank_phrases(ans_text: str) -> list[list[str]]:
     """默写答案 → 每行（(1)(2)… 或 ①②③…）的若干短语（每短语 = 一个空）。"""
-    t = re.split(r"【?评分(?:参考|标准|要求)】?", ans_text or "")[0]
+    t = re.split(r"【?评分(?:参考|标准|要求|说明|细则|意见)】?|【考点】|【分析】|【解答】|【点评】",
+                 ans_text or "")[0]
     parts: list[str] = []
     marks = list(SUBQ_RE.finditer(t))
     if marks:
@@ -202,67 +203,113 @@ def space_slots_in_quotes(line: str) -> str:
     return line
 
 
-def build_dictation(stem: str, ans_text: str, qid, review: list[str]):
+def build_dictation(stem: str, ans_text: str, qid, review: list[str],
+                    max_blanks: int | None = None):
     """默写：题干里每个空 → `<Input2 />`，每个空一道 input 小题（答案按空对）。
 
-    改进点（相对旧链路）：一行里有几处下划线/答案里有多短语时，按「短语数」拆成多个空，
-    不再把「汉家烟尘在东北 汉将辞家破残贼」这种一行两句压成一个空。
+    空数以**答案短语数**为准（教师版答案最可靠），题面里的空位只是「插在哪」的线索：
+    1) 按 (1)(2)… 或 ①②③ 把题干分行、把答案分组成 N_k 个短语；
+    2) 每行找空位：下划线字形（Word 导出的 `_`+`**` 组合）> 引号内/全角空格 > 行内 ①②③ 标记；
+    3) 空位比答案少就往行尾补、比答案多就删多余，最后保证
+       「占位符数 == 小问数 == 默写分」，并把对不上的地方写进 review。
     """
     groups = blank_phrases(ans_text)
     lines = stem.split("\n")
+    # 分行：优先按 (1)(2)…，否则按行首 ①②③
     line_idx = [i for i, ln in enumerate(lines) if SUBQ_RE.match(ln.strip())]
     if not line_idx:
         line_idx = [i for i, ln in enumerate(lines)
-                    if BLANK_RUN.search(ln) or BLANK_MARK.search(ln)]
+                    if re.match(r"^\s*[①②③④⑤⑥⑦⑧⑨⑩]", ln.strip())]
+    if not line_idx:                                     # 最后才退回「有下划线的行」
+        line_idx = [i for i, ln in enumerate(lines) if BLANK_RUN.search(ln)]
+    if not line_idx:
+        line_idx = list(range(len(lines)))
+    if len(groups) < len(line_idx) and groups:
+        groups += [[]] * (len(line_idx) - len(groups))
+
+    def slots_of(line: str):
+        runs = list(BLANK_RUN.finditer(line))
+        if runs:
+            return [(m.start(), m.end()) for m in runs]
+        marks = [m for m in BLANK_MARK.finditer(line)
+                 if not re.match(r"^\s*[①②③④⑤⑥⑦⑧⑨⑩]", line[max(0, m.start() - 1):m.start() + 1])]
+        if marks:                                  # 行内 ①②③ 就是空位
+            return [(m.start(), m.end()) for m in marks]
+        # 引号内或整行的空格（半角/全角）
+        return [(m.start(), m.end()) for m in re.finditer(r"[ \t\u3000]{1,}", line)]
+
+    cap = 14
+    if max_blanks and 4 <= max_blanks <= 14:
+        cap = max_blanks
     blanks: list[str] = []
     for k, li in enumerate(line_idx):
         ln = lines[li]
         phrases = groups[k] if k < len(groups) else []
-        runs = list(BLANK_RUN.finditer(ln))
-        marks = [] if runs else list(BLANK_MARK.finditer(ln))
-        if not runs and not marks:
-            # 有些卷（如 2026 丰台一模）docx 里的空位只剩引号内的空格，没有下划线字形
-            seg = space_slots_in_quotes(ln)
-            got = len(PH_RE.findall(seg))
-            if got:
-                lines[li] = seg
-                blanks += [phrases[i] if i < len(phrases) else "" for i in range(got)]
-                if got != len(phrases):
-                    review.append(f"默写第{k + 1}行：空位 {got} 个 / 答案短语 {len(phrases)} 个（按空位留空）")
+        n = len(phrases)
+        _runs = len(list(BLANK_RUN.finditer(ln)))
+        if phrases and _runs:
+            n = min(len(phrases), _runs)          # 双证：答案短语数 + 卷面下划线数，取较小
+            if len(phrases) != _runs:
+                review.append(f"默写第{k + 1}行：答案 {len(phrases)} 句 / 卷面下划线 {_runs} 处 → 取 {n}")
+        room = cap - len(blanks)
+        if room <= 0:
+            review.append(f"默写第{k + 1}行：已满 {cap} 空，余下按原文保留")
             continue
-        n = len(phrases) or len(runs) or len(marks) or 1
-        if runs and len(runs) not in (1, n):
-            n = len(runs)                                   # 下划线段数优先
-            review.append(f"默写第{k + 1}行：下划线 {len(runs)} 处 / 答案 {len(phrases)} 个，按下划线数留空")
-        if runs:
-            if len(runs) == 1 and n > 1:
-                ln = ln[:runs[0].start()] + "，".join(["<Input2 />"] * n) + ln[runs[0].end():]
-            else:
-                out, pos = [], 0
-                for r in runs:
-                    out.append(ln[pos:r.start()])
-                    out.append("<Input2 />")
-                    pos = r.end()
-                out.append(ln[pos:])
-                ln = "".join(out)
-                n = len(runs)
-        else:
+        if n > room:
+            review.append(f"默写第{k + 1}行：{n} 个短语超出剩余容量，只留 {room} 个")
+            n = room
+        slots = slots_of(ln)
+        if n == 0:                                        # 答案没切出来 → 按空位兜底
+            n = max(1, len(slots)) if slots else 1
+            review.append(f"默写第{k + 1}行：答案里没切出短语，按空位 {n} 个留空")
+        # 先删掉行首的 ①②③ 题号（不是空位）
+        ln = re.sub(r"^\s*[①②③④⑤⑥⑦⑧⑨⑩]\s*", "", ln)
+        slots = slots_of(ln)
+        if len(slots) == n:
             out, pos = [], 0
-            for m in marks:
-                out.append(ln[pos:m.start()])
+            for a, b in slots:
+                out.append(ln[pos:a])
                 out.append("<Input2 />")
-                pos = m.end()
+                pos = b
             out.append(ln[pos:])
             ln = "".join(out)
-            n = len(marks)
+        elif len(slots) > n:                              # 空位比答案多 → 只留前 n 个
+            out, pos, used = [], 0, 0
+            for a, b in slots:
+                out.append(ln[pos:a])
+                if used < n:
+                    out.append("<Input2 />")
+                    used += 1
+                pos = b
+            out.append(ln[pos:])
+            ln = "".join(out)
+            review.append(f"默写第{k + 1}行：空位 {len(slots)} 个 / 答案 {n} 个，多余空位已删")
+        else:                                             # 空位比答案少 → 补到行尾
+            out, pos = [], 0
+            for a, b in slots:
+                out.append(ln[pos:a])
+                out.append("<Input2 />")
+                pos = b
+            out.append(ln[pos:])
+            ln = "".join(out) + "".join(["<Input2 />"] * (n - len(slots)))
+            review.append(f"默写第{k + 1}行：空位 {len(slots)} 个 / 答案 {n} 个，已补 {n - len(slots)} 个")
         blanks += [phrases[i] if i < len(phrases) else "" for i in range(n)]
         lines[li] = ln
     content = "\n".join(lines)
-    content = BLANK_RUN.sub("<Input2 />", content)           # 兜底：其它行残留的下划线
+    content = BLANK_RUN.sub("<Input2 />", content)         # 其它行残留的下划线
+    content = BLANK_MARK.sub("", content)                 # 残留的①②③标注清掉
+    if len(blanks) > 14 or (max_blanks and 4 <= max_blanks <= 14 and len(blanks) > max_blanks):
+        keep = max_blanks if (max_blanks and 4 <= max_blanks <= 14) else 8
+        review.append(f"默写：答案切出 {len(blanks)} 个短语（超出 4–14 合理区间）→ 只留前 {keep} 个")
+        blanks = blanks[:keep]
+    if max_blanks and len(blanks) > max_blanks:
+        review.append(f"默写：答案切出 {len(blanks)} 个短语，超过卷面 {max_blanks} 空 → 只留前 {max_blanks} 个")
+        blanks = blanks[:max_blanks]
     n_ph = len(PH_RE.findall(content))
     if n_ph != len(blanks):
-        review.append(f"默写：占位符 {n_ph} 个 ≠ 答案短语 {len(blanks)} 个（按占位符数补齐答案）")
+        review.append(f"默写：占位符 {n_ph} 个 ≠ 答案短语 {len(blanks)} 个（按占位符数对齐）")
         blanks = (blanks + [""] * n_ph)[:n_ph]
+
     questions = [{"id": f"{qid}-{i + 1}", "questionType": "input", "content": "",
                   "options": [], "answer": blanks[i], "analysis": "", "score": 1}
                  for i in range(len(blanks))]
@@ -501,6 +548,18 @@ def parse_answers(ans: str) -> dict[int, str]:
     """从答案区抽每题答案：选择题取字母，主观题保留整段"""
     ans = cut_translation_block(ans)
     out: dict[int, str] = {}
+    # 「【答案】1. B 2. D / 3\\. A 4. A」这类答案行：一行里出现 ≥2 个「题号+字母」就算答案行
+    for line in ans.split("\n"):
+        hits = list(re.finditer(r"(?<![\dA-Za-z])(\d{1,2})\s*[.．、]\s*([A-D]{1,4})(?=[\s、,，]|$)", line))
+        if len(hits) >= 2:
+            for m in hits:
+                out.setdefault(int(m.group(1)), m.group(2))
+    # 「1．B（3分） 2．C（3分）」——字母在前、分值在后（北京卷教师版最常见版式）
+    for m in re.finditer(r"(?<![\dA-Za-z])(\d{1,2})\s*[.．、]\s*([A-D]{1,4})\s*[（(]\s*\d+\s*分", ans):
+        out.setdefault(int(m.group(1)), m.group(2))
+    # 「1【答案】C」/「1.【答案】C」这类教师版版式
+    for m in re.finditer(r"(?m)^\s*(\d{1,2})\s*[.．、]?\s*【答案】\s*([A-D]{1,4})\b", ans):
+        out.setdefault(int(m.group(1)), m.group(2))
     # 先抓「1.（3分）C 2.（3分）A」这种挤在一行的选择题答案
     for m in re.finditer(r"(\d{1,2})\s*[、.．]\s*[（(]\s*(\d+)\s*分\s*[）)]\s*([A-D])(?=[\s\d]|$)", ans):
         out[int(m.group(1))] = m.group(3)
@@ -961,7 +1020,13 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             if a >= 0:
                 start = body.rfind("\n", 0, a) + 1
         # 结束：本题组第一题的题号位置
-        qpos = next((m.start() for m in QSPLIT.finditer(body) if int(m.group(1)) == nos[0]), None)
+        qpos = None
+        if start is not None:
+            # 老卷（尤其真题）常把「1．（24分）阅读下面材料…」写在题号行里，题号位次在引导语之前；
+            # 所以取「start 之后的第一处题号」当材料右边界，比「题号 == 首题号」稳。
+            qpos = next((m.start() for m in QSPLIT.finditer(body) if m.start() > start), None)
+        if qpos is None:
+            qpos = next((m.start() for m in QSPLIT.finditer(body) if int(m.group(1)) == nos[0]), None)
         if start is not None and qpos is not None and qpos > start:
             article = body[start:qpos].strip()
         # 锚点校验（只提示，不影响结果）
@@ -995,6 +1060,21 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
             continue
         q["answer"] = answers.get(no, "")
         q["analysis"] = ""
+        if q["questionType"] == "single":
+            # 已有干净字母就别动；否则用整块重切，仍抽不出字母才判定为解析
+            cur = str(q.get("answer") or "").strip()
+            if not re.fullmatch(r"[A-D]{1,4}", cur):
+                blk = raw_answer(ans_raw, no)
+                letter, rest = extract_choice_answer(blk)
+                if letter:
+                    q["answer"] = letter
+                    if rest and len(rest) >= 8 and not str(q.get("analysis") or "").strip():
+                        q["analysis"] = rest
+                elif len(blk) > 20:
+                    q["answer"] = ""
+                    if not str(q.get("analysis") or "").strip():
+                        q["analysis"] = blk
+                    review.append(f"第{no}题：答案区块是解析（抽不出字母），已移入 analysis，答案留空待补")
         # 选择题：答案区若自带解析（不只是字母），直接抄过来
         raw_blk = blocks.get(no, "")
         if q["questionType"] == "single" and raw_blk:
@@ -1025,7 +1105,8 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
     if qtype == "chinese-dictation" and qs:
         # 默写：题干里每个空 → <Input2 />，每个空一道 input 小题（答案按空对）
         q0 = qs[0]
-        content, qs = build_dictation(q0["content"], q0["answer"], q0["id"], review)
+        content, qs = build_dictation(q0["content"], q0["answer"], q0["id"], review,
+                                      max_blanks=q0.get("score") or None)
         article = content
 
     if qtype in ("chinese-micro-writing", "chinese-essay") and qs:
@@ -1180,92 +1261,248 @@ def _largest_remainder(weights: list[float], total: int) -> list[int]:
     return out
 
 
-def normalize_scores(sections: list[dict], review: list[str], target: int = TOTAL_SCORE) -> None:
-    """← normalize_chinese_scores.py：把整卷分值规整到 150（卷面分对得上就不动）。
+def normalize_scores(sections: list[dict], review: list[str], target: int = TOTAL_SCORE,
+                     year: int | None = None) -> None:
+    """把整卷分值规整到 150（口径：2026-11 lead 拍板）。
 
-    1) 卷面分合计 == 150 且每个 section == Σ小问 → 原样保留（优先相信卷面）；
-    2) 否则按北京卷标准分值表兜底/缩放，并保证 Σ小问 == section.score、Σ section == 150；
-    3) 默写每空 1 分；微写作 10、作文 50 为硬口径。
+    1) **作文 / 微写作 / 默写以卷面为准**：作文 40–62、微写作 0–12 落在区间内就原样保留
+       （2011–2013 真题作文本来就是 60），只有解析出的分值跑到区间外才退回默认（作文 50/60、微写作 10）；
+       默写固定 1 分/空，板块分 = 空数；
+    2) 差额只由「其余阅读板块」按比例吸收（最大余数法），**绝不按比例缩放作文**；
+    3) 每个小问至少 1 分；Σ小问 == section.score；Σ section == 150。
     """
-    # ① 卷面已经对得上就直接过
-    total = sum(sec.get("score") or 0 for sec in sections)
-    consistent = all((sec.get("score") or 0) == sum(q.get("score") or 0 for q in sec["questions"])
-                     for sec in sections)
-    hard_ok = all(sec.get("score") == FIXED_SCORES.get(sec.get("category"), sec.get("score"))
-                  for sec in sections)
-    if total == target and consistent and hard_ok:
-        for sec in sections:                      # 默写仍要保证每空 1 分
-            if sec.get("category") == "默写":
-                for q in sec["questions"]:
-                    q["score"] = 1
-                sec["score"] = len(sec["questions"])
-        return
-
-    qsum = sum(q.get("score") or 0 for sec in sections for q in sec["questions"])
-    if consistent and qsum > 0 and target * 0.8 <= qsum <= target * 1.2:
-        # 卷面每题分值看起来可信 → 只在作文（或最后一段）吸收差额，不按比例重分
-        diff = target - total
-        if diff:
-            tgt = next((x for x in sections if x.get("category") == "作文"), sections[-1])
-            if tgt.get("questions"):
-                tgt["questions"][-1]["score"] = max(1, (tgt["questions"][-1].get("score") or 1) + diff)
-                tgt["score"] = sum(q.get("score") or 0 for q in tgt["questions"])
-            review.append(f"分值规整：卷面合计 {total} 分 → 差额 {diff} 分记到「{tgt.get('category')}」最后一题"
-                          f"（每题分值以卷面为准，未按比例重分）")
-        for sec in sections:
-            if sec.get("category") == "默写":
-                for q in sec["questions"]:
-                    q["score"] = 1
-                sec["score"] = len(sec["questions"])
-        return
-
-    review.append(f"分值规整：卷面合计 {total} 分 / 每题合计 {qsum} 分 → 按北京卷标准分值表归到 {target} 分")
-    # ② 每个板块的目标分：优先标准分值表，表里没有的按卷面
-    targets = []
+    dflt = dict(DEFAULT_SCORES)
+    if (year or 9999) <= 2013:
+        dflt["作文"] = 60                                   # 2011–2013 北京卷作文 60 分
+    targets: list[int] = []
     for sec in sections:
         cat = sec.get("category") or ""
-        targets.append(DEFAULT_SCORES.get(cat) or (sec.get("score") or 0) or 1)
-    if sum(targets) != target:
-        targets = _largest_remainder([float(t) for t in targets], target)
-    # ③ 板块内部分配
+        cur = sec.get("score") or 0
+        if cat == "默写":
+            targets.append(len(sec.get("questions") or []))
+        elif cat == "作文":
+            t = cur if 40 <= cur <= 62 else dflt.get("作文", 50)
+            if t != dflt.get("作文", 50):
+                review.append(f"复核：该卷作文 {t} 分（卷面标注 {cur} 分，默认口径 {dflt.get('作文')} 分）")
+            targets.append(t)
+        elif cat == "微写作":
+            t = cur if 0 <= cur <= 12 else dflt.get("微写作", 10)
+            if t != dflt.get("微写作", 10):
+                review.append(f"复核：该卷微写作 {t} 分（卷面标注 {cur} 分，默认口径 {dflt.get('微写作')} 分）")
+            targets.append(t)
+        else:
+            targets.append(max(1, cur or dflt.get(cat) or 1))
+
+    total = sum(targets)
+    diff = target - total
+    if diff:
+        adjustable = [i for i, sec in enumerate(sections)
+                      if (sec.get("category") or "") not in ("作文", "微写作", "默写")]
+        base = sum(targets[i] for i in adjustable)
+        if adjustable and base + diff >= len(adjustable):
+            alloc = _largest_remainder([float(targets[i]) for i in adjustable], base + diff)
+            for i, a in zip(adjustable, alloc):
+                targets[i] = a
+            review.append(f"分值规整：卷面合计 {total} 分 → 差额 {diff:+d} 分由阅读板块按比例吸收"
+                          f"（作文/微写作/默写保持卷面分）")
+        else:
+            review.append(f"分值规整：卷面合计 {total} 分、无可调板块（差额 {diff}），请人工核对卷面分值表")
+
     for sec, t in zip(sections, targets):
-        cat = sec.get("category") or ""
         qs = sec["questions"]
         if not qs:
             sec["score"] = 0
             continue
+        cat = sec.get("category") or ""
         if cat == "默写":
             for q in qs:
                 q["score"] = 1
             sec["score"] = len(qs)
-            if sec["score"] != t:
-                review.append(f"默写 {len(qs)} 空 → {sec['score']} 分（标准 {t} 分），以空数为准")
+            if len(qs) != t:
+                review.append(f"默写：{len(qs)} 空 → {len(qs)} 分（目标 {t} 分），以空数为准")
             continue
-        if cat in FIXED_SCORES:
-            t = FIXED_SCORES[cat]
         cur = [max(1, q.get("score") or 0) for q in qs]
-        if sum(cur) == t and all(q.get("score") for q in qs):
+        if sum(cur) == t and all((q.get("score") or 0) > 0 for q in qs):
             sec["score"] = t
             continue
-        alloc = _largest_remainder([float(x) for x in cur], t)
+        alloc = _largest_remainder([float(x) for x in cur], max(len(qs), t))
         for q, sc in zip(qs, alloc):
             q["score"] = sc
         sec["score"] = sum(q["score"] for q in qs)
         review.append(f"{cat}：{len(qs)} 题重分 {[q['score'] for q in qs]}（合计 {sec['score']}）")
-    # ④ 兜底：合计再差多少，补到作文/最后一题
+
     diff = target - sum(sec.get("score") or 0 for sec in sections)
     if diff:
-        tgt = next((x for x in sections if x.get("category") == "作文"), sections[-1])
-        if tgt.get("questions"):
-            tgt["questions"][-1]["score"] = max(1, (tgt["questions"][-1].get("score") or 1) + diff)
-            tgt["score"] = sum(q.get("score") or 0 for q in tgt["questions"])
-            review.append(f"总分差 {diff} 分补到「{tgt.get('category')}」最后一题")
+        comp = next((x for x in sections if x.get("category") == "作文" and x.get("questions")), None)
+        if comp:
+            q = comp["questions"][-1]
+            new = (q.get("score") or 1) + diff
+            if new >= 1 and 40 <= (comp.get("score") or 0) + diff <= 62:
+                q["score"] = new
+                comp["score"] = sum(x.get("score") or 0 for x in comp["questions"])
+                review.append(f"分值兜底：差额 {diff:+d} 分记到作文（作文 {comp['score']} 分，仍在 40–62 区间）")
+                diff = target - sum(sec.get("score") or 0 for sec in sections)
+    if diff:
+        review.append(f"整卷合计仍差 {diff} 分（卷面本身不符 150），请人工核对分值表")
+
+
+# ── 答案区是图片 / 答案页在 PDF 里时的视觉兜底 ─────────────────────
+ANS_VISION_PROMPT = r"""这是语文试卷教师版「参考答案 / 答案与解析」页的截图，里面通常有**选择题答案表**（形如「1．C 2．A…」或一张表格）。
+请**逐题**读出选择题答案，不许跳过。只输出 JSON：
+{"answers": [{"no": 1, "answer": "C", "conf": 0.95}, {"no": 2, "answer": null, "conf": 0.2}],
+ "note": "本页是不是答案页"}
+- answer 只能是 A/B/C/D（多选写 AB）；**看不清写 null 并给低 conf**，不要猜；
+- 本页不是答案页时 answers 给空数组、note 写「非答案页」。
+"""
+
+
+def _vision_ask_image(img: Path) -> dict:
+    """单张图 → {题号: 字母}（低置信/不确定的题不返回，交由 review 记录）"""
+    import base64
+    import requests as _rq
+    b64 = base64.b64encode(img.read_bytes()).decode()
+    r = _rq.post(f"{BASE_URL}/chat/completions",
+                 json={"model": MODEL, "max_tokens": 1500, "temperature": 0.0,
+                       "reasoning_effort": "none",
+                       "messages": [{"role": "system", "content": "你是语文试卷录入员，只输出 JSON。"},
+                                    {"role": "user", "content": [
+                                        {"type": "text", "text": ANS_VISION_PROMPT},
+                                        {"type": "image_url",
+                                         "image_url": {"url": "data:image/png;base64," + b64}}]}]},
+                 headers={"Authorization": f"Bearer {API_KEY}"},
+                 timeout=int(os.getenv("MATH_REQUEST_TIMEOUT", "300")))
+    r.raise_for_status()
+    txt = (r.json()["choices"][0]["message"].get("content") or "").strip()
+    txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt).strip()
+    m = re.search(r"\{.*\}", txt, re.S)
+    data = json.loads(m.group(0)) if m else {}
+    out: dict[str, str] = {}
+    if isinstance(data.get("answers"), list):
+        for item in data["answers"]:
+            if not isinstance(item, dict):
+                continue
+            no = re.sub(r"\D", "", str(item.get("no") or ""))
+            vv = str(item.get("answer") or "").strip().upper()
+            if no and re.fullmatch(r"[A-D]{1,4}", vv):
+                out[no] = vv
+    for k, v in (data.items() if isinstance(data, dict) else []):
+        if isinstance(v, str) and re.fullmatch(r"[A-D]{1,4}", v.strip().upper()):
+            out.setdefault(str(k), v.strip().upper())
+    return out
+
+
+def vision_answers_from_images(ans_text: str, md_dir: Path, review: list[str],
+                               cache_f: Path | None = None) -> dict[int, str]:
+    """答案区里的图片 → 视觉读选择题答案（老卷答案表常被 docx 压成图片）。"""
+    refs = IMG_REF.findall(ans_text or "")[:6]
+    if not refs:
+        return {}
+    cache: dict = {}
+    if cache_f is not None and cache_f.exists():
+        try:
+            cache = json.loads(cache_f.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
+    out: dict[int, str] = {}
+    new = False
+    for ref in refs:
+        if ref in cache:
+            for k, v in cache[ref].items():
+                kk = re.sub(r"\D", "", str(k))
+                if kk:
+                    out[int(kk)] = v
+            continue
+        img = md_dir / ref
+        if not img.exists():
+            continue
+        try:
+            got = _vision_ask_image(img)
+            cache[ref] = got
+            new = True
+            for k, v in got.items():
+                out[int(k)] = v
+        except Exception as e:                                  # noqa: BLE001
+            review.append(f"答案图识别失败（{img.name}）：{str(e)[:60]}")
+    if new and cache_f is not None:
+        try:
+            cache_f.parent.mkdir(parents=True, exist_ok=True)
+            cache_f.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+        except Exception:
+            pass
+    if out:
+        review.append(f"答案区图片视觉识别：{len(refs)} 张图读出 {len(out)} 个选择题答案")
+    return out
+
+
+def vision_answers_from_pdf(pdf: Path, review: list[str], cache_f: Path | None = None,
+                            pages: int = 8) -> dict[int, str]:
+    """md 里没有答案图时，直接渲染 PDF 前 N 页找「参考答案」页做视觉抽取。"""
+    if not pdf or not Path(pdf).exists():
+        return {}
+    cache: dict = {}
+    if cache_f is not None and cache_f.exists():
+        try:
+            cache = json.loads(cache_f.read_text(encoding="utf-8"))
+            if cache.get("__done__"):
+                return {int(k): v for k, v in cache.items() if k != "__done__"}
+        except Exception:
+            cache = {}
+    try:
+        import tempfile
+        import convert_math_pdf as M
+        with tempfile.TemporaryDirectory() as td:
+            imgs = M.render_pages(Path(pdf), 160, Path(td), pages)
+            for img in imgs:
+                try:
+                    got = _vision_ask_image(img)
+                except Exception:
+                    continue
+                if not got:
+                    continue
+                for k, v in got.items():
+                    cache[k] = v
+                cache["__done__"] = True
+                if len(got) >= 5:                     # 已经读到大半答案表就收
+                    break
+    except Exception as e:                                    # noqa: BLE001
+        review.append(f"PDF 答案页视觉抽取失败：{str(e)[:60]}")
+        return {}
+    if cache_f is not None and cache:
+        try:
+            cache_f.parent.mkdir(parents=True, exist_ok=True)
+            cache_f.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+        except Exception:
+            pass
+    out = {int(k): v for k, v in cache.items() if k != "__done__"}
+    if out:
+        review.append(f"PDF 答案页视觉抽取：读出 {len(out)} 个选择题答案")
+    return out
+
+
+def extract_choice_answer(block: str) -> tuple[str, str]:
+    """从一个「答案区块」里抠出选择题字母 + 剩余解析。返回 (字母, 解析)。"""
+    b = (block or "").strip()
+    if not b:
+        return "", ""
+    b = re.sub(r"^[（(]\s*\d+\s*分\s*[）)]\s*", "", b)
+    m = re.match(r"^[【\[]\s*([A-D]{1,4})\s*[】\]]", b)
+    if m:
+        return m.group(1), b[m.end():].strip()
+    m = re.match(r"^([A-D]{1,4})\s*(?:[.．、)）:：]|[（(]|\s|$)", b)
+    if m:
+        return m.group(1), b[m.end():].strip()
+    for pat in (r"【答案】\s*([A-D]{1,4})", r"答案\s*[:：]\s*([A-D]{1,4})",
+                r"故选\s*[:：]?\s*([A-D]{1,4})", r"选\s*([A-D]{1,4})\s*给\s*\d+\s*分",
+                r"([A-D])\s*项(?:正确|符合题意)", r"正确的是\s*([A-D]{1,4})"):
+        mm = re.search(pat, b)
+        if mm:
+            return mm.group(1), b
+    return "", b
 
 
 def normalize_choice_answers(sections: list[dict], review: list[str]) -> int:
-    """选择题答案从「A(B 错…)」「B. …」里只取字母，其余当解析（教师版常把解析写在答案后面）。"""
-    n = 0
-    filled = 0
+    """选择题答案只取字母；教师版把解析写在答案里（「A(B 错…)」/「【答案】C」/「故选：D」）时拆到 analysis。"""
+    n = filled = 0
     for sec in sections:
         for q in sec["questions"]:
             opts = q.get("options") or []
@@ -1273,16 +1510,32 @@ def normalize_choice_answers(sections: list[dict], review: list[str]) -> int:
                 continue
             ids = [str(o.get("id") or "").upper() for o in opts]
             ans = str(q.get("answer") or "").strip()
-            m = re.match(r"^([A-D]{1,4})\s*[.．、)）:：]?\s*(.*)$", ans, re.S)
-            if not m or m.group(1) not in ids:
+            if not ans:
                 continue
-            letter, rest = m.group(1), m.group(2).strip()
-            if len(letter) > 1:
-                continue                                  # 多选连写，保持原样
+            letter, rest = "", ans
+            m = re.match(r"^([A-D]{1,4})\s*[.．、)）:：]?\s*(.*)$", ans, re.S)
+            if m and m.group(1) in ids:
+                letter, rest = m.group(1), m.group(2).strip()
+            else:
+                m2 = (re.match(r"^[【\[]\s*([A-D])\s*[】\]]", ans)
+                      or re.search(r"【答案】\s*([A-D])\b", ans)
+                      or re.search(r"故选\s*[:：]?\s*([A-D])\b", ans)
+                      or re.search(r"选\s*([A-D])\s*给\s*\d+\s*分", ans)
+                      or re.search(r"^[（(]?([A-D])[）)]\s*$", ans))
+                if m2 and m2.group(1) in ids:
+                    letter, rest = m2.group(1), ans
+            if not letter or len(letter) > 1:
+                continue
             if ans != letter:
                 q["answer"] = letter
                 n += 1
-            if rest and len(rest) >= 8 and not str(q.get("analysis") or "").strip():
+            if len(ans) > 200 and not re.search(r"[A-D]", ans[:6]):
+                # 整块像题干/纯解析，没有可判定的字母
+                if not str(q.get("analysis") or "").strip():
+                    q["analysis"] = ans
+                q["answer"] = ""
+                continue
+            if rest and rest != letter and len(rest) >= 8 and not str(q.get("analysis") or "").strip():
                 q["analysis"] = rest
                 filled += 1
     if n:
@@ -1453,7 +1706,23 @@ def process(md: Path, type_dir: str, args) -> str:
             # 选择题解析：答案区没有的，让 AI 按答案生成
             singles = [q for q in grp["questions"] if q["questionType"] == "single" and not (q.get("analysis") or "").strip()]
             if singles and args.ai_analysis:
-                got = ai_choice_analyses(singles)
+                cache_f = OUT["root"] / type_dir / ".cache" / f"{title}-analysis.json"
+                cache_map = {}
+                if cache_f.exists():
+                    try:
+                        cache_map = json.loads(cache_f.read_text(encoding="utf-8"))
+                    except Exception:
+                        cache_map = {}
+                reused = 0
+                for q in singles:                       # 命中缓存的（题干没变）直接用，不再调模型
+                    key = f"{q['id']}::{hashlib.md5(str(q.get('content')).encode()).hexdigest()[:10]}"
+                    if cache_map.get(key):
+                        q["analysis"] = cache_map[key]
+                        reused += 1
+                if reused:
+                    log(f"  {grp['category']}：{reused} 道选择题解析取自缓存")
+                singles = [q for q in singles if not (q.get("analysis") or "").strip()]
+                got = ai_choice_analyses(singles) if singles else {}
                 filled = 0
                 for q in singles:
                     if got.get(q["id"]):
@@ -1461,6 +1730,15 @@ def process(md: Path, type_dir: str, args) -> str:
                         filled += 1
                 if filled:
                     log(f"  {grp['category']}：AI 补写 {filled} 道选择题解析")
+                    cache_f.parent.mkdir(parents=True, exist_ok=True)
+                    for q in grp["questions"]:
+                        if q.get("analysis") and q.get("options"):
+                            key = f"{q['id']}::{hashlib.md5(str(q.get('content')).encode()).hexdigest()[:10]}"
+                            cache_map[key] = q["analysis"]
+                    try:
+                        cache_f.write_text(json.dumps(cache_map, ensure_ascii=False, indent=1), encoding="utf-8")
+                    except Exception:
+                        pass
             if translation and grp["category"] == "文言文":
                 for q in grp["questions"]:
                     base = (q.get("analysis") or "").strip()
@@ -1468,7 +1746,8 @@ def process(md: Path, type_dir: str, args) -> str:
                 log(f"  文言文：参考译文已写入 {len(grp['questions'])} 道题的解析")
             out_groups.append(grp)
 
-    if args.ai_analysis and ans.strip():
+    ans_text_only = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", ans or "")
+    if args.ai_analysis and len(re.sub(r"\s+", "", ans_text_only)) >= 100:
         missing = []
         for grp in out_groups:
             for q in grp["questions"]:
@@ -1484,6 +1763,56 @@ def process(md: Path, type_dir: str, args) -> str:
                         filled += 1
             if filled:
                 log(f"  {title}：AI 从答案区补 {filled}/{len(missing)} 题答案")
+    # 解析版兜底：答案区里「【答案】X」按出现顺序映射到尚缺答案的选择题
+    _missing = [q for sec in out_groups for q in sec["questions"]
+                if q.get("options") and not str(q.get("answer") or "").strip()]
+    if _missing:
+        _seq = re.findall(r"【答案】\s*([A-D]{1,4})\b", ans)
+        if len(_seq) >= len(_missing):
+            for q, letter in zip(_missing, _seq):
+                q["answer"] = letter
+            review.append(f"解析版兜底：按顺序把 {len(_missing)} 个「【答案】X」映射到缺答案的选择题")
+
+    # 答案区是图片的老卷：视觉兜底（只补选择题字母）
+    if not args.no_vision:
+        need = [q for sec in out_groups for q in sec["questions"]
+                if q.get("options") and not str(q.get("answer") or "").strip()]
+        if need:
+            if IMG_REF.search(ans):                                # 答案区里有图（老卷答案表是截图）
+                got = vision_answers_from_images(
+                    ans, md.parent, review,
+                    OUT["root"] / type_dir / ".cache" / f"{title}-ansvision.json")
+                filled = 0
+                for sec in out_groups:
+                    for q in sec["questions"]:
+                        if q.get("options") and not str(q.get("answer") or "").strip():
+                            head = str(q.get("id")).split("-")[0]
+                            v = got.get(int(head)) if head.isdigit() else None
+                            if v:
+                                q["answer"] = v
+                                filled += 1
+                if filled:
+                    log(f"  {title}：视觉兜底补 {filled} 个选择题答案")
+                still = [q for sec in out_groups for q in sec["questions"]
+                         if q.get("options") and not str(q.get("answer") or "").strip()]
+                if still and not args.no_vision:
+                    pdfs = sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))
+                    if pdfs:
+                        got2 = vision_answers_from_pdf(
+                            pdfs[0], review,
+                            OUT["root"] / type_dir / ".cache" / f"{title}-anspdf.json")
+                        f2 = 0
+                        for sec in out_groups:
+                            for q in sec["questions"]:
+                                if q.get("options") and not str(q.get("answer") or "").strip():
+                                    head = str(q.get("id")).split("-")[0]
+                                    v = got2.get(int(head)) if head.isdigit() else None
+                                    if v:
+                                        q["answer"] = v
+                                        f2 += 1
+                        if f2:
+                            log(f"  {title}：PDF 答案页兜底补 {f2} 个选择题答案")
+
     # 微写作/作文：教师版常不给答案，题库惯例写「略」
     for sec in out_groups:
         if sec.get("category") in ("微写作", "作文"):
@@ -1498,7 +1827,8 @@ def process(md: Path, type_dir: str, args) -> str:
     # ── 出口后处理（原 4 个后处理脚本，一次做完）──
     sections = merge_sections(out_groups, review)
     normalize_choice_answers(sections, review)
-    normalize_scores(sections, review)
+    _y = re.search(r"(20\d{2})", title)
+    normalize_scores(sections, review, year=int(_y.group(1)) if _y else None)
     if args.repair_tables:
         pdfs = sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))
         repair_tables(sections, pdfs[0] if pdfs else None, type_dir, review)
@@ -1610,17 +1940,33 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
             continue
         if sec.get("questionType") != QTYPE_OF[cat]:
             errs.append(f"{cat}：questionType={sec.get('questionType')!r}（应为 {QTYPE_OF[cat]}）")
-        if cat in FIXED_SCORES and (sec.get("score") or 0) != FIXED_SCORES[cat]:
-            errs.append(f"{cat}：{sec.get('score')} 分（应固定 {FIXED_SCORES[cat]} 分）")
+        if cat == "作文":
+            sc = sec.get("score") or 0
+            if not 40 <= sc <= 62:
+                errs.append(f"作文：{sc} 分（应在 40–62 之间，以卷面为准）")
+        elif cat == "微写作":
+            sc = sec.get("score") or 0
+            if not 0 <= sc <= 12:
+                errs.append(f"微写作：{sc} 分（应在 0–12 之间，以卷面为准）")
         if cat == "默写":
             n_ph = len(PH_RE.findall(sec.get("content") or ""))
-            if n_ph != len(sec.get("questions") or []):
-                errs.append(f"默写：占位符 {n_ph} 个 ≠ 空/小题 {len(sec.get('questions') or [])} 个")
-            if (sec.get("score") or 0) != n_ph or n_ph not in DICTATION_SCORES:
-                errs.append(f"默写：{n_ph} 空 / {sec.get('score')} 分（应每空 1 分且空数 ∈ {DICTATION_SCORES}）")
-        elif cat in ("微写作", "作文"):
-            if len(sec.get("questions") or []) != 1:
-                errs.append(f"{cat}：应恰好 1 题，实为 {len(sec.get('questions') or [])}")
+            nq = len(sec.get("questions") or [])
+            if n_ph != nq:
+                errs.append(f"默写：占位符 {n_ph} 个 ≠ 空/小题 {nq} 个")
+            if (sec.get("score") or 0) != n_ph or (sec.get("score") or 0) != nq:
+                errs.append(f"默写：{n_ph} 空 / {sec.get('score')} 分（应每空 1 分）")
+            if not 4 <= n_ph <= 14:
+                errs.append(f"默写：{n_ph} 个空（应在 4–14 之间；超出说明切分错）")
+            if n_ph not in DICTATION_SCORES:
+                notes.append(f"默写：{n_ph} 空（常规 8/10 空，按卷面实际）")
+        elif cat == "微写作":
+            nq = len(sec.get("questions") or [])
+            if not 1 <= nq <= 3:
+                errs.append(f"微写作：{nq} 题（北京卷 1–3 个材料/题目三选一）")
+        elif cat == "作文":
+            nq = len(sec.get("questions") or [])
+            if not 1 <= nq <= 2:
+                errs.append(f"作文：{nq} 题（北京卷 1 个题目或二选一）")
         elif PH_RE.search(sec.get("content") or ""):
             errs.append(f"{cat}：content 里有占位符（阅读类不内联，前端按小题渲染）")
         exp = EXPECTED_QNUM.get(cat)
@@ -1631,8 +1977,10 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
     for sec in sections:
         cat = sec.get("category")
         content = sec.get("content") or ""
-        if cat in ("多文本", "文言文", "古诗", "文学类", "名著", "语用") and not content.strip():
+        if cat in ("多文本", "文言文", "古诗", "文学类") and not content.strip():
             errs.append(f"{cat}：content（阅读材料）为空")
+        elif cat in ("名著", "语用") and not content.strip():
+            notes.append(f"{cat}：该题组无阅读材料（整本书/语用问答直接给设问），content 为空属正常")
         if STEM_RESIDUE.match(content) or NOTICE_RE.search(content[:120]):
             errs.append(f"{cat}：材料开头混进分区标题/卷首说明：{content[:20]!r}")
         body = _norm(content)
@@ -1647,13 +1995,13 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
                 if oids != ["A", "B", "C", "D"]:
                     errs.append(f"{cat} 第{qid}题：options={oids}（应为 A–D 四项）")
                 ans = str(q.get("answer") or "")
-                if len(ans) != 1 or ans != ans.upper() or ans not in oids:
-                    errs.append(f"{cat} 第{qid}题：answer={ans!r}（应为单个大写字母且 ∈ options）")
+                if not re.fullmatch(r"[A-D]{1,4}", ans) or ans != ans.upper() or any(c not in oids for c in ans):
+                    errs.append(f"{cat} 第{qid}题：answer={ans!r}（应为 A–D 字母串且每个字母 ∈ options）")
                 if any(not str(o.get("label") or "").strip() for o in opts):
                     errs.append(f"{cat} 第{qid}题：有空选项")
             elif q.get("questionType") not in ("text", "input"):
                 errs.append(f"{cat} 第{qid}题：questionType={q.get('questionType')!r}")
-            if cat in ("多文本", "文言文", "古诗", "文学类", "名著", "语用"):
+            if cat in ("多文本", "文言文", "古诗", "文学类"):
                 if not qc:
                     errs.append(f"{cat} 第{qid}题：题干为空")
                 elif _norm(qc) in body:
@@ -1791,6 +2139,8 @@ def main():
     ap.add_argument("--no-dots", dest="dots", action="store_false")
     ap.add_argument("--no-ai-analysis", dest="ai_analysis", action="store_false")
     ap.add_argument("--refresh-plan", action="store_true", help="忽略缓存、重新让模型做结构规划")
+    ap.add_argument("--no-vision", dest="no_vision", action="store_true",
+                    help="关闭「答案区是图片」的多模态兜底")
     ap.add_argument("--repair-tables", action="store_true",
                     help="用 PDF 页面图像重识别可疑表格（原 repair_chinese_tables.py，慢）")
     ap.add_argument("--check", action="store_true", help="契约自检（纯 Python，不调模型）")
