@@ -101,10 +101,21 @@ def page_texts(pdf: Path) -> list[str]:
 
 
 def find_page(pdf: Path, stem: str) -> int | None:
-    key = re.sub(r"\s+", "", stem)[:14]
-    for i, page in enumerate(page_texts(pdf), start=1):
-        if key and key in re.sub(r"\s+", "", page):
-            return i
+    flat = re.sub(r"[\s\u3000]+", "", stem)
+    keys = [flat[:14], flat[:10], flat[:8]]
+    pages = page_texts(pdf)
+    for key in keys:
+        if not key:
+            continue
+        for i, page in enumerate(pages, start=1):
+            if key in re.sub(r"[\s\u3000]+", "", page):
+                return i
+    # 再退一步：取题干里最长的连续中文串去搜
+    m = re.findall(r"[\u4e00-\u9fff]{6,}", flat)
+    for frag in sorted(m, key=len, reverse=True)[:3]:
+        for i, page in enumerate(pages, start=1):
+            if frag in re.sub(r"[\s\u3000]+", "", page):
+                return i
     return None
 
 
@@ -156,7 +167,7 @@ def locate_pdf(json_path: Path) -> Path | None:
     return None
 
 
-def fix_paper(json_path: Path, only: set[str] | None, apply: bool) -> list[str]:
+def fix_paper(json_path: Path, only: set[str] | None, apply: bool, force: bool = False) -> list[str]:
     data = json.loads(json_path.read_text(encoding="utf-8"))
     pdf = locate_pdf(json_path)
     log = []
@@ -166,7 +177,7 @@ def fix_paper(json_path: Path, only: set[str] | None, apply: bool) -> list[str]:
         for q in sec.get("questions") or []:
             if only and str(q.get("id")) not in only:
                 continue
-            if not needs_fix(q):
+            if not force and not needs_fix(q):
                 continue
             stem = q.get("content") or ""
             page = find_page(pdf, stem)
@@ -238,6 +249,7 @@ def main() -> int:
     ap.add_argument("--apply", nargs="+", default=[], help="要修的 JSON（相对 JSON_ROOT 或绝对路径）")
     ap.add_argument("--only", nargs="+", default=None, help="只修这些题号")
     ap.add_argument("--apply-all", action="store_true")
+    ap.add_argument("--force", action="store_true", help="忽略题型判定，强制重做 --only 指定的题")
     args = ap.parse_args()
 
     if args.scan:
@@ -256,7 +268,7 @@ def main() -> int:
 
     only = set(args.only) if args.only else None
     for t in targets:
-        for line in fix_paper(t, only, apply=True):
+        for line in fix_paper(t, only, apply=True, force=args.force):
             print(line)
     return 0
 

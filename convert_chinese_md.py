@@ -1885,7 +1885,18 @@ def check_paper(jf: Path, exceptions_path: Path | None = None) -> tuple[dict, li
     for sec in sections:
         qs = sec.get("questions") or []
         ssum = sum(q.get("score") or 0 for q in qs)
-        if ssum != (sec.get("score") or 0):
+        _cat = sec.get("category") or ""
+        # 任选一题板块（作文二选一 / 微写作三选一）：每道候选题都按满分放，Σ小问 ≠ 板块分是正常的
+        _pick_one = _cat in ("作文", "微写作") and len(qs) > 1
+        if _pick_one:
+            _std = {"作文": 50, "微写作": 10}[_cat]
+            _bad = [q for q in qs if (q.get("score") or 0) != _std]
+            if _bad:
+                errs.append(f"{_cat}：任选一题板块应每问 {_std} 分，实际 " +
+                            "/".join(str(q.get("score")) for q in qs))
+            if (sec.get("score") or 0) != _std and _cat == "作文":
+                errs.append(f"{_cat}：板块分应为 {_std}（任选一题只算一次），实际 {sec.get('score')}")
+        elif ssum != (sec.get("score") or 0):
             errs.append(f"{sec.get('category')}：Σ小问 {ssum} ≠ section.score {sec.get('score')}")
         if any((q.get("score") or 0) <= 0 for q in qs):
             errs.append(f"{sec.get('category')}：有小问分值 ≤ 0")
