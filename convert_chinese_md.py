@@ -698,6 +698,10 @@ def split_named_book(content: str, ans_raw: str, total_score: int, qno, review: 
         if m:
             piece = (piece[:m.start()] + piece[m.end():]).strip()
         stem, opts = split_piece_options(piece)
+        if not opts:                                   # 表格/两栏形态：用通用内联选项拆分再试
+            stem2, opts2 = split_inline_options(piece)
+            if opts2:
+                stem, opts = stem2, opts2
         q = {
             "id": f"{qno}-{idx}" if len(pieces) > 1 else qno,
             "questionType": "single" if opts else "text",
@@ -997,7 +1001,8 @@ def ai_fill_answers(items: list[dict], ans_text: str, wanted: list) -> dict:
 
 
 def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], dots=None, ans_raw: str = "", blocks: dict | None = None,
-                md_dir: Path | None = None, stem_name: str = "", type_dir: str = "二模") -> dict | None:
+                md_dir: Path | None = None, stem_name: str = "", type_dir: str = "二模",
+                pdf_path: Path | None = None, allow_vision: bool = True) -> dict | None:
     blocks = blocks or {}
     cat = g.get("category", "")
     qtype = g.get("questionType") or "chinese-reading"
@@ -1058,8 +1063,8 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
         if not q:
             review.append(f"缺第{no}题正文")
             continue
-        q["answer"] = answers.get(no, "")
-        q["analysis"] = ""
+        q["answer"] = SCAN["letters"].get(no) or answers.get(no, "")
+        q["analysis"] = SCAN["rest"].get(no, "")
         if q["questionType"] == "single":
             # 已有干净字母就别动；否则用整块重切，仍抽不出字母才判定为解析
             cur = str(q.get("answer") or "").strip()
@@ -1084,8 +1089,45 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
                 q["analysis"] = rest
         q["score"] = q.get("score") or 0
         # 选项两栏/带续行时，纯正则切不干净 → 让模型把每个选项整段还原
+        if q["questionType"] == "text":
+            stem2, opts2 = split_inline_options(q.get("content") or "")
+            if opts2 and len(opts2) >= 4:
+                ids2 = [o["id"] for o in opts2]
+                ans2 = re.sub(r"[^A-D]", "", str(q.get("answer") or "").strip().upper())[:4]
+                if ans2 and all(c in ids2 for c in ans2):
+                    q.update(questionType="single", content=stem2, options=opts2)
+                    review.append(f"第{no}题：题干内联的选项已切出（{''.join(ids2)}），改为选择题")
+                elif not ans2:
+                    q.update(questionType="single", content=stem2, options=opts2)
+                    review.append(f"第{no}题：题干内联的选项已切出（{''.join(ids2)}），改为选择题（答案待补）")
+                else:
+                    review.append(f"第{no}题：题干里有内联选项但答案 {ans2!r} 不在其中 → 保持 text，请人工核对")
+        if q["questionType"] == "text" and len(re.findall(r"(?:^|\s)([A-D])[.．、]", q.get("content") or "")) >= 3:
+            stem2, opts2 = split_piece_options(q["content"])
+            if opts2:
+                q.update(questionType="single", content=stem2, options=opts2)
+                review.append(f"第{no}题：题干里混排的 A–D 已切回选项")
+            elif allow_vision and pdf_path:
+                got = vision_question_from_pdf(pdf_path, no, review,
+                                               (OUT["root"] / type_dir / ".cache" / f"{stem_name}-qvision.json"))
+                if got:
+                    q["content"] = str(got.get("stem") or q["content"]).strip()
+                    q["options"] = [{"id": str(o.get("id") or "ABCD"[k]).upper()[:1],
+                                     "label": str(o.get("label") or "").strip()}
+                                    for k, o in enumerate(got["options"][:4])]
+                    q["questionType"] = "single"
+                    if got.get("answer"):
+                        q["answer"] = str(got["answer"]).strip().upper()[:1]
         if q["questionType"] == "single":
             seg_q = _question_segment(body, no)
+            # 选项 label 为空但该题片段里有图片 → 图片就是选项本身（老卷选项被截成图）
+            if any(not str(o.get("label") or "").strip() for o in q["options"]):
+                imgs = IMG_REF.findall(seg_q)
+                if imgs:
+                    for k, o in enumerate(q["options"]):
+                        if not str(o.get("label") or "").strip() and k < len(imgs):
+                            o["label"] = f"![]({imgs[k]})"
+                    review.append(f"第{no}题：选项是图片，已把图片引用挂到对应选项 label")
             if looks_broken(q, seg_q):
                 fixed = ai_options(seg_q) if AI_ENABLED.get("on") else {}
                 if fixed:
@@ -1205,7 +1247,8 @@ def build_group(g: dict, body: str, answers: dict[int, str], review: list[str], 
 
 
 OUT = {"root": OUT_ROOT}
-AI_ENABLED = {"on": True}          # --no-ai 时置 False，保证「零模型调用、输出可复现」
+AI_ENABLED = {"on": True}
+SCAN = {"letters": {}, "rest": {}}          # 当前卷的「答案区逐行扫描」结果（process 里填充）          # --no-ai 时置 False，保证「零模型调用、输出可复现」
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1479,6 +1522,58 @@ def vision_answers_from_pdf(pdf: Path, review: list[str], cache_f: Path | None =
     return out
 
 
+# ── 答案区「逐行扫描」解析（第 3 轮；比 QSPLIT 全文切稳）────────────
+ANSLINE = re.compile(r"^[ \t]*(?:[（(]\s*)?([0-9０-９]{1,2})\s*(?:[）)]|[.．、,，:：])\s*(.*)$")
+NUM_MARK = re.compile(r"(?<![0-9０-９])([0-9０-９]{1,2})\s*\\?\s*(?:[.．、,，:：]|[）)])\s*")
+SEG_BREAK = re.compile(r"【(?:分析|解答|点评|详解|点睛|考点|解析)】|解析\s*[:：]|【答案】\s*$")
+
+
+def _to_int(s: str) -> int:
+    return int(s.translate(str.maketrans("０１２３４５６７８９", "0123456789")))
+
+
+def scan_answer_lines(ans: str) -> list[dict]:
+    """逐行扫描答案区（第 3 轮）：一行可有多题，题号容错全角/括号/顿号/逗号/转义点。
+
+    题号后紧跟答案 → 直接取；题号独占一行 → 用下一行回填（或以字母开头的上一行）。
+    段内遇到【分析】/【解答】/解析：就切掉，只留答案段。
+    """
+    lines = [l for l in (ans or "").split("\n")]
+    out: list[dict] = []
+    seen: set[int] = set()
+    for i, ln in enumerate(lines):
+        line = re.sub(r"^\s*(?:【[^】]{0,10}】|\*\*)", "", ln).strip()
+        marks = list(NUM_MARK.finditer(line))
+        if not marks:
+            continue
+        for k, m in enumerate(marks):
+            try:
+                no = _to_int(m.group(1))
+            except Exception:
+                continue
+            if not 1 <= no <= 40 or no in seen:
+                continue
+            endp = marks[k + 1].start() if k + 1 < len(marks) else len(line)
+            seg_raw = line[m.end():endp].strip()
+            rest = SEG_BREAK.split(seg_raw)[0].strip()
+            if not rest:                                    # 【分析】…故选X 这类解析版
+                mm = re.search(r"(?:故选|答案)\s*[:：]?\s*([A-D]{1,4})\b", seg_raw)
+                if mm:
+                    rest = mm.group(1)
+            src = "同行"
+            if not rest:                                   # 题号独占一行 → 相邻行回填
+                nxt = next((l.strip() for l in lines[i + 1:] if l.strip()), "")
+                if nxt and not NUM_MARK.match(nxt):
+                    rest, src = SEG_BREAK.split(nxt)[0].strip(), "下一行"
+                elif i:
+                    prev = lines[i - 1].strip()
+                    if re.match(r"^[A-D]", prev):
+                        rest, src = prev, "上一行"
+            seen.add(no)
+            out.append({"no": no, "text": rest, "src": src})
+    return out
+
+
 def extract_choice_answer(block: str) -> tuple[str, str]:
     """从一个「答案区块」里抠出选择题字母 + 剩余解析。返回 (字母, 解析)。"""
     b = (block or "").strip()
@@ -1492,12 +1587,304 @@ def extract_choice_answer(block: str) -> tuple[str, str]:
     if m:
         return m.group(1), b[m.end():].strip()
     for pat in (r"【答案】\s*([A-D]{1,4})", r"答案\s*[:：]\s*([A-D]{1,4})",
+                r"应选\s*([A-D]{1,4})", r"答案是\s*([A-D]{1,4})", r"故选\s*([A-D]{1,4})",
                 r"故选\s*[:：]?\s*([A-D]{1,4})", r"选\s*([A-D]{1,4})\s*给\s*\d+\s*分",
                 r"([A-D])\s*项(?:正确|符合题意)", r"正确的是\s*([A-D]{1,4})"):
         mm = re.search(pat, b)
         if mm:
             return mm.group(1), b
     return "", b
+
+
+# ── 被拆开的选项合并（2026-11 用户反馈：一道选择题被拆成 4 个大题）──────
+OPT_ASK = re.compile(r"请|分析|概括|说明|简析|简述|为什么|哪些|如何|谈谈|评价|赏析|举例|结合|指出|"
+                     r"[?？]|^\s*\d{1,2}\s*[.．、]")
+SETQ_HINT = re.compile(r"下列|一项|正确|不正确|错误|符合题意|是（|是\(")
+
+
+def _looks_like_option(text: str) -> bool:
+    """片段像不像选项：10–40 字、单行、不含设问语气词"""
+    t = (text or "").strip()
+    if not 10 <= len(t) <= 40 or "\n" in t:
+        return False
+    return not OPT_ASK.search(t)
+
+
+def _parallel_run(run: list[dict]) -> bool:
+    """平行判据：首二字高度相似，或都以 学生/分组/在/通过/以 这类主语开头"""
+    if len(run) < 3:
+        return False
+    heads = {re.sub(r"[\s\W]", "", q.get("content") or "")[:2] for q in run}
+    if len(heads) <= 2:
+        return True
+    return all((q.get("content") or "").strip().startswith(("学生", "分组", "在", "通过", "以", "教师"))
+               for q in run)
+
+
+def _pick_merged_stem(sec: dict, prev_qs: list[dict], run: list[dict]) -> str:
+    """合并后的题干：只用「前面（本板块内）小题的设问」；**不从 section.content 里取**
+    （从材料里取会和材料正文重复，触发「设问重复」断言）。取不到就留空，由 review 提示人工补。"""
+    for q in reversed(prev_qs):
+        c = (q.get("content") or "").strip()
+        if c and SETQ_HINT.search(c) and len(c) <= 120:
+            return c
+    return ""
+
+
+# ── 选项仍切不开时：PDF 该题所在页 → 视觉还原 {stem, options, answer} ──
+Q_VISION_PROMPT = r"""这是语文试卷的一页截图。请找到【第 {no} 题】，把它还原成 JSON：
+{"found": true, "stem": "题干文字", "options": [{"id":"A","label":"…"},{"id":"B","label":"…"},{"id":"C","label":"…"},{"id":"D","label":"…"}], "answer": "C 或 null"}
+- stem 只写题干，不含选项；options 逐项逐字照抄，不要合并、不要补内容；
+- 本页没有该题就输出 {"found": false}；题干/选项是图片时宁可 found:false。
+只输出 JSON。
+"""
+
+
+def vision_question_from_pdf(pdf: Path, no, review: list[str], cache_f: Path | None = None) -> dict:
+    """把（切不开选项的）某题交给 PDF 页面视觉还原；识别不出返回 {}。"""
+    if not pdf or not Path(pdf).exists():
+        return {}
+    cache: dict = {}
+    if cache_f is not None and cache_f.exists():
+        try:
+            cache = json.loads(cache_f.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
+    key = str(no)
+    if key in cache:
+        return cache[key] or {}
+    try:
+        import tempfile
+        import base64
+        import requests as _rq
+        import convert_math_pdf as M
+
+        # ① 用 pdftotext -layout 找该题所在页与行区间，裁一条横带再送视觉
+        page_no, y0, y1 = 0, 0.0, 1.0
+        try:
+            import subprocess as _sp
+            txt = _sp.run(["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True, timeout=120).stdout
+            pages = txt.split("\f")
+            pat = re.compile(rf"(?m)^\s*{no}\s*[.．、）)]")
+            for pi, pg in enumerate(pages):
+                m = pat.search(pg)
+                if not m:
+                    continue
+                total_lines = max(1, pg.count("\n"))
+                line_no = pg[:m.start()].count("\n")
+                frac = line_no / total_lines
+                page_no = pi
+                y0, y1 = max(0.0, frac - 0.4), min(1.0, frac + 0.4)
+                break
+        except Exception:
+            pass
+        with tempfile.TemporaryDirectory() as td:
+            imgs = M.render_pages(Path(pdf), 160, Path(td), max(10, page_no + 1))
+            if page_no and len(imgs) > page_no:
+                imgs = imgs[page_no:page_no + 1]
+            if 0.0 < y0 < y1 < 1.0 and imgs:
+                try:
+                    from PIL import Image
+                    im = Image.open(imgs[0])
+                    w, hpx = im.size
+                    im.crop((0, int(hpx * y0), w, int(hpx * y1))).save(imgs[0])
+                except Exception:
+                    pass
+            for img in imgs:
+                b64 = base64.b64encode(img.read_bytes()).decode()
+                r = _rq.post(f"{BASE_URL}/chat/completions",
+                             json={"model": MODEL, "max_tokens": 1800, "temperature": 0.0,
+                                   "reasoning_effort": "none",
+                                   "messages": [{"role": "system", "content": "你是语文试卷录入员，只输出 JSON。"},
+                                                {"role": "user", "content": [
+                                                    {"type": "text", "text": Q_VISION_PROMPT.format(no=no)},
+                                                    {"type": "image_url", "image_url":
+                                                     {"url": "data:image/png;base64," + b64}}]}]},
+                             headers={"Authorization": f"Bearer {API_KEY}"}, timeout=300)
+                r.raise_for_status()
+                txt = (r.json()["choices"][0]["message"].get("content") or "").strip()
+                txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt).strip()
+                m = re.search(r"\{.*\}", txt, re.S)
+                got = {}
+                if m:
+                    try:
+                        got = json.loads(m.group(0))
+                    except Exception:
+                        got = {}
+                if not got:                                   # 非 JSON → 换措辞重试一次
+                    try:
+                        r2 = _rq.post(f"{BASE_URL}/chat/completions",
+                                      json={"model": MODEL, "max_tokens": 1200, "temperature": 0.0,
+                                            "reasoning_effort": "none",
+                                            "messages": [{"role": "system", "content": "只输出 JSON，不要解释。"},
+                                                         {"role": "user", "content": [
+                                                             {"type": "text", "text": "请严格只输出 JSON，不要解释。"
+                                                                                      + Q_VISION_PROMPT.format(no=no)},
+                                                             {"type": "image_url", "image_url":
+                                                              {"url": "data:image/png;base64," + b64}}]}]},
+                                      headers={"Authorization": f"Bearer {API_KEY}"}, timeout=300)
+                        r2.raise_for_status()
+                        t2 = (r2.json()["choices"][0]["message"].get("content") or "").strip()
+                        t2 = re.sub(r"^```(?:json)?\s*|\s*```$", "", t2).strip()
+                        m2 = re.search(r"\{.*\}", t2, re.S)
+                        got = json.loads(m2.group(0)) if m2 else {}
+                    except Exception:
+                        got = {}
+                if isinstance(got, dict) and got.get("found") and str(got.get("stem") or "").strip() \
+                        and len(got.get("options") or []) >= 2:
+                    cache[key] = got
+                    if cache_f is not None:
+                        try:
+                            cache_f.parent.mkdir(parents=True, exist_ok=True)
+                            cache_f.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+                        except Exception:
+                            pass
+                    review.append(f"复核：第{no}题选项由 PDF 截图识别（视觉还原）")
+                    return got
+    except Exception as e:                                   # noqa: BLE001
+        review.append(f"第{no}题 PDF 视觉还原失败：{str(e)[:60]}")
+    cache[key] = {}
+    return {}
+
+
+# ── 题干内联选项拆分（选项写在题干里：A．/B．/C．/D．，含两栏、含 GFM 表格）──
+INLINE_OPT = re.compile(r"(?:^|(?<=[\s\u3000]))([A-D])\s*[.．、]\s*")
+TABLE_OPT_ROW = re.compile(r"^\|\s*\**([A-D])\**\s*[.．、]\s*(.*)$")
+NEXT_BLOCK = re.compile(r"^(?:根据|阅读下|完成|材料[一二三四1234]|第[一二三四]部分)")
+
+
+def split_inline_options(text: str) -> tuple[str, list[dict]]:
+    """把题干里内联的 A–D 选项切出来 → (题干, options)。切不出返回 (原文, [])。"""
+    t = (text or "").strip()
+    if not t:
+        return t, []
+    # ① GFM 表格形态：| A．xxx | 假：借用 |  （2012/2013 真题文言文）
+    rows = [l for l in t.split("\n") if l.strip().startswith("|")]
+    if len(rows) >= 3 and sum(1 for r in rows if TABLE_OPT_ROW.match(r.strip())) >= 2:
+        opts, stems = [], []
+        for l in t.split("\n"):
+            m = TABLE_OPT_ROW.match(l.strip())
+            if m:
+                cells = [c.strip() for c in l.strip().strip("|").split("|")]
+                label = "；".join([c for c in cells[1:] if c])
+                opts.append({"id": m.group(1), "label": label})
+            elif not l.strip().startswith("|"):
+                stems.append(l)
+        if len(opts) >= 2:
+            return "\n".join(stems).strip(), opts
+    # ② 行内形态：A.xxx B.xxx（可能两栏、可能跨行）
+    marks = [(m.start(), m.end(), m.group(1)) for m in INLINE_OPT.finditer(t)]
+    seq: list[tuple[int, int, str]] = []
+    for pos, end, k in marks:
+        want = "ABCD"[len(seq)] if len(seq) < 4 else None
+        if k == want:
+            seq.append((pos, end, k))
+    if len(seq) < 3:
+        # 兜底：选项字母后直接跟汉字（`A踔然独立`、`A第①句…`），要求 ≥3 个且按 A→D 顺序
+        marks2 = [(m.start(1), m.end(1), m.group(1))
+                  for m in re.finditer(r"(?m)(?:^|[ \t\u3000。；）)])([A-D])(?=[\u4e00-\u9fff①-⑩\"“])", t)]
+        seq = []
+        for pos, end, k in marks2:
+            want = "ABCD"[len(seq)] if len(seq) < 4 else None
+            if k == want:
+                seq.append((pos, end, k))
+            elif k == "A" and not seq:
+                seq.append((pos, end, k))
+    if len(seq) < 3:
+        return t, []
+    stem = t[:seq[0][0]].strip()
+    lines_at = [t.rfind("\n", 0, pos) + 1 for pos, _e, _k in seq]
+    # 选项若顶格起行，题干截到该行之前
+    if lines_at and lines_at[0] > 0 and t[lines_at[0]:seq[0][0]].strip() == "":
+        stem = t[:lines_at[0]].strip()
+    opts = []
+    for i, (pos, end, k) in enumerate(seq):
+        stop = seq[i + 1][0] if i + 1 < len(seq) else len(t)
+        seg = t[end:stop]
+        if i + 1 == len(seq):                       # 最后一项：切掉后面的下一大题引导语
+            cut = None
+            for mm in re.finditer(r"\n\s*\n", seg):
+                tail = seg[mm.end():].strip()
+                if tail and NEXT_BLOCK.match(tail):
+                    cut = mm.start()
+                    break
+            if cut is not None:
+                seg = seg[:cut]
+        opts.append({"id": k, "label": re.sub(r"\s*\n\s*", " ", seg).strip()})
+    opts = [o for o in opts if o["label"]]
+    if len(opts) < 3:
+        return t, []
+    return stem, opts
+
+
+def merge_split_options(sections: list[dict], answers: dict[int, str], review: list[str]) -> int:
+    """把「连续 ≥3 个无选项短 text」按三条硬门槛判为被拆开的选项 → 合并成一道 single。
+
+    门槛：①语气（不含设问/请求语气）②平行（首二字相近或同一主语开头）③答案印证
+    （答案区能给出字母，且字母序位 ≤ 片段数）。任一条不满足就不合并，只在 review 留痕。
+    """
+    merged_total = 0
+    for sec in sections:
+        qs = sec.get("questions") or []
+        if len(qs) < 4:
+            continue
+        out: list[dict] = []
+        i = 0
+        while i < len(qs):
+            j = i
+            while (j < len(qs) and not qs[j].get("options")
+                   and qs[j].get("questionType") == "text"
+                   and _looks_like_option(qs[j].get("content") or "")):
+                j += 1
+            run = qs[i:j]
+            ok = _parallel_run(run)
+            why = ""
+            if ok:
+                letters = set()
+                for q in run:
+                    for src in (str(q.get("answer") or ""), str(answers.get(int(q["id"])) if str(q["id"]).isdigit() else "")):
+                        v = src.strip().upper()
+                        if re.fullmatch(r"[A-D]{1,2}", v):
+                            letters.add(v)
+                if not letters:
+                    ok, why = False, "答案区没给出字母"
+                elif any(len(v) > 1 or "ABCD".index(v[0]) >= len(run) for v in letters):
+                    ok, why = False, f"答案字母 {sorted(letters)} 超出片段数 {len(run)}"
+            if run and len(run) >= 3 and not ok and why:
+                review.append(f"{sec.get('category')}：第{run[0]['id']}–{run[-1]['id']}题连续 {len(run)} 个短 text "
+                              f"疑似「选项被拆」，但{why} → 不合并（保留原样）")
+            if ok:
+                stem = _pick_merged_stem(sec, out, run)
+                opts = [{"id": "ABCD"[k], "label": (q.get("content") or "").strip()} for k, q in enumerate(run[:4])]
+                newq = {"id": qs[i]["id"], "questionType": "single",
+                        "content": stem, "options": opts, "answer": "",
+                        "analysis": "", "score": sum(q.get("score") or 0 for q in run)}
+                out.append(newq)
+                rep = f"{sec.get('category')}：第{qs[i]['id']}–{qs[j - 1]['id']}题（{len(run)} 个平行短句）判定为被拆开的选项，已合并为 1 道选择题"
+                if not (stem or "").strip():
+                    rep += "（题干取自材料末尾上下文，请人工核对）"
+                review.append(rep)
+                merged_total += 1
+                i = j
+                continue
+            out.extend(qs[i:max(j, i + 1)])
+            i = max(j, i + 1)
+        if merged_total:
+            # 合并后剥掉后续小题题干里混入的选项文本
+            opt_texts = [o["label"].strip() for q in out if q.get("options") for o in q["options"]]
+            for q in out:
+                c = (q.get("content") or "").strip()
+                if q.get("options") or not c or not opt_texts:
+                    continue
+                for t in sorted(opt_texts, key=len, reverse=True):
+                    if len(t) >= 10 and c.startswith(t):
+                        c = c[len(t):].lstrip("\n 。；")
+                        review.append(f"{sec.get('category')} 第{q.get('id')}题：题干开头混入选项文本，已剥离")
+                        break
+                q["content"] = c
+        sec["questions"] = out
+        sec["score"] = sum(q.get("score") or 0 for q in out)
+    return merged_total
 
 
 def normalize_choice_answers(sections: list[dict], review: list[str]) -> int:
@@ -1697,11 +2084,30 @@ def process(md: Path, type_dir: str, args) -> str:
         raise RuntimeError("结构规划为空")
 
     answers = parse_answers(ans)
+    # 第 3 轮：逐行扫描答案区（题号容错 + 相邻行回填），字母优先用扫描结果
+    scanned = scan_answer_lines(ans)
+    scan_letters: dict[int, str] = {}
+    scan_rest: dict[int, str] = {}
+    judged = 0
+    for item in scanned:
+        letter, rest = extract_choice_answer(item["text"])
+        if letter:
+            scan_letters[item["no"]] = letter
+            if rest and len(rest) >= 8:
+                scan_rest[item["no"]] = rest
+        elif len(item["text"]) > 20:
+            scan_rest[item["no"]] = item["text"]
+            judged += 1
+    SCAN["letters"], SCAN["rest"] = scan_letters, scan_rest
+    log(f"  {title}：答案区候选题号 {len(scanned)} 个 / 抽出字母 {len(scan_letters)} 个"
+        f" / 判解析 {judged} 个")
     review: list[str] = []
     out_groups = []
     translation = extract_translation(ans)
     for g in groups:
-        grp = build_group(g, body, answers, review, dots, ans, answer_blocks(ans), md.parent, title, type_dir)
+        grp = build_group(g, body, answers, review, dots, ans, answer_blocks(ans), md.parent, title, type_dir,
+                          pdf_path=next(iter(sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))), None),
+                          allow_vision=not args.no_vision)
         if grp and grp["questions"]:
             # 选择题解析：答案区没有的，让 AI 按答案生成
             singles = [q for q in grp["questions"] if q["questionType"] == "single" and not (q.get("analysis") or "").strip()]
@@ -1763,6 +2169,10 @@ def process(md: Path, type_dir: str, args) -> str:
                         filled += 1
             if filled:
                 log(f"  {title}：AI 从答案区补 {filled}/{len(missing)} 题答案")
+    if judged:
+        review.append(f"答案解析：{judged} 个题号区块判定为解析（抽不出字母），已移入 analysis"
+                      f"（候选 {len(scanned)} / 抽出字母 {len(scan_letters)}）")
+
     # 解析版兜底：答案区里「【答案】X」按出现顺序映射到尚缺答案的选择题
     _missing = [q for sec in out_groups for q in sec["questions"]
                 if q.get("options") and not str(q.get("answer") or "").strip()]
@@ -1778,6 +2188,7 @@ def process(md: Path, type_dir: str, args) -> str:
         need = [q for sec in out_groups for q in sec["questions"]
                 if q.get("options") and not str(q.get("answer") or "").strip()]
         if need:
+            got = {}
             if IMG_REF.search(ans):                                # 答案区里有图（老卷答案表是截图）
                 got = vision_answers_from_images(
                     ans, md.parent, review,
@@ -1791,11 +2202,12 @@ def process(md: Path, type_dir: str, args) -> str:
                             if v:
                                 q["answer"] = v
                                 filled += 1
-                if filled:
-                    log(f"  {title}：视觉兜底补 {filled} 个选择题答案")
-                still = [q for sec in out_groups for q in sec["questions"]
-                         if q.get("options") and not str(q.get("answer") or "").strip()]
-                if still and not args.no_vision:
+            filled = locals().get("filled", 0)
+            if filled:
+                log(f"  {title}：视觉兜底补 {filled} 个选择题答案")
+            still = [q for sec in out_groups for q in sec["questions"]
+                     if q.get("options") and not str(q.get("answer") or "").strip()]
+            if still and not args.no_vision:
                     pdfs = sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))
                     if pdfs:
                         got2 = vision_answers_from_pdf(
@@ -1826,6 +2238,16 @@ def process(md: Path, type_dir: str, args) -> str:
 
     # ── 出口后处理（原 4 个后处理脚本，一次做完）──
     sections = merge_sections(out_groups, review)
+    n_merged = merge_split_options(sections, answers, review)
+    if n_merged:
+        log(f"  {title}：合并被拆开的选项 {n_merged} 处")
+    # 合并出来的选择题补答案（答案区按题号）
+    for sec in sections:
+        for q in sec["questions"]:
+            if q.get("options") and not str(q.get("answer") or "").strip():
+                v = str(answers.get(int(q["id"])) if str(q["id"]).isdigit() else "").strip().upper()
+                if re.fullmatch(r"[A-D]{1,2}", v):
+                    q["answer"] = v
     normalize_choice_answers(sections, review)
     _y = re.search(r"(20\d{2})", title)
     normalize_scores(sections, review, year=int(_y.group(1)) if _y else None)
@@ -1894,10 +2316,55 @@ def img_exists(ref: str, type_dir: str) -> bool:
     return (parent / paper / "images" / fname).exists()
 
 
-def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
+EXC_DIR = Path(__file__).parent / "exceptions"
+EXC_DEFAULT = EXC_DIR / "chinese.json"
+
+
+def load_exceptions(path: Path | None) -> dict[tuple[str, str], dict[str, str]]:
+    """{"(类型, 卷名)": {"题号或 section": reason}}"""
+    p = path or EXC_DEFAULT
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    if not p.exists():
+        return out
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return out
+    for item in data.get("papers") or []:
+        key = (str(item.get("type") or ""), str(item.get("title") or ""))
+        m: dict[str, str] = {}
+        for it in item.get("items") or []:
+            q = str(it.get("question") or "")
+            m[q] = str(it.get("reason") or "")
+            m[f"{it.get('section') or ''}::{q}"] = str(it.get("reason") or "")
+        out[key] = m
+    return out
+
+
+def _exc_hit(exc: dict, cat: str, qid, kinds: tuple[str, ...]) -> str | None:
+    """命中白名单（按题号，或 section::题号）；reason 为空视为未登记"""
+    for k in (str(qid), f"{cat}::{qid}") + tuple(kinds):
+        if k in exc:
+            return exc[k] or None
+    return None
+
+
+def check_paper(jf: Path, exceptions_path: Path | None = None) -> tuple[dict, list[str], list[str]]:
     stat: dict = {"title": jf.stem}
     errs: list[str] = []
     notes: list[str] = []
+    exc_all = load_exceptions(exceptions_path)
+    exc_map = exc_all.get((jf.parent.name, jf.stem), {})
+    exc_hits: list[dict] = []
+
+    def err(msg: str, cat: str = "", qid=None, kind: str = "") -> None:
+        """登记错误；命中白名单且有原因 → 记例外（不计错误）"""
+        if exc_map and qid is not None:
+            reason = _exc_hit(exc_map, cat, qid, (kind,) if kind else ())
+            if reason:
+                exc_hits.append({"section": cat, "question": str(qid), "reason": reason})
+                return
+        errs.append(msg)
     raw = jf.read_text(encoding="utf-8")
     data = json.loads(raw)
     type_dir = jf.parent.name
@@ -1917,7 +2384,7 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
     if paper.get("totalScore") != total:
         errs.append(f"paper.totalScore={paper.get('totalScore')} ≠ Σsection {total}")
     if total != TOTAL_SCORE:
-        errs.append(f"整卷 {total} 分 ≠ 语文标准 {TOTAL_SCORE} 分")
+        err(f"整卷 {total} 分 ≠ 语文标准 {TOTAL_SCORE} 分", "整卷", "*", "整卷分值")
     for sec in sections:
         qs = sec.get("questions") or []
         ssum = sum(q.get("score") or 0 for q in qs)
@@ -1952,11 +2419,11 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
             n_ph = len(PH_RE.findall(sec.get("content") or ""))
             nq = len(sec.get("questions") or [])
             if n_ph != nq:
-                errs.append(f"默写：占位符 {n_ph} 个 ≠ 空/小题 {nq} 个")
+                err(f"默写：占位符 {n_ph} 个 ≠ 空/小题 {nq} 个", "默写", "*", "默写空数")
             if (sec.get("score") or 0) != n_ph or (sec.get("score") or 0) != nq:
                 errs.append(f"默写：{n_ph} 空 / {sec.get('score')} 分（应每空 1 分）")
-            if not 4 <= n_ph <= 14:
-                errs.append(f"默写：{n_ph} 个空（应在 4–14 之间；超出说明切分错）")
+            if not 1 <= n_ph <= 14:
+                err(f"默写：{n_ph} 个空（应在 1–14 之间；超出说明切分错）", cat, "*", "默写空数")
             if n_ph not in DICTATION_SCORES:
                 notes.append(f"默写：{n_ph} 空（常规 8/10 空，按卷面实际）")
         elif cat == "微写作":
@@ -1993,19 +2460,20 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
             if opts:
                 oids = [str(o.get("id") or "").upper() for o in opts]
                 if oids != ["A", "B", "C", "D"]:
-                    errs.append(f"{cat} 第{qid}题：options={oids}（应为 A–D 四项）")
+                    err(f"{cat} 第{qid}题：options={oids}（应为 A–D 四项）", cat, qid, "选项数不足")
                 ans = str(q.get("answer") or "")
                 if not re.fullmatch(r"[A-D]{1,4}", ans) or ans != ans.upper() or any(c not in oids for c in ans):
-                    errs.append(f"{cat} 第{qid}题：answer={ans!r}（应为 A–D 字母串且每个字母 ∈ options）")
+                    err(f"{cat} 第{qid}题：answer={ans!r}（应为 A–D 字母串且每个字母 ∈ options）",
+                        cat, qid, "答案缺失" if not ans else "答案格式")
                 if any(not str(o.get("label") or "").strip() for o in opts):
-                    errs.append(f"{cat} 第{qid}题：有空选项")
+                    err(f"{cat} 第{qid}题：有空选项", cat, qid, "空选项")
             elif q.get("questionType") not in ("text", "input"):
-                errs.append(f"{cat} 第{qid}题：questionType={q.get('questionType')!r}")
+                err(f"{cat} 第{qid}题：questionType={q.get('questionType')!r}", cat, qid, "题型异常")
             if cat in ("多文本", "文言文", "古诗", "文学类"):
                 if not qc:
-                    errs.append(f"{cat} 第{qid}题：题干为空")
+                    err(f"{cat} 第{qid}题：题干为空", cat, qid, "题干为空")
                 elif _norm(qc) in body:
-                    errs.append(f"{cat} 第{qid}题：设问重复出现在 section.content 里（前端会双显）")
+                    err(f"{cat} 第{qid}题：设问重复出现在 section.content 里（前端会双显）", cat, qid, "设问重复")
             if cat in ("微写作", "作文") and not qc:
                 errs.append(f"{cat} 第{qid}题：题目为空")
             if not str(q.get("answer") or "").strip():
@@ -2018,6 +2486,7 @@ def check_paper(jf: Path) -> tuple[dict, list[str], list[str]]:
             errs.append(f"图片不存在：/exam-images/{ref}")
     notes.append(f"图片引用 {len(refs)} 张")
 
+    stat["exceptions"] = exc_hits
     stat.update({
         "sections": len(sections),
         "questions": sum(len(sec.get("questions") or []) for sec in sections),
@@ -2068,6 +2537,9 @@ def run_check(args) -> int:
         return 2
     bad = 0
     rows = []
+    n_exc_total = 0
+    n_err_total = 0
+    _exc_reasons: dict[str, int] = {}
     skipped = []
     kept = []
     for jf in files:
@@ -2088,7 +2560,7 @@ def run_check(args) -> int:
         return 0
     for jf in files:
         try:
-            stat, errs, notes = check_paper(jf)
+            stat, errs, notes = check_paper(jf, getattr(args, "exceptions_path", None))
         except Exception as e:                              # noqa: BLE001
             print(f"\n===== {jf.name} =====\n  ✗ 读不了：{str(e)[:160]}")
             bad += 1
@@ -2104,6 +2576,10 @@ def run_check(args) -> int:
             print(f"   · {sec.get('category')}｜{sec.get('questionType')}｜{sec.get('score')} 分"
                   f"｜{len(qs)} 题｜Σ{sum(q.get('score') or 0 for q in qs)}"
                   f"｜材料 {len(sec.get('content') or '')} 字")
+        for ex in stat.get("exceptions") or []:
+            _exc_reasons[str(ex.get("reason") or "")] = _exc_reasons.get(str(ex.get("reason") or ""), 0) + 1
+        n_exc_total += len(stat.get("exceptions") or [])
+        n_err_total += len(errs)
         if errs:
             bad += 1
             print(f"  ✗ 契约错误 {len(errs)} 条：")
@@ -2111,6 +2587,8 @@ def run_check(args) -> int:
                 print(f"     - {e}")
         else:
             print("  ✓ 契约校验通过")
+        for ex in stat.get("exceptions") or []:
+            print(f"  · 例外（白名单）：{ex['section']} 第{ex['question']}题 — {ex['reason']}")
         for n in notes:
             print(f"  · 提示：{n}")
         rows.append((jf.stem, stat.get("sections"), stat.get("questions"), stat.get("total"),
@@ -2119,10 +2597,15 @@ def run_check(args) -> int:
     print("| --- | --- | --- | --- | --- | --- |")
     for r in rows:
         print(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} | {r[5]} |")
+    print(f"\n例外 {n_exc_total} 处（白名单）/ 新增错误 {n_err_total} 处")
+    if _exc_reasons:
+        print("例外按原因分组：")
+        for why, cnt in sorted(_exc_reasons.items(), key=lambda x: -x[1]):
+            print(f"  {cnt:3d}  {why}")
     if bad:
-        print(f"\n共 {len(rows)} 卷，{bad} 卷有问题")
+        print(f"共 {len(rows)} 卷，{bad} 卷有新增错误（白名单之外）")
         return 2
-    print(f"\n共 {len(rows)} 卷，全部通过 ✓")
+    print(f"共 {len(rows)} 卷，除白名单例外外全部通过 ✓")
     return 0
 
 
@@ -2145,11 +2628,19 @@ def main():
                     help="用 PDF 页面图像重识别可疑表格（原 repair_chinese_tables.py，慢）")
     ap.add_argument("--check", action="store_true", help="契约自检（纯 Python，不调模型）")
     ap.add_argument("--only", default=None, help="配合 --check：只检查卷名含该子串的卷")
+    ap.add_argument("--strict", action="store_true",
+                    help="配合 --check：忽略例外白名单（CI/发版前用）")
+    ap.add_argument("--exceptions", default=None,
+                    help="例外白名单（默认 exam-parser/exceptions/chinese.json）")
     ap.add_argument("-w", "--workers", type=int, default=3)
     args = ap.parse_args()
 
     OUT["root"] = Path(args.output)
     AI_ENABLED["on"] = bool(args.ai)
+    args.exceptions_path = None if getattr(args, "strict", False) else (
+        Path(args.exceptions) if getattr(args, "exceptions", None) else None)
+    if getattr(args, "strict", False):
+        print("（--strict：忽略例外白名单）")
     if args.check:
         raise SystemExit(run_check(args))
     if args.path:
