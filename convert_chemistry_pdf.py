@@ -166,7 +166,7 @@ def build_json(pdf: Path, pages: list[Path], model: str, stem: str, args) -> tup
         "year": int(year_m.group(1)) if year_m else None,
         "totalScore": args.choice_score * len(qs) or None,
         "duration": args.duration,
-        "tags": ["化学", args.grade or "高三", "二模"] + ([year_m.group(1)] if year_m else []),
+        "tags": ["化学", args.grade or "高三", args.type] + ([year_m.group(1)] if year_m else []),
     }
     sections = [{
         "type": "选择题", "questionType": "chemistry-choice", "title": "第一部分　选择题",

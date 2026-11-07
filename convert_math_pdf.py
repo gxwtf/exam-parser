@@ -719,7 +719,8 @@ def build_json(pdf: Path, pages: list[Path], model: str, out_root: Path, stem: s
         "year": int(m.group(1)) if (m := re.search(r"(20\d{2})", stem)) else None,
         "totalScore": sum(s["score"] for s in sections) or None,
         "duration": args.duration,
-        "tags": [t for t in ["数学", args.grade or "高三"] + ["一模", "二模", "真题"] if t in stem] + (
+        # tags 的类型取 -T（2026-11 修正：原按文件名认「一模/二模/真题」，跑上期中/上期末时恒缺类型）
+        "tags": [t for t in ["数学", args.grade or "高三", args.type] if t] + (
             [m.group(1)] if (m := re.search(r"(20\d{2})", stem)) else []
         ),
     }

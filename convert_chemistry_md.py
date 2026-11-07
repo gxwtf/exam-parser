@@ -675,7 +675,7 @@ def convert_one(md_file: Path, type_dir: str, subject: str, args) -> str:
         "title": stem, "subject": subject, "source": stem,
         "grade": args.grade, "year": int(year_m.group(1)) if year_m else None,
         "totalScore": score * len(out_qs) or None, "duration": 90,
-        "tags": [subject, args.grade, "二模"] + ([year_m.group(1)] if year_m else []),
+        "tags": [subject, args.grade, args.type] + ([year_m.group(1)] if year_m else []),
     }
     sections = [{
         "type": "选择题", "questionType": "chemistry-choice", "title": "第一部分　选择题",

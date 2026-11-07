@@ -2861,7 +2861,16 @@ def main():
 
     OUT["root"] = Path(args.output)
     if args.path:
-        files = [Path(args.path)]
+        # -p 既接受 .md 文件，也接受「卷目录」（与政治/历史/地理脚本口径一致；
+        # 目录里取第一份 *.md，避免误传目录时报 [Errno 21] Is a directory）
+        p = Path(args.path)
+        if p.is_dir():
+            mds = sorted(p.glob("*.md"))
+            if not mds:
+                raise SystemExit(f"[x] 目录里没有 .md：{p}")
+            files = [mds[0]]
+        else:
+            files = [p]
     else:
         root = Path(args.dir) / args.type / args.subject
         files = sorted(p for d in sorted(root.iterdir()) if d.is_dir()

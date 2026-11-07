@@ -155,7 +155,7 @@ def build_json(pdf: Path, pages: list[Path], model: str, stem: str, args) -> tup
         "year": int(m.group(1)) if (m := re.search(r"(20\d{2})", stem)) else None,
         "totalScore": args.choice_score * len(qs) or None,
         "duration": args.duration,
-        "tags": [t for t in ["物理", args.grade or "高三", "二模"] if t] + ([m.group(1)] if (m := re.search(r"(20\d{2})", stem)) else []),
+        "tags": [t for t in ["物理", args.grade or "高三", args.type] if t] + ([m.group(1)] if (m := re.search(r"(20\d{2})", stem)) else []),
     }
     sections = [{
         "type": "选择题", "questionType": "physics-choice", "title": "一、选择题",

@@ -211,7 +211,8 @@ python3 convert_chemistry_pdf.py -T 二模 -w 4
 # 单卷
 python3 build_image_paper.py -d ../gaozhong/二模/化学/<卷>.docx -T 二模
 # 批量：裁图 → paper.json（选择题走重排后裁图，非选择题走原 PDF 裁图）
-python3 batch_image_papers.py -T 二模 -s 化学 [--limit N] [--only 关键词]
+python3 batch_image_papers.py -T 二模 -s 化学 [--limit N] [--only 完整卷名 ...] [--like 关键词]
+#   --only 是**精确**匹配（可给多个完整卷名）；只做子串筛选请用 --like（命中多卷会先打印清单）
 # 给每道选择题的截图补 AI 解析
 python3 add_image_choice_analysis.py -T 二模 --workers 4
 ```

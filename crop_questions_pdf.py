@@ -318,6 +318,9 @@ def main():
     serve_dir = Path(args.serve_dir) if args.serve_dir else out_dir
     serve_dir.mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
+    # 图片版链路会把选择题重排成 <卷>_reflow.pdf 后再裁图；生成的 URL 必须指回「<卷>/images/」，
+    # 否则库内路径变成 <卷>_reflow/images/…（目录不存在 → 前端 404）。见 PIPELINES §5.4。
+    stem = re.sub(r"_reflow$", "", stem).strip()
 
     pages = page_words(pdf)
     marks = find_markers(pages, args.max_q)

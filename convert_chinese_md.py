@@ -1325,6 +1325,64 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, int(v)))
 
 
+def rebalance_after_passes(payload: dict, review: list[str], target: int = TOTAL_SCORE) -> None:
+    """出口 pass（默写重建）之后把整卷合计重新对齐到 target。
+
+    背景：`normalize_scores` 在「默写重建」之前跑（那时默写空数还是 AI/卷面旧值，常是 3~5 空），
+    重建后默写变成真实空数（通常 8 空 8 分），合计就会漂成 151/155，多出来的分被平衡循环
+    留在「最后一个主观题」上（实测：朝阳语用 20(2) 被写成 4 分、丰台被写成 8 分，卷面都是 3 分）。
+
+    这里把差额从**末位主观题**（排除默写/作文/微写作这些有硬口径的板块）退回，保证
+    Σ板块分 == target；退到 1 分下限还不够就写 review 交人工判。
+    """
+    sections = payload.get("sections") or []
+    payload.setdefault("paper", {})
+    total = sum(sec.get("score") or 0 for sec in sections)
+    if total == target:
+        payload["paper"]["totalScore"] = total
+        return
+
+    delta = total - target
+    cands: list[tuple[dict, dict]] = []
+    for sec in sections:
+        if (sec.get("category") or "") in ("默写", "作文", "微写作"):
+            continue
+        for q in sec.get("questions") or []:
+            if (q.get("questionType") or "") == "text":
+                cands.append((sec, q))
+    if not cands:
+        review.append(f"分值再平衡：合计 {total} ≠ {target}，但无可调整的主观题，未改（需人工核对）")
+        payload["paper"]["totalScore"] = total
+        return
+
+    moved: list[str] = []
+    left = abs(delta)
+    for sec, q in reversed(cands):
+        if left <= 0:
+            break
+        cur = int(q.get("score") or 0)
+        if delta > 0:                                  # 合计多了：从末位主观题退回，最少留 1 分
+            take = min(left, max(0, cur - 1))
+            if not take:
+                continue
+            q["score"] = cur - take
+            sec["score"] = (sec.get("score") or 0) - take
+            moved.append(f"第{q.get('id')}题 {cur}→{q['score']} 分")
+            left -= take
+        else:                                          # 合计少了：补到末位主观题
+            q["score"] = cur + left
+            sec["score"] = (sec.get("score") or 0) + left
+            moved.append(f"第{q.get('id')}题 {cur}→{q['score']} 分")
+            left = 0
+
+    new_total = sum(sec.get("score") or 0 for sec in sections)
+    payload["paper"]["totalScore"] = new_total
+    if new_total == target:
+        review.append(f"分值再平衡：{total} → {target}（{'、'.join(moved)}）")
+    else:
+        review.append(f"分值再平衡：{total} → {new_total}，仍差 {target - new_total} 分（需人工核对）")
+
+
 def normalize_scores(sections: list[dict], review: list[str], target: int = TOTAL_SCORE,
                      year: int | None = None) -> None:
     """按【题型】分配合格的单题分值（2026-11 修正：老卷按大题给总分，逐题分常被算歪）。
@@ -1822,12 +1880,12 @@ def process(md: Path, type_dir: str, args) -> str:
         run_post_passes(dst, type_dir, review, args,
                         md_path=md,
                         pdf_path=next(iter(sorted((GAOZHONG / type_dir / "语文").glob(f"{title}*.pdf"))), None))
-        try:                                   # pass 之后重算总分/写回
+        try:                                   # pass 之后把合计重新对齐到 150（默写重建会改空数）
             fixed = json.loads(dst.read_text(encoding="utf-8"))
-            fixed["paper"]["totalScore"] = sum(sec.get("score") or 0 for sec in fixed.get("sections") or [])
+            rebalance_after_passes(fixed, review)
             dst.write_text(json.dumps(fixed, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            review.append(f"分值再平衡失败：{str(e)[:80]}")
     dst.with_suffix(".review.txt").write_text("\n".join(review) + "\n", encoding="utf-8")
     n = sum(len(sec["questions"]) for sec in sections)
     return f"✓ {title}：{len(sections)} 板块 / {n} 题 / {total} 分（复核 {len(review)} 处）"

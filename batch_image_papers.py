@@ -23,7 +23,10 @@ def main():
     ap.add_argument("-T", "--type", default="二模")
     ap.add_argument("-s", "--subject", default="化学")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--only", default=None)
+    ap.add_argument("--only", nargs="*", default=None,
+                    help="只处理这些卷（完整卷名，可多个；精确匹配，不做子串）")
+    ap.add_argument("--like", default=None,
+                    help="按子串筛选（旧行为），如 --like 海淀；命中多卷时先打印清单再处理")
     ap.add_argument("--skip-existing", action="store_true")
     args = ap.parse_args()
 
@@ -35,10 +38,22 @@ def main():
     if args.limit:
         pdfs = pdfs[: args.limit]
 
+    picked = []
     for pdf in pdfs:
         stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
-        if args.only and args.only not in stem:
+        if args.only and not any(o in (stem, pdf.stem, pdf.name) for o in args.only):
             continue
+        if args.like and args.like not in stem:
+            continue
+        picked.append(pdf)
+    if (args.only or args.like) and len(picked) > 1:
+        print(f"将处理 {len(picked)} 套：")
+        for p in picked:
+            print(f"  · {p.name}")
+    pdfs = picked
+
+    for pdf in pdfs:
+        stem = re.sub(r"（教师版）|\(教师版\)|含答案", "", pdf.stem).strip()
         qdir = out_root / stem
         if args.skip_existing and (qdir / "paper.json").exists():
             results.append((stem, "skip", 0, 0, 0))

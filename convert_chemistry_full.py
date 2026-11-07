@@ -249,7 +249,7 @@ def process(md: Path, type_dir: str, args) -> str:
     paper = {"title": title, "subject": "化学", "source": title, "grade": args.grade,
              "year": int(year.group(1)) if year else None,
              "totalScore": sum(g["score"] for g in groups) or None, "duration": 90,
-             "tags": ["化学", args.grade, "二模"] + ([year.group(1)] if year else [])}
+             "tags": ["化学", args.grade, args.type] + ([year.group(1)] if year else [])}
     dst.parent.mkdir(parents=True, exist_ok=True)
     payload = {"paper": paper, "groups": groups}
     normalize_choice_case_in_paper(payload, log=log)  # 出口约定：选择题答案与选项 id 一律大写

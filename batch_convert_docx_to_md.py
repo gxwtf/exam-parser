@@ -270,7 +270,9 @@ def main():
         if not os.path.isfile(single_path):
             print(f"错误: 文件不存在 - {single_path}")
             sys.exit(1)
-        output_dir = args.output if args.output else os.path.join(
+        # 输出目录一律取绝对路径：.doc 要先交给 LibreOffice 转到 <输出目录>/<卷>/.tmp_doc/，
+        # 相对路径会让 soffice 与随后的 w2m 解析到不同基准目录（报 File not found .../.tmp_doc/xxx.docx）
+        output_dir = os.path.abspath(args.output) if args.output else os.path.join(
             os.path.dirname(single_path), "output_docx_to_md"
         )
         print(f"单文件: {single_path}")
