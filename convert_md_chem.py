@@ -19,17 +19,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import batch_convert_docx_to_md as conv  # noqa: E402
 from paths import GAOZHONG, OUTPUT_DOCX_TO_MD  # noqa: E402
 
-SUBJECT = "化学"
+SUBJECT = "化学"  # 默认化学，可用 --subject 覆盖
 
 
 def norm_stem(name: str) -> str:
     return re.sub(r"（教师版）|\(教师版\)|含答案|教师版", "", name).strip()
 
 
-def pick(args):
+def pick(args, subject: str):
     chosen: dict[tuple[str, str], Path] = {}
     for t in args.type:
-        src = Path(GAOZHONG) / t / SUBJECT
+        src = Path(GAOZHONG) / t / subject
         if not src.is_dir():
             print(f"⚠ 没有目录：{src}")
             continue
@@ -59,9 +59,10 @@ def main():
     ap.add_argument("--year-to", type=int, default=2030)
     ap.add_argument("--grade", default=None)
     ap.add_argument("--must", default=None)
+    ap.add_argument("--subject", default=SUBJECT, help="学科（默认 化学），如 历史/地理/政治")
     args = ap.parse_args()
 
-    items = pick(args)
+    items = pick(args, args.subject)
     print(f"待转换 {len(items)} 卷（{args.type}，{args.year_from}-{args.year_to}"
           f"{f'，{args.grade}' if args.grade else ''}{f'，含 {args.must}' if args.must else ''}）", flush=True)
 
