@@ -4,6 +4,7 @@
 数据来源：
 - <单题目录>/manifest.json（split_chem_docx.py 生成）
 - 答案：优先复用已有解析 JSON（选择题），非选择题从 MD 答案区解析
+- 非选择题的题型与分值：chem_category.py 按原卷 MD 判（结构/原理/有机/流程/探究 + （N分））
 用法：python3 build_image_questions.py -d <单题目录> -T 二模
 """
 import argparse, json, re
@@ -12,6 +13,7 @@ from PIL import Image
 
 from convert_chemistry_full import parse_essay_answers, QSPLIT
 from convert_chinese_md import split_paper
+from chem_category import analyze_paper
 from src.answer_case import normalize_choice_case_in_paper
 
 PROJ = Path(__file__).parent
@@ -40,23 +42,33 @@ def main():
                     continue
 
     essay_answers: dict[int, str] = {}
+    cat_info: dict[int, dict] = {}
     if args.md and Path(args.md).exists():
         body, ans = split_paper(Path(args.md).read_text(encoding="utf-8"))
         essay_answers = parse_essay_answers(ans)
+        try:
+            # 非选择题题型 + 分值（结构/原理/有机/流程/探究；（N分）取不到时 chem_category 兜底 13）
+            rep = analyze_paper(Path(args.md))
+            cat_info = {int(k): v for k, v in rep["questions"].items()}
+        except Exception as e:
+            print(f"⚠ 题型分类失败（非选择题 category 留空）：{str(e)[:120]}")
 
     questions = []
     for no_str in sorted(manifest, key=lambda x: int(x)):
         no = int(no_str)
         info = manifest[no_str]
         is_choice = no in choice_answers or no <= 14
+        ci = None if is_choice else cat_info.get(no)
         q = {
             "no": no,
             "type": "single" if is_choice else "text",
             "image": info["image"],
             "options": [{"id": k.upper(), "label": k.upper()} for k in "abcd"] if is_choice else [],
             "answer": choice_answers.get(no, "") if is_choice else essay_answers.get(no, ""),
-            "score": 3 if is_choice else None,
+            "score": 3 if is_choice else (ci["score"] if ci else None),
         }
+        if ci:                                    # 非选择题才有题型
+            q["category"] = ci["category"]
         img_path = qdir / f"q{no}.png"
         try:
             wpx = Image.open(img_path).size[0]
@@ -70,6 +82,8 @@ def main():
             "image": q["image"], "answer": q["answer"], "score": q["score"],
             "options": q["options"], "px": q.get("px"), "content": q["content"],
         }
+        if ci:
+            q_payload["category"] = ci["category"]
         normalize_choice_case_in_paper(q_payload)  # 出口约定：选择题答案与选项 id 一律大写
         (qdir / f"q{no}.json").write_text(json.dumps(q_payload, ensure_ascii=False, indent=1), encoding="utf-8")
 
@@ -84,6 +98,13 @@ def main():
     out.write_text(json.dumps(paper, ensure_ascii=False, indent=1), encoding="utf-8")
     n_choice = sum(1 for q in questions if q["type"] == "single")
     print(f"生成 {out.name}：{len(questions)} 题（选择 {n_choice}，非选择 {len(questions)-n_choice}），缺答案 {sum(1 for q in questions if not q['answer'])}")
+    texts = [q for q in questions if q["type"] == "text"]
+    if texts:
+        dist = {}
+        for q in texts:
+            dist[q.get("category") or "未分类"] = dist.get(q.get("category") or "未分类", 0) + 1
+        print("  非选择题题型：" + "  ".join(f"{k} {v}" for k, v in dist.items())
+              + "｜分值 " + "/".join(str(q["score"]) for q in texts))
 
 
 if __name__ == "__main__":
