@@ -227,22 +227,36 @@ python3 add_image_choice_analysis.py -T 二模 --workers 4
 ```bash
 python3 batch_convert_docx_to_md.py -p "../gaozhong/一模/语文/<卷>.docx" -o output_docx_to_md/一模/语文
 python3 convert_chinese_md.py -p ../output_docx_to_md/一模/语文/<卷>/<卷>.md -T 一模
-python3 convert_chinese_md.py --check -T 一模              # 契约断言（7 条），出错 exit 2
+python3 convert_chinese_md.py --check -T 一模        # 契约断言（含例外白名单；--strict 忽略白名单）
+python3 audit_chinese_choice_split.py               # 只读体检：选择题是否被渲染成大题
 python3 qa_scaffold.py --subject 语文 --type 一模 --check
-# 表格识别可疑时再加 --repair-tables（要 PDF + 多模态，默认关）
 ```
 
-- 产出 `output_json_chinese/<类型>/<卷>.json`（`{paper, sections}`，**旧格式 `groups` 已废止**）+ `.review.txt`。
-- 原来串行跑的 4 个脚本已并进出口：`merge_chinese_groups` → `merge_sections()`、
-  `normalize_chinese_scores` → `normalize_scores()`（卷面分对得上就原样保留，只把默写固定 1 分/空；
-  对不上才按北京卷标准分值表 18/18/12/8/10/18/6/10/50 + 最大余数法分配）、
-  `repair_chinese_tables` → `repair_tables()`（`--repair-tables`）、`sanitize_chinese` → `sanitize_payload()`；
-  另加 `strip_residue()` 出口清洗（分区标题 / 卷首说明 / 与 intro 重复的引导语 / 材料末尾「（10分）」）。
-- 结构规划缓存到 `<输出根>/<类型>/.cache/<卷>-plan.json`，重跑不调模型；`--no-ai` 可完全离线复现。
+- 产出 `output_json_chinese/<类型>/<卷>.json`（`{paper, sections}`；旧 `groups` 已废止）+ `.review.txt`；
+- 入口脚本内含原 4 个后处理的等价逻辑：`merge_sections` / `normalize_scores`（卷面分对得上就原样保留，
+  只把默写固定 1 分/空）/ `repair_tables(--repair-tables)` / `sanitize_payload`，外加 `strip_residue()` 出口清洗；
+- **题干内联选项**（2026-11 新增，老卷高频）：`A．/B．/C．`（全角半角、`A、`、`A)`）、两栏排版、GFM 表格行、
+  无标点 `A踔然独立//…` 都能切；**必须凑满 A–D 四项**才转 `single`，并校验答案 ∈ 选项；切不出来的走
+  PDF 视觉兜底（pdftotext 定位题号页 + 行区间裁横带 → 严格 JSON → 失败重试一次 → 再失败保留原文 + review）
+- **例外白名单** `exceptions/chinese.json`：只登记「原卷确实没有」（解析版无判定字母 / 答案区给题干 /
+  选项或题面是图片 / 答案区没这题 / 老卷默写按卷面）。`--check` 命中且 reason 非空记「例外」不计错，
+  末尾打印「例外 N / 新增 M」+ 按原因分组；`--strict` 忽略白名单
 - 板块口径：多文本/文言文/古诗/文学类/语用/名著 = `chinese-reading`，默写 = `chinese-dictation`
-  （每空一个 `<Input2 />`，空数 == 默写分 == 8），微写作 = `chinese-micro-writing`，作文 = `chinese-essay`（50 分）。
-- 名著阅读：单问卷为一题，多小问按 `(1)(2)` 拆题（题号形如 `11-1`），材料进 section.content。
-- 陈旧数据：2025 及以前的二模 JSON 仍是 `groups` 格式，`--check -T 二模` 会跳过并提示「未迁移」。
+  （每空一个 `<Input2 />`，空数 == 默写分），微写作 = `chinese-micro-writing`，作文 = `chinese-essay`（50 分）
+
+### 6.1 导入（2026-11 起）
+
+```bash
+# 单卷
+npx tsx scripts/import-chinese-json.ts --file <json> --force --keep-submissions
+# 列表批量（推荐：单进程，135 卷 41 秒；逐卷 npx 约 45 秒/卷）
+npx tsx scripts/import-chinese-json.ts --files /tmp/list.txt --force --keep-submissions --manifest /tmp/imp.json
+# 回退
+npx tsx scripts/import-chinese-json.ts --rollback /tmp/imp.json
+```
+
+- `--keep-submissions`：有作答的卷也能重导（先快照 → 重建 → 按题组/内容映射写回，保留分数与 AI 批改结果）；
+- 目录模式会跳过 `*.old-groups.json` 备份；`--manifest` 记录每卷导入前状态供回退。
 
 ## 7. 政治（链路 ⑨，2026-11 重写为生物同构）
 
