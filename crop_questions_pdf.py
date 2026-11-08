@@ -363,16 +363,24 @@ def main():
         nos = sorted(marks)
         for i, no in enumerate(nos):
             pi, y0, wd, digits = marks[no]
-            prev_bottom = 0.0
-            for ln3 in build_lines(pages[pi]):
-                if ln3["y0"] < y0 - 2:
-                    prev_bottom = max(prev_bottom, ln3["y1"])
-            if prev_bottom and prev_bottom > y0:
-                y0 = prev_bottom + 0.6
+            # 下一题的起点先算出来，供「上一行压过题号」时做夹紧，避免区间被压成空
             if i + 1 < len(nos):
                 npi, ny0, _, _ = marks[nos[i + 1]]
             else:
                 npi, ny0 = len(pages) - 1, pages[-1]["h"]
+            prev_bottom = 0.0
+            for ln3 in build_lines(pages[pi]):
+                # 跳过「一个字符被 PDF 拉成整列高」的乱码行（y1-y0 异常大），
+                # 否则它会把下一题的起点一直压到区间为空、整题丢失
+                if ln3["y1"] - ln3["y0"] > 40:
+                    continue
+                if ln3["y0"] < y0 - 2:
+                    prev_bottom = max(prev_bottom, ln3["y1"])
+            if prev_bottom and prev_bottom > y0:
+                # 上一行（题干换行/图注）尾巴压到题号下方时，起点下移到它下面；
+                # 但必须留出到下一题题号的空间，否则本题区间变成空、整题丢失
+                limit = (ny0 - 1.5) if npi == pi else (pages[pi]["h"] - 1.5)
+                y0 = min(prev_bottom + 0.6, limit)
             # 大题标题提前截断
             npi, ny0 = find_heading_cut(pages, pi, y0, npi, ny0)
             pieces = []

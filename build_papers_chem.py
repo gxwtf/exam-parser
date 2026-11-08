@@ -37,6 +37,12 @@ def norm_stem(name: str) -> str:
     return re.sub(r"（教师版）|\(教师版\)|含答案|教师版", "", name).strip()
 
 
+def find_choice_json(t: str, stem: str) -> Path | None:
+    """老链路（batch_image_papers）用的选择题答案 JSON：output_json_math/<类型>/<学科>/<卷>.json"""
+    p = DATA / "output_json_math" / t / SUBJECT / f"{stem}.json"
+    return p if p.is_file() else None
+
+
 def find_md(t: str, stem: str) -> Path | None:
     base = DATA / "output_docx_to_md" / t / SUBJECT
     for cand in (base / f"{stem}（教师版）", base / f"{stem}含答案", base / stem):
@@ -92,6 +98,21 @@ def main():
             print(f"[{i}/{len(items)}] ✗ {stem} 无 MD", flush=True)
             continue
         answers = eca.extract(md)
+        # 老链路的选择题答案 JSON 更全（尤其是二模那批），优先并进来
+        cj = find_choice_json(t, stem)
+        if cj:
+            try:
+                d = json.loads(cj.read_text(encoding="utf-8"))
+                for sec in d.get("sections", []):
+                    for q in sec.get("questions", []):
+                        try:
+                            n, a = int(q["id"]), str(q.get("answer") or "").strip().upper()
+                        except Exception:
+                            continue
+                        if re.fullmatch(r"[A-D]", a):
+                            answers.setdefault(n, a)
+            except Exception as e:
+                print(f"  ⚠ {stem} 选择题 JSON 读取失败：{e}", flush=True)
         # OCR 兜底：只补 MD 抽不到的题号
         for k, v in (OCR_ANSWERS.get(stem) or {}).items():
             answers.setdefault(int(k), v)
