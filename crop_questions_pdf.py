@@ -69,11 +69,17 @@ def find_markers(pages, max_q=25):
         for ln in build_lines(pg):
             if ln["x0"] > pg["w"] * 0.3:
                 continue
-            m = re.match(r"^(\d{1,2})\s*[.．、](?!\d)", ln["t"])
+            # 不再要求「点号后不是数字」：有的卷把年份粘在题号后面（`1．20223` → 题号1，
+            # 后面是「2022」「3」的跑偏文本），旧正则会把这一题整条丢掉
+            m = re.match(r"^(\d{1,2})\s*[.．、]", ln["t"])
             if not m:
                 continue
             n = int(m.group(1))
-            if n <= prev or n > 60:
+            if n > 60:
+                continue
+            # 题号必须递增且基本连续（允许小幅跳号 ≤3）：题干里出现「36、CO、H2…」这种
+            # 数字串时，旧逻辑（n > prev 即接受）会把 36 当成题号，后面 15..19 全被拒掉
+            if prev >= 0 and not (prev < n <= prev + 3):
                 continue
             marks[n] = (pi, ln["y0"], ln, m.group(1))
             prev = n

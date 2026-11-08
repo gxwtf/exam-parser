@@ -74,6 +74,7 @@ def main():
     ap.add_argument("--must", default=None)
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--skip-existing", action="store_true", default=True)
+    ap.add_argument("--force", action="store_true", help="已裁过也重裁")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--timeout", type=int, default=600)
     args = ap.parse_args()
@@ -88,7 +89,7 @@ def main():
     for i, ((t, stem), pdf) in enumerate(items, 1):
         out_dir = DATA_ROOT / "output_image_questions" / t / SUBJECT / stem
         serve = DATA_ROOT / "output_docx_to_md" / t / SUBJECT / stem / "images"
-        if args.skip_existing and (out_dir / "manifest.json").exists():
+        if args.skip_existing and not args.force and (out_dir / "manifest.json").exists():
             skip += 1
             print(f"[{i}/{len(items)}] — 跳过（已裁过）{stem}", flush=True)
             continue
