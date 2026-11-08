@@ -19,6 +19,21 @@ from src.answer_case import normalize_choice_case_in_paper
 PROJ = Path(__file__).parent
 
 
+
+def declared_choice_count(body: str) -> int | None:
+    """从 MD 正文里读「本部分共 N 题」「本题包括 N 小题」「选择题（共 N 小题）」里的选择题数。
+    用它定选择题边界，比「答案表里最大的题号」可靠（答案常常是图片，抽不全就会把选择题当大题）。"""
+    m = re.search(r"本题包括\s*(\d{1,2})\s*小?题", body)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"选择题[（(][^）)]{0,10}共\s*(\d{1,2})\s*小?题", body)
+    if m:
+        return int(m.group(1))
+    heads = re.findall(r"本部分共\s*(\d{1,2})\s*题", body)
+    if len(heads) >= 2:
+        return int(heads[0])
+    return None
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dir", required=True)
@@ -43,9 +58,11 @@ def main():
 
     essay_answers: dict[int, str] = {}
     cat_info: dict[int, dict] = {}
+    n_choice_declared: int | None = None
     if args.md and Path(args.md).exists():
         body, ans = split_paper(Path(args.md).read_text(encoding="utf-8"))
         essay_answers = parse_essay_answers(ans)
+        n_choice_declared = declared_choice_count(body)
         try:
             # 非选择题题型 + 分值（结构/原理/有机/流程/探究；（N分）取不到时 chem_category 兜底 13）
             rep = analyze_paper(Path(args.md))
@@ -57,7 +74,16 @@ def main():
     for no_str in sorted(manifest, key=lambda x: int(x)):
         no = int(no_str)
         info = manifest[no_str]
-        is_choice = no in choice_answers or no <= 14
+        # 选择题边界：有答案就以「答案里出现的最大题号」为准（老国标卷只有 7 道选择，
+        # 第 8 题起是大题；以前写死 no<=14 会把大题当选择题、还留空答案），没答案才退回 14
+        # 边界优先级：MD 里声明的选择题数 > 答案表里最大题号 > 14
+        if n_choice_declared:
+            is_choice = no <= n_choice_declared
+        elif choice_answers:
+            max_choice = max(choice_answers)
+            is_choice = no in choice_answers or no <= max_choice
+        else:
+            is_choice = no <= 14
         ci = None if is_choice else cat_info.get(no)
         q = {
             "no": no,
