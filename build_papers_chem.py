@@ -24,6 +24,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extract_choice_answers as eca  # noqa: E402
 
+# MD 里答案是图片的卷：用 mineru（-b pipeline -m ocr）OCR 出来的答案表兜底，key = 卷名
+_OCR_FILE = Path(__file__).with_name("chem_answers_ocr.json")
+OCR_ANSWERS = json.loads(_OCR_FILE.read_text(encoding="utf-8")) if _OCR_FILE.exists() else {}
+
 DATA = Path("/home/gxwtf/jingshibang")
 PROJ = Path(__file__).resolve().parent
 SUBJECT = "化学"
@@ -88,6 +92,9 @@ def main():
             print(f"[{i}/{len(items)}] ✗ {stem} 无 MD", flush=True)
             continue
         answers = eca.extract(md)
+        # OCR 兜底：只补 MD 抽不到的题号
+        for k, v in (OCR_ANSWERS.get(stem) or {}).items():
+            answers.setdefault(int(k), v)
         if len(answers) < 10:
             no_choice += 1
             problems.append(f"{t}/{stem}：选择题答案只抽到 {len(answers)} 个")
