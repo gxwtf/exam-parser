@@ -14,6 +14,9 @@ from pathlib import Path
 
 DATA = Path("/home/gxwtf/jingshibang/gaozhong")
 ouch = ["上期中", "上期末", "下期末", "一模", "二模", "真题"]
+# 模拟题（非真题）只统计 2021 及以后；真题不限年份
+MOCK_TYPES = {"上期中", "上期末", "下期末", "一模", "二模"}
+MOCK_MIN_YEAR = 2021
 SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物", "历史", "政治", "地理"]
 DB = "gxexercise"
 env = dict(os.environ, PGPASSWORD="wddxgy_2714")
@@ -60,8 +63,14 @@ def main():
                 continue
             stems = {}
             for f in list(d.glob("*.pdf")) + list(d.glob("*.docx")) + list(d.glob("*.doc")):
+                # 只算高三（真题没有年级标记，不套这条）
+                if typ in MOCK_TYPES and "高三" not in f.stem:
+                    continue
                 m = re.search(r"(20\d{2})", f.stem)
                 if not m:
+                    continue
+                # 模拟题只算 2021 及以后（真题不限年份）
+                if typ in MOCK_TYPES and int(m.group(1)) < MOCK_MIN_YEAR:
                     continue
                 stem = re.sub(r"（教师版）|\(教师版\)|含答案|教师版", "", f.stem).strip()
                 key = norm(stem)
@@ -95,6 +104,8 @@ def main():
 
     head = [f"题库存量缺口盘点　{date.today():%Y-%m-%d} {os.popen('date +%H:%M').read().strip()}",
             "口径：素材目录 gaozhong/<类型>/<学科> 下的 PDF/DOCX（同名只算一份，优先教师版）；",
+            "     只统计「高三」卷；模拟题（上期中/上期末/下期末/一模/二模）只统计 2021 及以后；",
+            "     真题不限年份但只算北京卷（外省真题单列，不计入）；",
             "     与库里 TestPaper 标题按「去空格/括号/教师版」归一后比对（允许包含关系）。",
             "",
             f"{'学科':<4}{'素材卷数':>8}{'已入库':>8}{'缺':>8}"]
