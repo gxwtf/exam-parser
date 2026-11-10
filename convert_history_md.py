@@ -596,8 +596,187 @@ def repair_tables(text: str, review: list[str] | None = None, where: str = "") -
     return "\n".join(out)
 
 
+# ──────────────────────────────────────────────────────────────────
+# 表格感知的选项切分（方案 A）
+#   判据与前端一致：**表头行 + 分隔行**才算一张 GFM 表格
+#   （~/gxexercise/src/lib/pdf/markdown.ts:254-256）；只有竖线的脏行不算表格，
+#   所以题干正文里的 `|` 不会被误当成表格吃掉。认不出来就一律回落到原逻辑。
+# ──────────────────────────────────────────────────────────────────
+TBL_ROW = re.compile(r"^\s*\|.*\|\s*$")          # 表格行：整行以 | 起、以 | 止
+TBL_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$")     # 分隔行：| --- | :--: | --- |
+# 一个单元格里可能塞了好几个选项（`A.①② B.①④`）→ 按「字母 + 点号」再拆
+CELL_OPT = re.compile(r"(?:^|(?<=[\s\u3000|]))([A-D])\s*[．.、]\s*")
+# 选项对照残渣整行（`A．A B．B C．C D．D`）：原卷选项表「字母列」导出后的产物
+OPT_ECHO = re.compile(r"^(?:[A-D]\s*[．.、]\s*[A-D]\s*)+$")
+
+
+def _tbl_cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _tbl_blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """段内所有 GFM 表格块 → [(start, end)) 半开区间（表头行 + 分隔行 + 数据行）。"""
+    out, i, n = [], 0, len(lines)
+    while i < n - 1:
+        if TBL_ROW.match(lines[i]) and TBL_SEP.match(lines[i + 1]):
+            j = i + 2
+            while j < n and TBL_ROW.match(lines[j]):
+                j += 1
+            out.append((i, j))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def _opts_from_tbl_block(block: list[str]):
+    """表格本身就是 A–D 选项 → (options, 用掉的行号集合)；认不出来就 (None, set())。
+
+    覆盖三种版式：
+      L1 一行四格        `| A．… | B．… | C．… | D．… |`（2026 高考真题 1/4/5/9–12/14 题）
+      L2 单元格内多选项   `| A.①② B.①④ | C.②③ D.②④ |`（2024 海淀二模 7/8 题的表格末行）
+      L3 首列字母         `| A. | 史实 | 结论 |` 每行一选项（2021 昌平期末 14 题、
+                          2024 顺义期末 12 题；顺义期末的字母与正文粘在一起 `A．东汉的班超…`）
+    """
+    rows: list[tuple[int, list[str]]] = []
+    for k, ln in enumerate(block):
+        if TBL_SEP.match(ln):
+            continue
+        rows.append((k, _tbl_cells(ln)))
+    if len(rows) < 1:
+        return None, set()
+    # L3：末尾恰好四行，首列剥掉点号/空白后正是 A B C D（顺序固定）。
+    # 只取末尾四行是为了兼容「表头 + A–D 四行」的表（2024 海淀二模 5 题），
+    # 表头行留给 _drop_empty_tbl_blocks 收尾，不会漏进题干。
+    tail4 = rows[-4:]
+    bare = [re.sub(r"[\s．.、]", "", cells[0]) if cells else "" for _, cells in tail4]
+    if len(tail4) == 4 and bare == list("ABCD"):
+        opts = [{"id": L, "label": "；".join(c for c in cells[1:] if c)}
+                for L, (_, cells) in zip("ABCD", tail4)]
+        if all(o["label"] for o in opts):
+            return opts, {k for k, _ in tail4}
+    # L3'：首列以字母开头、后面粘着正文（`A．东汉的班超…`）
+    lead = [cells[0] if cells else "" for _, cells in tail4]
+    if len(tail4) == 4 and all(re.match(rf"^{L}(?![A-Za-z])", t) for L, t in zip("ABCD", lead)):
+        opts = []
+        for L, (_, cells) in zip("ABCD", tail4):
+            body = re.sub(r"^[A-D]\s*[．.、]?\s*", "", cells[0]).strip()
+            parts = ([body] if body else []) + [c for c in cells[1:] if c]
+            if not parts:
+                return None, set()
+            opts.append({"id": L, "label": "；".join(parts)})
+        return opts, {k for k, _ in tail4}
+    # L1 / L2：扫所有单元格里的「字母 + 点号」，按出现顺序凑齐 A–D
+    got: dict[str, str] = {}
+    used: set[int] = set()
+    for k, cells in rows:
+        joined = "|".join(cells)
+        marks = list(CELL_OPT.finditer(joined))
+        for n, m in enumerate(marks):
+            end = marks[n + 1].start() if n + 1 < len(marks) else len(joined)
+            L = m.group(1)
+            txt = re.sub(r"\s+", " ", joined[m.end():end]).strip(" |")
+            if L in got or not txt:
+                continue
+            got[L] = txt
+            used.add(k)
+    if sorted(got) == list("ABCD"):
+        return [{"id": L, "label": got[L]} for L in "ABCD"], used
+    return None, set()
+
+
+def _drop_empty_tbl_blocks(lines: list[str]) -> list[str]:
+    """摘掉选项行后只剩「表头 + 分隔行」的空壳表格。"""
+    out = list(lines)
+    while True:
+        for s, e in _tbl_blocks(out):
+            if not [ln for ln in out[s + 1:e] if not TBL_SEP.match(ln)]:
+                del out[s:e]
+                break
+        else:
+            return out
+
+
+def _scrub_orphan_sep(lines: list[str]) -> list[str]:
+    """分隔行只有在「紧跟在表格行后面」时才是真表格的一部分，否则是残渣。"""
+    out: list[str] = []
+    for ln in lines:
+        if TBL_SEP.match(ln):
+            prev = out[-1] if out else ""
+            if not (TBL_ROW.match(prev) and not TBL_SEP.match(prev)):
+                continue
+        out.append(ln)
+    return out
+
+
+def _trailing_table_of(text: str):
+    """text 末尾若整块拖着一张 GFM 表格 → (表格文本, 去掉表格的剩余文本)。"""
+    lines = (text or "").rstrip().split("\n")
+    for s, e in reversed(_tbl_blocks(lines)):
+        if e == len(lines):
+            tbl = "\n".join(lines[s:e]).strip("\n")
+            rest = "\n".join(lines[:s]).strip()
+            return tbl, rest
+    return None
+
+
+def _scrub_opt_label(t: str) -> str:
+    """选项 label 出门前的表格痕迹清扫：整条分隔行、行首行尾多余的竖线、单元格分隔符残留。"""
+    if "|" not in (t or ""):
+        return t
+    parts = []
+    for ln in t.split("\n"):
+        s = ln.strip()
+        if not s or TBL_SEP.match(s):
+            continue
+        s = s.strip("|").strip()
+        if s:
+            parts.append(s)
+    out = re.sub(r"\s*\|\s*", " ", " ".join(parts))
+    return re.sub(r"\s{2,}", " ", out).strip()
+
+
+def split_options_table_aware(seg: str):
+    """表格感知的选项切分 → (options, head)；段内没有「选项表」时返回 (None, None)。
+
+    只在**能完整还原出 A–D** 时才接管，否则原逻辑一字节都不动（宁可不修，不许误伤）。
+    题干只摘掉被选项用掉的那几行：2024 海淀二模 7/8 题的表格前两行是①②③④材料，
+    必须原样留在 content 里，只有末行的 A./B./C./D. 是被吃掉的选项。
+    """
+    lines = seg.split("\n")
+    drop: set[int] = set()
+    opts = None
+    for s, e in _tbl_blocks(lines):
+        got, used = _opts_from_tbl_block(lines[s:e])
+        if not got or opts is not None:
+            continue
+        opts, drop = got, {s + k for k in used}
+    if opts is None:
+        return None, None
+    keep = [ln for i, ln in enumerate(lines) if i not in drop]
+    keep = _scrub_orphan_sep(_drop_empty_tbl_blocks(keep))
+    head = "\n".join(ln for ln in keep if not OPT_ECHO.match(ln.strip()))
+    return opts, head
+
+
 def split_options(seg: str):
-    """从题干段里切出 A–D 四项（选项可能一行挤好几个、跨行、也可能带前置图）。
+    """从题干段里切出 A–D 四项（表格感知 + 原字母切分两段式）。
+
+    **残渣判据**：原卷把 A–D 排成一行四格 / 两行两格 / 首列 A–D 的多列行时，老逻辑会把表格的
+    `|` 与分隔行一起切进 option.label。所以先跑老逻辑，**只有老结果的 label 里确实带 `|`**
+    时才用 `split_options_table_aware()` 重算一次；老结果干净就一字节不动
+    —— 保证「残渣题以外零回归」（宁可不修，不许误伤）。
+    """
+    got_opts, got_head = _split_options_legacy(seg)
+    if got_opts and any("|" in (o["label"] or "") for o in got_opts):
+        t_opts, t_head = split_options_table_aware(seg)
+        if t_opts:
+            return t_opts, t_head
+    return got_opts, got_head
+
+
+def _split_options_legacy(seg: str):
+    """原来的纯字母切分（一字未改，作为基准逻辑保留）。
 
     有些卷把选项排成两列，导出后顺序变成 `A. … C. …` / `B. … D. …`（2021 真题第 1、9 题），
     所以严格 A→B→C→D 顺序切不出来时，退化成「按出现位置切、只要求四项齐全」。
@@ -661,6 +840,13 @@ def split_options(seg: str):
     for i, (s, e, k) in enumerate(best):
         end = best[i + 1][0] if i + 1 < len(best) else len(seg)
         opts.append({"id": k, "label": seg[e:end]})
+    # 选项后面还整块拖着一张题干材料表（「下表为……」：延庆 2021 一模 4 题、昌平 2021 期末 9 题、
+    # 丰台 2023 一模 1 题）→ 表格搬回题干末尾，别让它粘进最后一个选项的 label。
+    got = _trailing_table_of(opts[-1]["label"])
+    if got:
+        tbl, rest = got
+        opts[-1]["label"] = rest
+        head = head.rstrip() + "\n\n" + tbl
     return opts, head
 
 
@@ -781,7 +967,8 @@ def parse_choices(text: str, review: list[str], each: float | None = None,
                 "options": [], "answer": "", "analysis": "",
                 "score": float(sc) if sc else explicit.get(no, each)}
         if opts:
-            item["options"] = [{"id": o["id"], "label": tidy(o["label"])} for o in opts]
+            item["options"] = [{"id": o["id"], "label": tidy(_scrub_opt_label(o["label"]))}
+                               for o in opts]
         else:
             review.append(f"复核：第{no}题没切出 A–D 四个选项，请人工核对原卷")
         out.append(item)

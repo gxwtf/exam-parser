@@ -847,8 +847,95 @@ def _opt_chain(seg: str) -> list[tuple[int, str]]:
     return []
 
 
+# ── 表格感知的选项切分（只在「字母切分把表格带进 label」时才介入，见 opt_split）──────
+# 判据直接复用题库现成的两份（gxexercise/src/lib/pdf/markdown.ts:254-256）：
+#   isTableRow   = /^\s*\|.*\|\s*$/       ← 表格行
+#   isTableStart = 下一行 /^\s*\|[\s:|-]+\|\s*$/  ← 分隔行
+# 「表头行 + 分隔行」才算表格；只有竖线的脏行不算，避免把 | 当表格吃掉。
+GEO_TBL_ROW = re.compile(r"^\s*\|.*\|\s*$")
+GEO_TBL_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
+# 单元格自带的选项前缀：`A. xxx` / `A．xxx` / `**A.** xxx`
+GEO_CELL_OPT = re.compile(r"^\**\s*([A-D])\s*\**\s*[．.、]\s*(.+)$", re.S)
+
+
+def _geo_cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _geo_table_blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """段内所有 GFM 表格块的 [start, end) 半开区间（表头行 + 分隔行 + 连续表格行）。"""
+    out: list[tuple[int, int]] = []
+    i = 0
+    while i < len(lines) - 1:
+        if GEO_TBL_ROW.match(lines[i]) and GEO_TBL_SEP.match(lines[i + 1]):
+            j = i + 2
+            while j < len(lines) and GEO_TBL_ROW.match(lines[j]):
+                j += 1
+            out.append((i, j))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def _opt_table_dirty(opts: list[dict]) -> bool:
+    """字母切分的结果里还带着表格残渣？（分隔行 / 行首竖线 / 行尾粘的单元格分隔符）"""
+    for o in opts or []:
+        lab = o.get("label") or ""
+        if (GEO_TBL_SEP.search(lab) or re.search(r"(?m)^\s*\|", lab)
+                or re.search(r"[^|]\|\s*$", lab)):
+            return True
+    return False
+
+
+def options_from_row_table(seg: str) -> tuple[str, list[dict]] | None:
+    """原卷把 A–D 排成 GFM 表格（纯排版）时，按单元格还原选项，表格块从题干里摘掉。
+
+    只认两种版式（其余一律返回 None，交回原逻辑，不硬猜）：
+      L1 一行四格  `| A．… | B．… | C．… | D．… |`
+      L2 两行两格  `| A．… | B．… |` + 分隔行 + `| C．… | D．… |`（2022 顺义地理 5 题）
+    要求：一~两行、每个非空单元格都是「字母 + 内容」、四个字母恰好凑齐 A B C D。
+    """
+    lines = seg.split("\n")
+    for s, e in _geo_table_blocks(lines):
+        rows = [_geo_cells(ln) for ln in lines[s:e] if not GEO_TBL_SEP.match(ln)]
+        rows = [r for r in rows if any(r)]
+        if not rows or len(rows) > 2:            # 三行以上多半是材料表（人口普查/降水数据…）
+            continue
+        got: dict[str, str] = {}
+        other = False                            # 有非空单元格不是「字母 + 内容」→ 不是纯选项表
+        for r in rows:
+            for c in r:
+                m = GEO_CELL_OPT.match(c.strip())
+                if m:
+                    got.setdefault(m.group(1), m.group(2).strip())
+                elif c.strip():
+                    other = True
+        if other or sorted(got) != list("ABCD") or not all(got.values()):
+            continue
+        rest = "\n".join(lines[:s] + lines[e:])
+        stem = re.sub(r"\n{3,}", "\n\n", rest).strip()
+        return stem, [{"id": k, "label": got[k]} for k in "ABCD"]
+    return None
+
+
 def opt_split(seg: str) -> tuple[str, list[dict]]:
-    """把「题干 + A．… B．… C．… D．…」切成 (题干, 四个选项)。"""
+    """把「题干 + A．… B．… C．… D．…」切成 (题干, 四个选项)。
+
+    先走原来的字母切分；**只有当结果里带表格残渣时**才启用表格感知还原 —— 这样没中招的
+    1170+ 道题输出逐字不变（零回归），中招的（选项排成 GFM 表格）按单元格还原 A–D。
+    """
+    stem, opts = _opt_split_letters(seg)
+    if not _opt_table_dirty(opts):
+        return stem, opts
+    got = options_from_row_table(seg)
+    if got:
+        return got
+    return stem, opts
+
+
+def _opt_split_letters(seg: str) -> tuple[str, list[dict]]:
+    """原字母切分（保持原样，勿改）：扫 A．B．C．D．四个标记，字母之间就是选项文字。"""
     marks = [(m.start(1), m.group(1)) for m in
              re.finditer(r"(?:^|[\s\u3000])([A-D])\s*[．.、]\s*", seg)]
     # 兜底写法①：「A 设立保护区…」（字母后有空格但没有点）

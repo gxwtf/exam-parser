@@ -505,6 +505,216 @@ def regroup_choice_segments(segs: list[dict], declared: int | None,
     return out
 
 
+def _choice_seg(s: dict) -> str:
+    """一个选择题段的原文（砍掉段尾噪声、带上题号行里的材料引子）。"""
+    seg = cut_tail(s["text"]).strip()
+    if s["lead"]:
+        seg = s["lead"] + "\n" + seg
+    return seg
+
+
+# ── 表格感知的选项修复 ───────────────────────────────────────────────────────────
+# 判据复用题库现成的两份（gxexercise/src/lib/pdf/markdown.ts:254-256）：
+#   isTableRow   = /^\s*\|.*\|\s*$/        表格行
+#   isTableStart = 下一行 /^\s*\|[\s:|-]+\|\s*$/  分隔行
+# 「表头行 + 分隔行」才算表格；只有竖线的脏行不算，避免把 | 当表格吃掉。
+BIO_TBL_ROW = re.compile(r"^\s*\|.*\|\s*$")
+BIO_TBL_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
+# 单元格自带的选项前缀：`A. xxx` / `A．xxx` / `**A.** xxx`
+BIO_CELL_OPT = re.compile(r"^\**\s*([A-D])\s*\**\s*[．.、]\s*(.+)$", re.S)
+# 选项标记（行首版）：`A.` / `A．` / `**A．**`。选项各自成行时用它，避免把题干里的
+# 「诱导A、B两种细胞…」里的 A、 当成选项 A 的标记（2025 昌平期末第 8 题的塌陷就是这么来的）。
+BIO_OPT_LINE = re.compile(r"(?m)^[ \t]*\**\s*([A-D])\**\s*[．.、][ \t]*")
+# 题干里「这张表要被读」的引子（强）：如下表 / 下表 / 右表 / 如表 / 表中 / 表格 …
+BIO_TBL_CUE = re.compile(r"如下表|下表|右表|上表|左表|如表|表中|表格|表\s*[ⅠⅡ12一-五]|附表")
+# 弱引子（表就是配图数据）：如图 / 调查结果 / 结果如 …（只在没有强引子时才用）
+BIO_FIG_CUE = re.compile(r"如图|见图|下图|上图|右图|左图|调查结果|结果如")
+
+
+def _bio_table_blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """段内所有 GFM 表格块的 [start, end) 半开区间。"""
+    out: list[tuple[int, int]] = []
+    i = 0
+    while i < len(lines) - 1:
+        if BIO_TBL_ROW.match(lines[i]) and BIO_TBL_SEP.match(lines[i + 1]):
+            j = i + 2
+            while j < len(lines) and BIO_TBL_ROW.match(lines[j]):
+                j += 1
+            out.append((i, j))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def _bio_has_table_residue(opts: list[dict] | None) -> bool:
+    """选项里还带着表格残渣？（分隔行 / 行首竖线 / 行尾粘的单元格分隔符）
+
+    注意：`可引|起` 这种 OCR 误识（竖线在句子中间）不算 —— 那不是表格，别当残渣去洗。
+    """
+    for o in opts or []:
+        lab = o.get("label") or ""
+        if (BIO_TBL_SEP.search(lab) or re.search(r"(?m)^\s*\|", lab)
+                or re.search(r"[^|]\|\s*$", lab)):
+            return True
+    return False
+
+
+def _bio_scrub(text: str) -> str:
+    """洗掉 label / 题干里残留的表格痕迹：整行分隔行、被切断的半行竖线、行尾粘的分隔符。"""
+    out = []
+    for ln in (text or "").split("\n"):
+        s = ln.strip()
+        if s and set(s) <= set("|:- ") and "|" in s:
+            continue                                   # 纯分隔行
+        if s.startswith("|") and not s.endswith("|"):
+            s = s.lstrip("|").strip()                  # 被切断的半行
+        if s.endswith("|") and s.count("|") == 1:
+            s = s[:-1].strip()                         # 单元格分隔符粘在行尾
+        out.append(s)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def options_from_row_table(block: list[str]) -> list[dict] | None:
+    """表格本身就是选项（纯排版）→ 按单元格还原 A–D；否则 None。
+
+    认两种版式（其余一律返回 None，不硬猜）：
+      L1 一行四格  `| A．… | B．… | C．… | D．… |`
+      L2 两行两格  `| A．… | B．… |` + 分隔行 + `| C．… | D．… |`
+    要求：一~两行、每个非空单元格都是「字母 + 内容」、四个字母恰好凑齐 A B C D。
+    """
+    rows = [_cell_split(ln) for ln in block if not BIO_TBL_SEP.match(ln)]
+    rows = [[_clean_cell(c) for c in r] for r in rows]
+    rows = [r for r in rows if any(r)]
+    if not rows or len(rows) > 2:
+        return None
+    got: dict[str, str] = {}
+    other = False
+    for r in rows:
+        for c in r:
+            m = BIO_CELL_OPT.match(c.strip())
+            if m:
+                got.setdefault(m.group(1), m.group(2).strip())
+            elif c.strip():
+                other = True
+    if other or sorted(got) != list("ABCD") or not all(got.values()):
+        return None
+    return [{"id": k, "label": _bio_scrub(got[k])} for k in "ABCD"]
+
+
+def _split_options_by_line(body: str) -> tuple[list[dict] | None, str]:
+    """按「行首 A．/B．/C．/D．」切选项（选项各自成行时用）；切不出四个就返回 (None, body)。"""
+    found: dict[str, re.Match] = {}
+    for m in BIO_OPT_LINE.finditer(body):
+        found.setdefault(m.group(1), m)
+    if sorted(found) != list("ABCD"):
+        return None, body
+    order = [found[k] for k in "ABCD"]
+    if [m.start(1) for m in order] != sorted(m.start(1) for m in order):
+        return None, body                            # 字母顺序乱了 → 不硬猜
+    content = body[:order[0].start(1)].strip()
+    opts = []
+    for i, m in enumerate(order):
+        end = order[i + 1].start(1) if i + 1 < len(order) else len(body)
+        opts.append({"id": m.group(1), "label": _bio_scrub(body[m.end():end])})
+    return opts, content
+
+
+def _place_material_table(table: str, it: dict, items: list[dict], i: int,
+                          review: list[str]) -> None:
+    """把「选项里混进来的题干材料表」放回它该在的位置（就地改 content）。
+
+    ① 本题题干里有强引子（如下表/如表/右表…）→ 紧跟该行之后；
+    ② 本题题干有弱引子（如图/调查结果…，表就是配图数据）→ 题干末尾（选项之前）；
+    ③ 本题没有引子、下一题题干有强引子 → 搬进下一题题干（docx 表格浮动串题，
+       如 2023 西城二模第 8 题的选项里混着第 9 题的实验数据表）；
+    ④ 都不认 → 留在本题题干末尾并在 review 里点名，交人工核对（不硬猜）。
+    """
+    def after_cue(content: str, pat: re.Pattern) -> str | None:
+        lines = (content or "").split("\n")
+        for k, ln in enumerate(lines):
+            if pat.search(ln):
+                return "\n".join(lines[:k + 1] + ["", table] + lines[k + 1:]).strip()
+        return None
+
+    content = it.get("content") or ""
+    got = after_cue(content, BIO_TBL_CUE)
+    if got:
+        it["content"] = got
+        review.append(f"第{it['id']}题（选择题）：选项里的表格其实是题干材料（「如下表/如表」引子），"
+                      f"已整块搬回题干、紧跟引子行之后，选项恢复成纯文本")
+        return
+    if BIO_FIG_CUE.search(content):
+        it["content"] = content.rstrip() + "\n\n" + table
+        review.append(f"第{it['id']}题（选择题）：选项里的表格是该题的配图数据（引子「如图/调查结果」），"
+                      f"已整块搬到题干末尾（选项之前），选项恢复成纯文本")
+        return
+    if i + 1 < len(items):
+        nxt = items[i + 1]
+        got = after_cue(nxt.get("content") or "", BIO_TBL_CUE)
+        if got:
+            nxt["content"] = got
+            review.append(f"第{it['id']}题（选择题）：选项里混进了第{nxt['id']}题的题干材料表"
+                          f"（docx 表格浮动串题），已整块搬到第{nxt['id']}题题干、紧跟引子行之后")
+            return
+    it["content"] = content.rstrip() + "\n\n" + table
+    review.append(f"第{it['id']}题（选择题）：选项里的表格没找到「如下表/如表」引子，"
+                  f"已暂留本题题干末尾，**请人工核对它是否属于本题**")
+
+
+def repair_option_tables(items: list[dict], segs: list[str], review: list[str]) -> None:
+    """表格落进选项时的还原（只在「选项里已经有表格残渣」时才动手 → 没中招的题输出逐字不变）。
+
+    处理三种情况：
+      A. 表格本身就是选项（一行四格 / 两行两格，单元格自带 A．B．C．D．）→ 按单元格还原 A–D，
+         原表从题干摘掉；
+      B. 表格是题干材料 → 整块搬回 content（位置见 _place_material_table），选项按行首标记重切；
+      C. 识别不了 / 切不干净 → 保持原样（不硬猜）。
+    """
+    for i, it in enumerate(items):
+        if i >= len(segs) or not _bio_has_table_residue(it.get("options")):
+            continue
+        seg = segs[i]
+        lines = seg.split("\n")
+        blocks = _bio_table_blocks(lines)
+        if not blocks:
+            continue
+        opt_rows: list[dict] | None = None
+        material: list[str] = []
+        keep: list[str] = []
+        pos = 0
+        for s, e in blocks:
+            block = lines[s:e]
+            got = options_from_row_table(block)
+            if got and opt_rows is None:
+                opt_rows = got
+            else:
+                material.append("\n".join(block))
+            keep.extend(lines[pos:s])
+            pos = e
+        keep.extend(lines[pos:])
+        body = "\n".join(keep)
+        if opt_rows:
+            opts = opt_rows
+            content = strip_table_remnant(_bio_scrub(body))
+        else:
+            opts, content = _split_options_by_line(body)
+            if not opts:
+                continue                              # 切不出来 → 保持原样
+            content = _bio_scrub(content)
+        if (len(opts) != 4 or _bio_has_table_residue(opts)
+                or any(not (o.get("label") or "").strip() for o in opts)):
+            continue                                  # 校验不通过 → 保持原样
+        it["options"], it["content"] = opts, content
+        if material:
+            for table in material:
+                _place_material_table(table, it, items, i, review)
+        else:
+            review.append(f"第{it['id']}题（选择题）：选项原是 GFM 表格（一行四格/两行两格），"
+                          f"已按单元格还原成 A–D，原表从题干摘掉")
+        log(f"    第{it['id']}题选项带表格残渣 → 已按表格感知还原")
+
+
 def parse_choice_questions(body: str, table_opt: list[int] | None = None,
                            choice_notes: list[str] | None = None,
                            declared: int | None = None) -> list[dict]:
@@ -515,9 +725,7 @@ def parse_choice_questions(body: str, table_opt: list[int] | None = None,
     choice_notes = choice_notes if choice_notes is not None else []
     out = []
     for s in segs:
-        seg = cut_tail(s["text"]).strip()
-        if s["lead"]:
-            seg = s["lead"] + "\n" + seg
+        seg = _choice_seg(s)
         found = {}
         for m in OPT_MARK.finditer(seg):
             k = m.group(1)
@@ -566,6 +774,8 @@ def parse_choice_questions(body: str, table_opt: list[int] | None = None,
         out.append({"id": s["no"], "questionType": "single", "content": content,
                     "options": opts, "answer": "", "analysis": "", "score": CHOICE_SCORE,
                     "_printed": s["no"], "_qscore": s["score"]})
+    # 表格落进选项时的事后修复（只在「选项里已经有表格残渣」时才动手，见函数注释）
+    repair_option_tables(out, [_choice_seg(s) for s in segs], choice_notes)
     # 选择题题号一律按出现顺序重编 1..N：Word 自动编号常把个别题号写错（重复/跳号），
     # 而答案表（1–15）是按位置给的，按位置编才对应得上。
     nos = [q["id"] for q in out]

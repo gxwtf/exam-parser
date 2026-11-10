@@ -765,6 +765,169 @@ def parse_choice_answer_tables(ans: str) -> dict[int, str]:
     return out
 
 
+# ──────────────────────────────────────────────────────────────────
+# 表格感知的选项切分（方案 A）
+#   判据与前端一致：**表头行 + 分隔行**才算一张 GFM 表格
+#   （~/gxexercise/src/lib/pdf/markdown.ts:254-256）；只有竖线的脏行一律不算表格，
+#   题干正文里的 `|` 不会被误吃。认不出完整 A–D 就回落到原逻辑（宁可不修，不许误伤）。
+# ──────────────────────────────────────────────────────────────────
+PT_TBL_ROW = re.compile(r"^\s*\|.*\|\s*$")
+PT_TBL_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
+# 一个单元格里可能塞好几个选项（`| A.①② B.①④ C.②③ D.③④ |`，2024 通州期末 4 题）
+PT_CELL_OPT = re.compile(r"(?:^|(?<=[\s\u3000|]))([A-D])\s*[．.、]\s*")
+# 选项对照残渣整行（`A．A B．B C．C D．D`，2025 顺义一模/期末 7 题）
+PT_OPT_ECHO = re.compile(r"^(?:[A-D]\s*[．.、]\s*[A-D]\s*)+$")
+# 同一残渣粘在 label 末尾（`… D. ④ A. A B. B C. C D. D`）：字母列导出后被并进最后一项
+PT_OPT_ECHO_TAIL = re.compile(r"(?:^|\s)(?:[A-D]\s*[．.、]\s*[A-D]\s*)+$")
+
+
+def _pt_cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _pt_blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """段内所有 GFM 表格块 → [(start, end)) 半开区间（表头行 + 分隔行 + 数据行）。"""
+    out, i, n = [], 0, len(lines)
+    while i < n - 1:
+        if PT_TBL_ROW.match(lines[i]) and PT_TBL_SEP.match(lines[i + 1]):
+            j = i + 2
+            while j < n and PT_TBL_ROW.match(lines[j]):
+                j += 1
+            out.append((i, j))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def _pt_opts_from_block(block: list[str]):
+    """表格本身就是 A–D 选项 → (options, 用掉的行号集合)；认不出来就 (None, set())。
+
+    覆盖三种版式：
+      L3 首列字母   `| A | 观点 | 评析 |` 每行一选项（2024 昌平期末 3 题、2024/2025 顺义 7 题、
+                    2026 顺义一模 5 题的 `| A. | … | … |`）——label 取全部单元格用「；」连接；
+      L1 一格多选项 `| A.①② B.①④ C.②③ D.③④ |  |  |  |`（2024 通州期末 4 题）。
+    只认「末尾四行」的首列字母，是为了让表头行留给 _pt_drop_empty_blocks 收尾，不漏进题干。
+    """
+    rows: list[tuple[int, list[str]]] = []
+    for k, ln in enumerate(block):
+        if PT_TBL_SEP.match(ln):
+            continue
+        rows.append((k, _pt_cells(ln)))
+    if not rows:
+        return None, set()
+    tail4 = rows[-4:]
+    bare = [re.sub(r"[\s．.、]", "", cells[0]) if cells else "" for _, cells in tail4]
+    if len(tail4) == 4 and bare == list("ABCD"):
+        opts = [{"id": L, "label": "；".join(c for c in cells[1:] if c)}
+                for L, (_, cells) in zip("ABCD", tail4)]
+        if all(o["label"] for o in opts):
+            return opts, {k for k, _ in tail4}
+    lead = [cells[0] if cells else "" for _, cells in tail4]
+    if len(tail4) == 4 and all(re.match(rf"^{L}(?![A-Za-z])", t) for L, t in zip("ABCD", lead)):
+        opts = []
+        for L, (_, cells) in zip("ABCD", tail4):
+            body = re.sub(r"^[A-D]\s*[．.、]?\s*", "", cells[0]).strip()
+            parts = ([body] if body else []) + [c for c in cells[1:] if c]
+            if not parts:
+                return None, set()
+            opts.append({"id": L, "label": "；".join(parts)})
+        return opts, {k for k, _ in tail4}
+    got: dict[str, str] = {}
+    used: set[int] = set()
+    for k, cells in rows:
+        joined = "|".join(cells)
+        marks = list(PT_CELL_OPT.finditer(joined))
+        for n, m in enumerate(marks):
+            end = marks[n + 1].start() if n + 1 < len(marks) else len(joined)
+            L = m.group(1)
+            txt = re.sub(r"\s+", " ", joined[m.end():end]).strip(" |")
+            if L in got or not txt:
+                continue
+            got[L] = txt
+            used.add(k)
+    if sorted(got) == list("ABCD"):
+        return [{"id": L, "label": got[L]} for L in "ABCD"], used
+    return None, set()
+
+
+def _pt_drop_empty_blocks(lines: list[str]) -> list[str]:
+    """摘掉选项行后只剩「表头 + 分隔行」的空壳表格。"""
+    out = list(lines)
+    while True:
+        for s, e in _pt_blocks(out):
+            if not [ln for ln in out[s + 1:e] if not PT_TBL_SEP.match(ln)]:
+                del out[s:e]
+                break
+        else:
+            return out
+
+
+def _pt_scrub_orphan_sep(lines: list[str]) -> list[str]:
+    """分隔行只有紧跟在表格行后面才是真表格的一部分，否则是残渣。"""
+    out: list[str] = []
+    for ln in lines:
+        if PT_TBL_SEP.match(ln):
+            prev = out[-1] if out else ""
+            if not (PT_TBL_ROW.match(prev) and not PT_TBL_SEP.match(prev)):
+                continue
+        out.append(ln)
+    return out
+
+
+def _pt_trailing_table(text: str):
+    """text 末尾若整块拖着一张 GFM 表格 → (表格文本, 去掉表格的剩余文本)。"""
+    lines = (text or "").rstrip().split("\n")
+    for s, e in reversed(_pt_blocks(lines)):
+        if e == len(lines):
+            return "\n".join(lines[s:e]).strip("\n"), "\n".join(lines[:s]).strip()
+    return None
+
+
+def _pt_scrub_label(t: str) -> str:
+    """选项 label 出门前的表格痕迹清扫：整条分隔行、行首行尾多余的竖线、单元格分隔符残留、
+    以及原卷选项表「字母列」导出的对照尾巴（`… D. ④ A. A B. B C. C D. D`）。"""
+    if "|" not in (t or ""):
+        out = re.sub(r"\s+", " ", t or "").strip()
+        return PT_OPT_ECHO_TAIL.sub("", out).strip()
+    parts = []
+    for ln in t.split("\n"):
+        s = ln.strip()
+        if not s or PT_TBL_SEP.match(s):
+            continue
+        s = s.strip("|").strip()
+        if s:
+            parts.append(s)
+    out = re.sub(r"\s*\|\s*", " ", " ".join(parts))
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    return PT_OPT_ECHO_TAIL.sub("", out).strip()
+
+
+def options_from_choice_table(seg: str, review: list[str], no: int):
+    """表格感知的选项切分 → (options, content)；段内没有「选项表」时返回 ([], None)。
+
+    只在能完整还原出 A–D 时才接管，题干只摘掉被选项用掉的那几行（表头/分隔行按需收尾），
+    表格之外的文字一个都不少（2026 顺义一模 5 题：选项表后面还粘着下一题的共享材料）。
+    """
+    lines = seg.split("\n")
+    drop: set[int] = set()
+    opts = None
+    for s, e in _pt_blocks(lines):
+        got, used = _pt_opts_from_block(lines[s:e])
+        if not got or opts is not None:
+            continue
+        opts, drop = got, {s + k for k in used}
+    if opts is None:
+        return [], None
+    keep = [ln for i, ln in enumerate(lines) if i not in drop]
+    keep = _pt_scrub_orphan_sep(_pt_drop_empty_blocks(keep))
+    content = "\n".join(ln for ln in keep if not PT_OPT_ECHO.match(ln.strip()))
+    content = re.sub(r"\n{3,}", "\n\n", content).strip()
+    review.append(f"第{no}题（选择题）：A–D 选项在原卷里排成表格，已按单元格还原成 options"
+                  f"（多列用「；」连接），表格已从题干摘掉，需人工核对")
+    return [{"id": o["id"], "label": _pt_scrub_label(o["label"])} for o in opts], content
+
+
 def options_from_table(seg: str) -> tuple[list[dict], str, str]:
     """选项被排成表格的选择题：首列是 A/B/C/D 时，表格留在题干，options 只给字母。"""
     lines = seg.split("\n")
@@ -894,6 +1057,27 @@ def norm_option_labels(text: str) -> str:
                   "A. ", text)
 
 
+def _line_is_tbl_row(text: str, pos: int) -> bool:
+    """pos 所在的那一整行是不是一行 GFM 表格行（`| A.①② B.①④ | … |`）。"""
+    ls = text.rfind("\n", 0, pos) + 1
+    le = text.find("\n", pos)
+    le = le if le > 0 else len(text)
+    return bool(PT_TBL_ROW.match(text[ls:le]))
+
+
+def _row_has_options(text: str) -> bool:
+    """段内有没有「整行是表格 + 这一行塞了多个选项」（选项被排成表格的判据）。
+
+    只在命中时才对锚点结果做表格感知重切，保证残渣题以外一题不改。
+    """
+    for ln in (text or "").split("\n"):
+        if not PT_TBL_ROW.match(ln):
+            continue
+        if len({m.group(1) for m in PT_CELL_OPT.finditer(ln)}) >= 2:
+            return True
+    return False
+
+
 def _table_block_end(text: str, pos: int) -> int:
     """pos 所在的 markdown 表格块结束位置（用于「选项排成表」的题：题干要整表保留）。"""
     start = text.rfind("\n\n", 0, pos)
@@ -959,9 +1143,20 @@ def split_choice_by_options(choice_body: str, choice_n: int, review: list[str]) 
     prev_end = 0
     for a_pos, d_end, opts in runs:
         end = d_end
-        table_mode = "|" in choice_body[a_pos:d_end + 1]
+        # 选项本身排成一行表格（`| A.①② B.①④ C.②③ D.③④ |  |  |`）：A–D 锚点在表格行内部，
+        # 中间没有 `|`，所以单独判一次「这一整行是不是表格行」——否则分隔行会漏到下一题、
+        # 表格不完整导致表格感知切分认不出来（2024 通州期末 4 题）。
+        row_only = (_line_is_tbl_row(choice_body, a_pos)
+                    and "|" not in choice_body[a_pos:d_end + 1])
+        table_mode = "|" in choice_body[a_pos:d_end + 1] or row_only
+        nxt_end = None
         if table_mode:                       # 选项就是一张表（首列 A–D）：整表留在题干
             end = _table_block_end(choice_body, a_pos)
+            if row_only:
+                # 只为让**本题** seg 含完整表格（表行 + 分隔行）；分段边界仍停在 D 所在行行尾，
+                # 保证下一题 raw 与改前逐字节一致（零回归）。
+                nl = choice_body.find("\n", d_end)
+                nxt_end = nl if nl > 0 else len(choice_body)
         if not table_mode:
             # D 选项的文字通常就在同一行：截到行尾，免得「D.③④」的「③④」落到下一题题干开头
             nl = choice_body.find("\n", d_end)
@@ -975,7 +1170,7 @@ def split_choice_by_options(choice_body: str, choice_n: int, review: list[str]) 
                          r"\1", seg, count=1)
             opts = [{"id": L, "label": L} for L in "ABCD"]
         items.append({"raw": seg.strip(), "options": opts})
-        prev_end = end
+        prev_end = end if nxt_end is None else nxt_end
     review.append(f"选择题题号被 Word 自动编号写乱 → 以 {len(runs)} 组「A–D 选项」为锚点重切并顺序编号")
     return items
 
@@ -1030,7 +1225,27 @@ def options_from_listnum(seg: str, review: list[str], no: int) -> dict[str, str]
 
 
 def parse_choice_segment(seg: str, no: int, review: list[str]) -> dict:
-    """一道选择题 → {content, options}。选项可能一行一个、一行两个，也可能整块是表。"""
+    """一道选择题 → {content, options}（表格感知 + 原逻辑两段式）。
+
+    **残渣判据**：原卷把 A–D 排成「首列字母的多列行」或「一格塞多个选项」时，老逻辑（OPT_MARK
+    的 `(?=\\|)` 分支）会把表格的 `|` 与分隔行一起切进 option.label。所以先跑老逻辑，
+    **只有老结果的 label 里确实带 `|`** 时才用 `options_from_choice_table()` 重算一次；
+    老结果干净就一字节不动 —— 保证「残渣题以外零回归」（宁可不修，不许误伤）。
+    """
+    rv: list[str] = []
+    got = _parse_choice_segment_legacy(seg.strip(), no, rv)
+    if not any("|" in (o.get("label") or "") for o in (got.get("options") or [])):
+        review.extend(rv)
+        return got
+    topts, tcontent = options_from_choice_table(seg.strip(), review, no)
+    if topts:
+        return {"content": tcontent, "options": topts}
+    review.extend(rv)
+    return got
+
+
+def _parse_choice_segment_legacy(seg: str, no: int, review: list[str]) -> dict:
+    """原来的切分逻辑（除「选项后拖一张题干材料表」的搬移外一字未改，作为基准逻辑保留）。"""
     seg = seg.strip()
     opts, content, mode = options_from_table(seg)
     if mode == "first_col":
@@ -1048,6 +1263,15 @@ def parse_choice_segment(seg: str, no: int, review: list[str]) -> dict:
             start = found[k].end()
             end = found[order[i + 1]].start(1) if i + 1 < len(order) else len(seg)
             opts.append({"id": k, "label": seg[start:end].strip()})
+        # 选项后面还整块拖着一张题干材料表（2024 延庆一模 7 题「提问 | 回答」）→ 搬回题干末尾，
+        # 别让它粘进最后一个选项的 label。
+        tail = _pt_trailing_table(opts[-1]["label"]) if opts else None
+        if tail:
+            tbl, rest = tail
+            opts[-1]["label"] = rest
+            content = content.rstrip() + "\n\n" + tbl
+            review.append(f"第{no}题（选择题）：选项后面跟着一张题干材料表，已从 options 搬回 content，"
+                          f"需人工核对")
     else:
         gopts, gstem = options_from_grid(seg, review, no)
         if gopts:
@@ -1071,7 +1295,7 @@ def parse_choice_segment(seg: str, no: int, review: list[str]) -> dict:
         log(f"    ⚠ 第{no}题选项没切全（标记 {sorted(found)}）")
         review.append(f"第{no}题（选择题）：选项没切全（只找到 {''.join(sorted(found)) or '无'}），需人工核对")
     for o in opts:
-        o["label"] = re.sub(r"\s+", " ", o["label"]).strip()
+        o["label"] = _pt_scrub_label(o["label"])
     if any(not o["label"] for o in opts):
         for alt_fn in ("_grid", "_ltable", "_listnum"):
             got = None
@@ -1249,6 +1473,18 @@ def parse_choice_part(choice_body: str, review: list[str],
         shared.clear()
         items = build([{"no": i + 1, "raw": a["raw"]} for i, a in enumerate(alt)], False)
         preset = {i + 1: a["options"] for i, a in enumerate(alt)}
+        # 以「A–D 选项块」为锚点重切时，「选项排成表格」的题会把 `|` 与分隔行切进 label
+        # （2024 通州期末 4 题 `| A.①② B.①④ C.②③ D.③④ |`）。这里只对**锚点结果带 `|`**、
+        # 或**段内确有「整行是表格且塞了多个选项」**的题再试一次表格感知切分：表格能完整还原
+        # A–D 就以表格为准，还原不出就原样不动 —— 保证除残渣题外一题不改（宁可不修，不许误伤）。
+        for it in items:
+            dirty = [o for o in (preset.get(it["no"]) or []) if "|" in (o.get("label") or "")]
+            if not dirty and not _row_has_options(it["raw"]):
+                continue
+            tops, tcont = options_from_choice_table(it["raw"], review, it["no"])
+            if tops:
+                preset[it["no"]] = tops
+                it["raw"] = tcont
     else:
         items = build(segs, True)
         # ② 选项被写成「1./2./3./D.」时，小段落会被当成新题号 → 并回上一题
